@@ -49,7 +49,7 @@ def test_gymnax_api():
 
 def test_sizes():
     # can specify sizes with integers
-    env = ForagerObject(size=8, aperture_size=3, object_types=tuple())
+    env = ForagerObject(size=8, aperture_size=3)
     params = env.default_params
     key = jax.random.PRNGKey(0)
     obs, state = env.reset(key, params)
@@ -61,7 +61,7 @@ def test_sizes():
 
 def test_uneven_sizes():
     # can specify sizes as uneven tuples
-    env = ForagerObject(size=(10, 5), aperture_size=(5, 1), object_types=tuple())
+    env = ForagerObject(size=(10, 5), aperture_size=(5, 1))
     params = env.default_params
     key = jax.random.PRNGKey(0)
     obs, state = env.reset(key, params)
@@ -74,7 +74,20 @@ def test_uneven_sizes():
 def test_add_objects():
     # can add objects
     env = ForagerObject(
-        size=10, object_types=(FLOWER,), biomes=(Biome(object_frequencies=(0.1,)),)
+        size=10,
+        object_types=(
+            EMPTY,
+            FLOWER,
+        ),
+        biomes=(
+            Biome((0, 0)),
+            Biome(
+                object_frequencies=(
+                    0,
+                    0.1,
+                )
+            ),
+        ),
     )
     params = env.default_params
     key = jax.random.PRNGKey(0)
@@ -86,7 +99,7 @@ def test_add_objects():
 
 def test_world_observation_mode():
     # can use world observation mode
-    env = ForagerWorld(size=(10, 10), object_types=tuple())
+    env = ForagerWorld(size=(10, 10))
     params = env.default_params
     key = jax.random.PRNGKey(0)
     obs, state = env.reset(key, params)

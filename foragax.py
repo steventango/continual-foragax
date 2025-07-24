@@ -91,8 +91,8 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
         self,
         size: Tuple[int, int] | int = (10, 10),
         aperture_size: Tuple[int, int] | int = (5, 5),
-        object_types: Tuple[ObjectType, ...] = tuple(),
-        biomes: Tuple[Biome, ...] = tuple(),
+        object_types: Tuple[ObjectType, ...] = (EMPTY,),
+        biomes: Tuple[Biome, ...] = (Biome(object_frequencies=(1.0,)),),
     ):
         super().__init__()
         if isinstance(size, int):
@@ -363,6 +363,8 @@ class ForagerObject(ForagerEnv):
         )
 
         obs = jax.nn.one_hot(aperture, num_obj_types)
+
+        obs = obs[:, :, 1:]
 
         return obs
 
