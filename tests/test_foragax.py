@@ -73,7 +73,9 @@ def test_uneven_sizes():
 
 def test_add_objects():
     # can add objects
-    env = ForagerObject(size=10, object_types=(FLOWER,), biomes=(Biome(object_frequencies=(0.1,)),))
+    env = ForagerObject(
+        size=10, object_types=(FLOWER,), biomes=(Biome(object_frequencies=(0.1,)),)
+    )
     params = env.default_params
     key = jax.random.PRNGKey(0)
     obs, state = env.reset(key, params)
@@ -96,8 +98,22 @@ def test_basic_movement():
     """Test agent movement and collision with walls."""
     key = jax.random.PRNGKey(0)
 
-    biome = Biome(object_frequencies=(0, 1.0,), start=(3, 4), stop=(4, 6))
-    env = ForagerObject(size=7, object_types=(EMPTY, WALL,), biomes=(biome,))
+    biome = Biome(
+        object_frequencies=(
+            0,
+            1.0,
+        ),
+        start=(3, 4),
+        stop=(4, 6),
+    )
+    env = ForagerObject(
+        size=7,
+        object_types=(
+            EMPTY,
+            WALL,
+        ),
+        biomes=(biome,),
+    )
     params = env.default_params
     _, state = env.reset(key, params)
 
