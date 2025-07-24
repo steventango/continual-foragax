@@ -183,28 +183,87 @@ def test_respawn():
     assert state.object_grid[3, 4] == flower_with_regen.id
 
 
-def test_clipping_dynamics():
-    """Test that the agent is clipped to the environment boundaries."""
-    env = Forager(size=(5, 5))
+def test_wrapping_dynamics():
+    """Test that the agent wraps around the environment boundaries."""
     key = jax.random.PRNGKey(0)
+    env = ForagerObject(size=(5, 5), object_types=(EMPTY,))
     params = env.default_params
-    _, state = env.reset_env(key, params)
+    _, state = env.reset(key, params)
 
-    # Move to top edge
-    state = state.replace(pos=jnp.array([0, 2]))
-
-    # Try to move North (action 0)
+    # Go up
+    assert jnp.array_equal(state.pos, jnp.array([2, 2]))
     key, step_key = jax.random.split(state.key)
-    _, new_state, _, _, _ = env.step_env(step_key, state, 0, params)
-    assert jnp.array_equal(new_state.pos, jnp.array([0, 2]))
-
-    # Move to right edge
-    state = state.replace(pos=jnp.array([2, 4]))
-
-    # Try to move East (action 3)
+    _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
+    assert jnp.array_equal(state.pos, jnp.array([2, 3]))
     key, step_key = jax.random.split(state.key)
-    _, new_state, _, _, _ = env.step_env(step_key, state, 3, params)
-    assert jnp.array_equal(new_state.pos, jnp.array([2, 4]))
+    _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
+    assert jnp.array_equal(state.pos, jnp.array([2, 4]))
+    key, step_key = jax.random.split(state.key)
+    _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
+    assert jnp.array_equal(state.pos, jnp.array([2, 0]))
+    key, step_key = jax.random.split(state.key)
+    _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
+    assert jnp.array_equal(state.pos, jnp.array([2, 1]))
+    key, step_key = jax.random.split(state.key)
+    _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
+    assert jnp.array_equal(state.pos, jnp.array([2, 2]))
+
+    # Go down
+    _, state = env.reset(key, params)
+    assert jnp.array_equal(state.pos, jnp.array([2, 2]))
+    key, step_key = jax.random.split(state.key)
+    _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+    assert jnp.array_equal(state.pos, jnp.array([2, 1]))
+    key, step_key = jax.random.split(state.key)
+    _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+    assert jnp.array_equal(state.pos, jnp.array([2, 0]))
+    key, step_key = jax.random.split(state.key)
+    _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+    assert jnp.array_equal(state.pos, jnp.array([2, 4]))
+    key, step_key = jax.random.split(state.key)
+    _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+    assert jnp.array_equal(state.pos, jnp.array([2, 3]))
+    key, step_key = jax.random.split(state.key)
+    _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+    assert jnp.array_equal(state.pos, jnp.array([2, 2]))
+
+    # Go right
+    _, state = env.reset(key, params)
+    assert jnp.array_equal(state.pos, jnp.array([2, 2]))
+    key, step_key = jax.random.split(state.key)
+    _, state, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
+    assert jnp.array_equal(state.pos, jnp.array([3, 2]))
+    key, step_key = jax.random.split(state.key)
+    _, state, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
+    assert jnp.array_equal(state.pos, jnp.array([4, 2]))
+    key, step_key = jax.random.split(state.key)
+    _, state, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
+    assert jnp.array_equal(state.pos, jnp.array([0, 2]))
+    key, step_key = jax.random.split(state.key)
+    _, state, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
+    assert jnp.array_equal(state.pos, jnp.array([1, 2]))
+    key, step_key = jax.random.split(state.key)
+    _, state, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
+    assert jnp.array_equal(state.pos, jnp.array([2, 2]))
+
+    # Go left
+    _, state = env.reset(key, params)
+    assert jnp.array_equal(state.pos, jnp.array([2, 2]))
+    key, step_key = jax.random.split(state.key)
+    _, state, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
+    assert jnp.array_equal(state.pos, jnp.array([1, 2]))
+    key, step_key = jax.random.split(state.key)
+    _, state, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
+    assert jnp.array_equal(state.pos, jnp.array([0, 2]))
+    key, step_key = jax.random.split(state.key)
+    _, state, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
+    assert jnp.array_equal(state.pos, jnp.array([4, 2]))
+    key, step_key = jax.random.split(state.key)
+    _, state, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
+    assert jnp.array_equal(state.pos, jnp.array([3, 2]))
+    key, step_key = jax.random.split(state.key)
+    _, state, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
+    assert jnp.array_equal(state.pos, jnp.array([2, 2]))
 
 
 def test_generate_objects_in_biome():

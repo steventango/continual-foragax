@@ -139,8 +139,8 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
         direction = DIRECTIONS[action]
         new_pos = state.pos + direction
 
-        # Check boundaries
-        new_pos = jnp.clip(new_pos, 0, jnp.array(self.size) - 1)
+        # Wrap around boundaries
+        new_pos = jnp.mod(new_pos, jnp.array(self.size))
 
         # Check for blocking objects
         obj_at_new_pos = state.object_grid[new_pos[0], new_pos[1]]
