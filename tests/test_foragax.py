@@ -75,8 +75,10 @@ def test_uneven_sizes():
 
 def test_add_objects():
     # can add objects
+    size = 100
+    freq = 0.1
     env = ForagerObject(
-        size=10,
+        size=size,
         object_types=(
             EMPTY,
             FLOWER,
@@ -85,16 +87,17 @@ def test_add_objects():
             Biome(
                 object_frequencies=(
                     0,
-                    0.1,
+                    freq,
                 )
             ),
         ),
     )
     params = env.default_params
     key = jax.random.PRNGKey(0)
-    obs, state = env.reset_env(key, params)
+    obs, state = env.reset(key, params)
 
-    assert jnp.count_nonzero(state.object_grid) == int(100 * 0.1)
+    empirical_freq = jnp.count_nonzero(state.object_grid) / size ** 2
+    chex.assert_trees_all_close(empirical_freq, freq, rtol=0.1)
     chex.assert_shape(obs, (5, 5, 1))
 
 
@@ -171,7 +174,7 @@ def test_vision():
 
     # No movement
     key, step_key = jax.random.split(state.key)
-    obs, state, _, _, _ = env.step_env(step_key, state, Actions.UP, params)
+    obs, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
 
     expected = jnp.zeros((3, 3, 1), dtype=jnp.int32)
     expected = expected.at[0, 1, 0].set(1)
@@ -197,7 +200,7 @@ def test_respawn():
     key = jax.random.PRNGKey(0)
     # predictable respawn
     flower_with_regen = FLOWER.replace(regen_delay=(5, 6))
-    env = Forager(
+    env = ForagerObject(
         size=(7, 7),
         object_types=(EMPTY, WALL, flower_with_regen),
     )
@@ -213,7 +216,7 @@ def test_respawn():
 
     # Collect the flower (action is irrelevant, agent is on the flower)
     key, step_key = jax.random.split(state.key)
-    _, state, reward, _, _ = env.step_env(step_key, state, 0, params)
+    _, state, reward, _, _ = env.step(step_key, state, 0, params)
     assert reward == flower_with_regen.reward
     assert state.object_grid[3, 4] == EMPTY.id
     assert state.respawn_timers[3, 4] > 0
@@ -221,11 +224,11 @@ def test_respawn():
     # Step until it respawns
     for _ in range(4):
         key, step_key = jax.random.split(state.key)
-        _, state, _, _, _ = env.step_env(step_key, state, 0, params)
+        _, state, _, _, _ = env.step(step_key, state, 0, params)
         assert state.object_grid[3, 4] == EMPTY.id
 
     key, step_key = jax.random.split(state.key)
-    _, state, _, _, _ = env.step_env(step_key, state, 0, params)
+    _, state, _, _, _ = env.step(step_key, state, 0, params)
     assert state.object_grid[3, 4] == flower_with_regen.id
 
 
@@ -363,7 +366,7 @@ def test_generate_objects_in_biome():
         object_types=(EMPTY, WALL, FLOWER, THORNS, MOREL, OYSTER),
         biomes=(
             Biome(
-                object_frequencies=(0.9, 0.0, 0.0, 0.0, 0.1, 0.0),
+                object_frequencies=(0.0, 0.0, 0.0, 0.0, 0.1, 0.0),
                 start=(2, 2),
                 stop=(6, 6),
             ),
