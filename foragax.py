@@ -143,12 +143,12 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
         new_pos = jnp.mod(new_pos, jnp.array(self.size))
 
         # Check for blocking objects
-        obj_at_new_pos = state.object_grid[new_pos[0], new_pos[1]]
+        obj_at_new_pos = state.object_grid[new_pos[1], new_pos[0]]
         is_blocking = self.object_blocking[obj_at_new_pos]
         pos = jax.lax.select(is_blocking, state.pos, new_pos)
 
         # 2. HANDLE COLLISIONS AND REWARDS
-        obj_at_pos = state.object_grid[pos[0], pos[1]]
+        obj_at_pos = state.object_grid[pos[1], pos[0]]
         reward = self.object_rewards[obj_at_pos]
         is_collectable = self.object_collectable[obj_at_pos]
 
@@ -168,7 +168,7 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
         # Collect object
         new_object_grid = jax.lax.select(
             is_collectable,
-            object_grid.at[pos[0], pos[1]].set(0),
+            object_grid.at[pos[1], pos[0]].set(0),
             object_grid,
         )
 
@@ -184,7 +184,7 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
 
         new_respawn_timers = jax.lax.select(
             is_collectable,
-            respawn_timers.at[pos[0], pos[1]].set(regen_delay),
+            respawn_timers.at[pos[1], pos[0]].set(regen_delay),
             respawn_timers,
         )
 
@@ -213,15 +213,15 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
         """Reset environment state."""
         key, subkey = jax.random.split(key)
 
-        object_grid = jnp.zeros(self.size, dtype=jnp.int32)
+        object_grid = jnp.zeros((self.size[1], self.size[0]), dtype=jnp.int32)
 
         for i in range(self.biome_object_frequencies.shape[0]):
             key, biome_key = jax.random.split(key)
             # Generate random layout
-            grid_rand = jax.random.uniform(biome_key, self.size)
+            grid_rand = jax.random.uniform(biome_key, (self.size[1], self.size[0]))
 
             # Generate objects for this biome
-            biome_grid = jnp.zeros(self.size, dtype=jnp.int32)
+            biome_grid = jnp.zeros((self.size[1], self.size[0]), dtype=jnp.int32)
 
             cumulative_freq = 0.0
             for j, freq in enumerate(self.biome_object_frequencies[i]):
@@ -246,14 +246,14 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
                 self.biome_stops[i],
             )
 
-            rows = jnp.arange(self.size[0])[:, None]
-            cols = jnp.arange(self.size[1])
+            rows = jnp.arange(self.size[1])[:, None]
+            cols = jnp.arange(self.size[0])
 
             mask = (
-                (rows >= start[0])
-                & (rows < stop[0])
-                & (cols >= start[1])
-                & (cols < stop[1])
+                (rows >= start[1])
+                & (rows < stop[1])
+                & (cols >= start[0])
+                & (cols < stop[0])
             )
 
             # Update the main grid with the biome's objects
@@ -261,13 +261,13 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
 
         # Place agent in the center of the world and ensure the cell is empty.
         agent_pos = jnp.array([self.size[0] // 2, self.size[1] // 2])
-        object_grid = object_grid.at[agent_pos[0], agent_pos[1]].set(0)
+        object_grid = object_grid.at[agent_pos[1], agent_pos[0]].set(0)
 
         state = EnvState(
             pos=agent_pos,
             object_grid=object_grid,
             original_object_grid=object_grid,
-            respawn_timers=jnp.full(self.size, -1, dtype=jnp.int32),
+            respawn_timers=jnp.full((self.size[1], self.size[0]), -1, dtype=jnp.int32),
             time=0,
             key=key,
         )
@@ -306,16 +306,18 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
                 "object_grid": spaces.Box(
                     0,
                     len(self.object_ids),
-                    self.size,
+                    (self.size[1], self.size[0]),
                     jnp.int32,
                 ),
                 "original_object_grid": spaces.Box(
                     0,
                     len(self.object_ids),
-                    self.size,
+                    (self.size[1], self.size[0]),
                     jnp.int32,
                 ),
-                "respawn_timers": spaces.Box(-1, 1000, self.size, jnp.int32),
+                "respawn_timers": spaces.Box(
+                    -1, 1000, (self.size[1], self.size[0]), jnp.int32
+                ),
                 "time": spaces.Discrete(params.max_steps_in_episode),
                 "key": spaces.PRNGKey(),
             }
@@ -326,14 +328,14 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
         fig, ax = plt.subplots()
 
         # Create an RGB image from the object grid
-        img = jnp.zeros((self.size[0], self.size[1], 3))
+        img = jnp.zeros((self.size[1], self.size[0], 3))
         for i, obj_id in enumerate(self.object_ids):
             color = self.object_colors[i]
             img = img.at[state.object_grid == obj_id].set(jnp.array(color))
 
         # Agent color
         agent_color = self.object_colors[-1]
-        img = img.at[state.pos[0], state.pos[1]].set(jnp.array(agent_color))
+        img = img.at[state.pos[1], state.pos[0]].set(jnp.array(agent_color))
 
         ax.imshow(img)
         ax.set_xticks([])
@@ -363,7 +365,6 @@ class ForagerObject(ForagerEnv):
             self.aperture_size,
         )
 
-        # flip rows to match the agent's perspective
         aperture = jnp.flip(aperture, axis=0)
 
         obs = jax.nn.one_hot(aperture, num_obj_types)
@@ -390,8 +391,8 @@ class ForagerRGB(ForagerEnv):
         padded_grid = jnp.pad(
             state.object_grid,
             (
-                (self.aperture_size[0] // 2, self.aperture_size[0] // 2),
                 (self.aperture_size[1] // 2, self.aperture_size[1] // 2),
+                (self.aperture_size[0] // 2, self.aperture_size[0] // 2),
             ),
             "constant",
             constant_values=0,
@@ -399,8 +400,8 @@ class ForagerRGB(ForagerEnv):
 
         aperture = jax.lax.dynamic_slice(
             padded_grid,
-            (state.pos[0], state.pos[1]),
-            self.aperture_size,
+            (state.pos[1], state.pos[0]),
+            (self.aperture_size[1], self.aperture_size[0]),
         )
 
         aperture_one_hot = jax.nn.one_hot(aperture, num_obj_types)
@@ -424,10 +425,10 @@ class ForagerWorld(ForagerEnv):
     def get_obs(self, state: EnvState, params: EnvParams, key=None) -> jax.Array:
         num_obj_types = len(self.object_ids)
         obs = jax.nn.one_hot(state.object_grid, num_obj_types)
-        obs = obs.at[state.pos[0], state.pos[1], -1].set(1)
+        obs = obs.at[state.pos[1], state.pos[0], -1].set(1)
         return obs
 
     def observation_space(self, params: EnvParams) -> spaces.Box:
         num_obj_types = len(self.object_ids)
-        obs_shape = (self.size[0], self.size[1], num_obj_types)
+        obs_shape = (self.size[1], self.size[0], num_obj_types)
         return spaces.Box(0, 1, obs_shape, jnp.float32)
