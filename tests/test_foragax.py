@@ -324,22 +324,39 @@ def test_generate_objects_in_biome():
     assert OYSTER.id not in unique_objects
 
 
-if __name__ == "__main__":
-    pytest.main()
-    params = env.default_params.replace(size=(10, 10), biomes=(biome,))
+def test_benchmark_big_env(benchmark):
+    env = ForagerObject(
+        size=10_000,
+        aperture_size=61,
+        object_types=(EMPTY, WALL, FLOWER),
+        biomes=(Biome(object_frequencies=(0.9, 0.05, 0.05)),),
+    )
+    params = env.default_params
+    key = jax.random.PRNGKey(0)
 
-    _, state = env.reset_env(key, params)
+    # Reset is part of the setup, not benchmarked
+    key, reset_key = jax.random.split(key)
+    _, state = env.reset(reset_key, params)
 
-    # Check that morels only appear within the biome
-    morel_locations = jnp.argwhere(state.object_grid == ObjectType.MOREL)
+    @jax.jit
+    def _run(state, key):
+        def f(carry, _):
+            state, key = carry
+            key, step_key = jax.random.split(key, 2)
+            action = Actions.UP
+            _, new_state, _, _, _ = env.step(step_key, state, action, params)
+            return (new_state, key), None
 
-    assert jnp.all(morel_locations >= 2)
-    assert jnp.all(morel_locations < 6)
+        (final_state, _), _ = jax.lax.scan(f, (state, key), None, length=100)
+        return final_state
 
-    # Check that no other objects were generated
-    unique_objects = jnp.unique(state.object_grid)
-    assert ObjectType.OYSTER not in unique_objects
+    # warm-up compilation
+    key, run_key = jax.random.split(key)
+    _run(state, run_key).pos.block_until_ready()
 
+    def benchmark_fn():
+        # use a fixed key for benchmark consistency
+        key, run_key = jax.random.split(jax.random.PRNGKey(1))
+        _run(state, run_key).pos.block_until_ready()
 
-if __name__ == "__main__":
-    pytest.main()
+    benchmark(benchmark_fn)
