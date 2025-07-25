@@ -78,7 +78,6 @@ class EnvParams(environment.EnvParams):
 class EnvState(environment.EnvState):
     pos: jax.Array
     object_grid: jax.Array
-    original_object_grid: jax.Array
     respawn_timers: jax.Array
     time: int
     key: jax.Array
@@ -154,15 +153,20 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
 
         # 3. HANDLE OBJECT COLLECTION AND RESPAWNING
         key, subkey = jax.random.split(state.key)
+        num_obj_types = len(self.object_ids)
 
-        # Update respawn timers
-        respawn_timers = state.respawn_timers - 1
+        # Decrement timers
+        respawn_timers = jnp.where(
+            state.respawn_timers > -1,
+            state.respawn_timers - num_obj_types,
+            -1,
+        )
 
         # Respawn objects
-        respawn_candidates = respawn_timers == 0
-        object_grid = jnp.where(
-            respawn_candidates, state.original_object_grid, state.object_grid
-        )
+        respawn_candidates = (respawn_timers > -1) & (respawn_timers < num_obj_types)
+        respawn_obj_ids = jnp.mod(respawn_timers, num_obj_types)
+
+        object_grid = jnp.where(respawn_candidates, respawn_obj_ids, state.object_grid)
         respawn_timers = jnp.where(respawn_candidates, -1, respawn_timers)
 
         # Collect object
@@ -181,10 +185,11 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
             return jax.random.randint(key_regen, (), min_delay, max_delay)
 
         regen_delay = get_regen_delay(obj_at_pos)
+        encoded_timer = regen_delay * num_obj_types + obj_at_pos
 
         new_respawn_timers = jax.lax.select(
             is_collectable,
-            respawn_timers.at[pos[1], pos[0]].set(regen_delay),
+            respawn_timers.at[pos[1], pos[0]].set(encoded_timer),
             respawn_timers,
         )
 
@@ -192,7 +197,6 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
         state = EnvState(
             pos=pos,
             object_grid=new_object_grid,
-            original_object_grid=state.original_object_grid,
             respawn_timers=new_respawn_timers,
             time=state.time + 1,
             key=key,
@@ -215,24 +219,11 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
 
         object_grid = jnp.zeros((self.size[1], self.size[0]), dtype=jnp.int32)
 
+        iter_key = subkey
         for i in range(self.biome_object_frequencies.shape[0]):
-            key, biome_key = jax.random.split(key)
+            iter_key, biome_key = jax.random.split(iter_key)
             # Generate random layout
             grid_rand = jax.random.uniform(biome_key, (self.size[1], self.size[0]))
-
-            # Generate objects for this biome
-            biome_grid = jnp.zeros((self.size[1], self.size[0]), dtype=jnp.int32)
-
-            cumulative_freq = 0.0
-            for j, freq in enumerate(self.biome_object_frequencies[i]):
-                obj_id = self.object_ids[j]
-                biome_grid = jnp.where(
-                    (grid_rand >= cumulative_freq)
-                    & (grid_rand < cumulative_freq + freq),
-                    obj_id,
-                    biome_grid,
-                )
-                cumulative_freq += freq
 
             # Create mask for the biome
             start = jax.lax.select(
@@ -256,8 +247,18 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
                 & (cols < stop[0])
             )
 
-            # Update the main grid with the biome's objects
-            object_grid = jnp.where(mask, biome_grid, object_grid)
+            # Generate objects for this biome and update the main grid
+            cumulative_freq = 0.0
+            for j, freq in enumerate(self.biome_object_frequencies[i]):
+                obj_id = self.object_ids[j]
+                object_grid = jnp.where(
+                    mask
+                    & (grid_rand >= cumulative_freq)
+                    & (grid_rand < cumulative_freq + freq),
+                    obj_id,
+                    object_grid,
+                )
+                cumulative_freq += freq
 
         # Place agent in the center of the world and ensure the cell is empty.
         agent_pos = jnp.array([self.size[0] // 2, self.size[1] // 2])
@@ -266,7 +267,6 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
         state = EnvState(
             pos=agent_pos,
             object_grid=object_grid,
-            original_object_grid=object_grid,
             respawn_timers=jnp.full((self.size[1], self.size[0]), -1, dtype=jnp.int32),
             time=0,
             key=key,
@@ -309,14 +309,11 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
                     (self.size[1], self.size[0]),
                     jnp.int32,
                 ),
-                "original_object_grid": spaces.Box(
-                    0,
-                    len(self.object_ids),
+                "respawn_timers": spaces.Box(
+                    -1,
+                    1000 * len(self.object_ids),
                     (self.size[1], self.size[0]),
                     jnp.int32,
-                ),
-                "respawn_timers": spaces.Box(
-                    -1, 1000, (self.size[1], self.size[0]), jnp.int32
                 ),
                 "time": spaces.Discrete(params.max_steps_in_episode),
                 "key": spaces.PRNGKey(),
