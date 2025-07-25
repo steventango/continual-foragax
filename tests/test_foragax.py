@@ -27,7 +27,7 @@ def test_observation_shape():
     env = ForagerObject(
         size=(500, 500),
         aperture_size=(9, 9),
-        object_types=(WALL, FLOWER, THORNS),
+        object_types=(EMPTY, WALL, FLOWER, THORNS),
     )
     params = env.default_params
     assert env.observation_space(params).shape == (9, 9, 3)
