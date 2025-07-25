@@ -1,9 +1,10 @@
 import pickle
+
+import chex
 import gymnax
 import jax
 import jax.numpy as jnp
 import pytest
-import chex
 
 from foragax import (
     AGENT,
@@ -12,8 +13,8 @@ from foragax import (
     MOREL,
     OYSTER,
     THORNS,
-    Actions,
     WALL,
+    Actions,
     Biome,
     ForagerObject,
     ForagerWorld,
@@ -293,6 +294,50 @@ def test_wrapping_dynamics():
     key, step_key = jax.random.split(state.key)
     _, state, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 2]))
+
+
+def test_wrapping_vision():
+    """Test that the agent's vision wraps around the environment boundaries."""
+    key = jax.random.PRNGKey(0)
+    env = ForagerObject(size=(5, 5), aperture_size=(3, 3), object_types=(EMPTY, FLOWER))
+    params = env.default_params
+    obs, state = env.reset(key, params)
+
+    # Create a predictable environment with a flower at (0, 0)
+    grid = jnp.zeros((5, 5), dtype=jnp.int32)
+    grid = grid.at[0, 0].set(1)
+    state = state.replace(object_grid=grid)
+
+    obs = env.get_obs(state, params)
+
+    expected = jnp.zeros((3, 3, 1), dtype=jnp.int32)
+    assert jnp.array_equal(obs, expected)
+
+    # go left
+    key, step_key = jax.random.split(state.key)
+    _, state, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
+
+    # go down
+    key, step_key = jax.random.split(state.key)
+    obs, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+
+    expected = jnp.zeros((3, 3, 1), dtype=jnp.int32)
+    expected = expected.at[2, 0, 0].set(1)
+
+    assert jnp.array_equal(state.pos, jnp.array([1, 1]))
+    assert jnp.array_equal(obs, expected)
+
+    # go left , go left
+    key, step_key = jax.random.split(state.key)
+    _, state, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
+    key, step_key = jax.random.split(state.key)
+    obs, state, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
+
+    expected = jnp.zeros((3, 3, 1), dtype=jnp.int32)
+    expected = expected.at[2, 2, 0].set(1)
+
+    assert jnp.array_equal(state.pos, jnp.array([4, 1]))
+    assert jnp.array_equal(obs, expected)
 
 
 def test_generate_objects_in_biome():

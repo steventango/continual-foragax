@@ -346,21 +346,25 @@ class ForagerObject(ForagerEnv):
 
     def get_obs(self, state: EnvState, params: EnvParams, key=None) -> jax.Array:
         num_obj_types = len(self.object_ids)
-        padded_grid = jnp.pad(
-            state.object_grid,
-            (
-                (self.aperture_size[0] // 2, self.aperture_size[0] // 2),
-                (self.aperture_size[1] // 2, self.aperture_size[1] // 2),
-            ),
-            "constant",
-            constant_values=0,
-        )
 
+        # Roll the grid to center the agent's position
+        # The agent should be at the center of the aperture, which is aperture_size // 2
+        # We want to move the agent's position (state.pos) to the center.
+        # The amount to roll is -(state.pos - aperture_size // 2)
+        # Note: jnp.roll is on (row, col) but pos is (x, y), so we swap them.
+        roll_amount = -(state.pos - jnp.array(self.aperture_size) // 2)
+        roll_amount = jnp.array([roll_amount[1], roll_amount[0]])
+        rolled_grid = jnp.roll(state.object_grid, shift=roll_amount, axis=(0, 1))
+
+        # Extract the aperture
         aperture = jax.lax.dynamic_slice(
-            padded_grid,
-            (state.pos[0], state.pos[1]),
+            rolled_grid,
+            (0, 0),
             self.aperture_size,
         )
+
+        # flip rows to match the agent's perspective
+        aperture = jnp.flip(aperture, axis=0)
 
         obs = jax.nn.one_hot(aperture, num_obj_types)
 
@@ -370,7 +374,11 @@ class ForagerObject(ForagerEnv):
 
     def observation_space(self, params: EnvParams) -> spaces.Box:
         num_obj_types = len(self.object_ids)
-        obs_shape = (self.aperture_size[0], self.aperture_size[1], num_obj_types)
+        obs_shape = (
+            self.aperture_size[0],
+            self.aperture_size[1],
+            num_obj_types - 1,
+        )
         return spaces.Box(0, 1, obs_shape, jnp.float32)
 
 
