@@ -82,7 +82,6 @@ def test_add_objects():
             FLOWER,
         ),
         biomes=(
-            Biome((0, 0)),
             Biome(
                 object_frequencies=(
                     0,
@@ -93,10 +92,10 @@ def test_add_objects():
     )
     params = env.default_params
     key = jax.random.PRNGKey(0)
-    obs, state = env.reset(key, params)
+    obs, state = env.reset_env(key, params)
 
     assert jnp.count_nonzero(state.object_grid) == int(100 * 0.1)
-    chex.assert_shape(obs, (5, 1, 0))
+    chex.assert_shape(obs, (5, 5, 1))
 
 
 def test_world_observation_mode():
@@ -447,9 +446,9 @@ def test_benchmark_creation(benchmark):
 def test_benchmark_small_env(benchmark):
     env = ForagerObject(
         size=1_000,
-        aperture_size=15,
+        aperture_size=11,
         object_types=(EMPTY, WALL, FLOWER),
-        biomes=(Biome(object_frequencies=(0, 0.05, 0.05)),),
+        biomes=(Biome(object_frequencies=(0, 0.1, 0.1)),),
     )
     params = env.default_params
     key = jax.random.PRNGKey(0)
@@ -464,7 +463,7 @@ def test_benchmark_small_env(benchmark):
             _, new_state, _, _, _ = env.step(step_key, state, Actions.UP, params)
             return (new_state, key), None
 
-        (final_state, _), _ = jax.lax.scan(f, (state, key), None, length=100)
+        (final_state, _), _ = jax.lax.scan(f, (state, key), None, length=1000)
         return final_state
 
     key, run_key = jax.random.split(key)
@@ -515,12 +514,12 @@ def test_benchmark_big_env(benchmark):
 
 
 def test_benchmark_vmap_env(benchmark):
-    num_envs = 600
+    num_envs = 100
     env = ForagerObject(
-        size=15,
-        aperture_size=1,
+        size=1_000,
+        aperture_size=11,
         object_types=(EMPTY, WALL, FLOWER),
-        biomes=(Biome(object_frequencies=(0, 0.05, 0.05)),),
+        biomes=(Biome(object_frequencies=(0, 0.1, 0.1)),),
     )
     params = env.default_params
     key = jax.random.PRNGKey(0)
@@ -541,7 +540,7 @@ def test_benchmark_vmap_env(benchmark):
             )
             return (new_states, key), None
 
-        (final_states, _), _ = jax.lax.scan(f, (states, key), None, length=100)
+        (final_states, _), _ = jax.lax.scan(f, (states, key), None, length=1000)
         return final_states
 
     # warm-up compilation
