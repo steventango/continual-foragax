@@ -154,26 +154,42 @@ def test_basic_movement():
 def test_vision():
     """Test the agent's observation."""
     key = jax.random.PRNGKey(0)
-    env = Forager(
-        size=(7, 7), aperture_size=(3, 3), observation_mode=ObservationMode.OBJECTS
+    env = ForagerObject(
+        size=(7, 7), aperture_size=(3, 3), object_types=(EMPTY, WALL)
     )
     params = env.default_params
-    _, state = env.reset_env(key, params)
+    obs, state = env.reset(key, params)
 
     # Create a predictable environment
-    grid = jnp.zeros(env.observation_space(params).shape[:2], dtype=jnp.int32)
-    grid = grid.at[2, 3].set(WALL.id)
-    state = state.replace(object_grid=grid, pos=jnp.array([3, 3]))
+    grid = jnp.zeros((7, 7), dtype=jnp.int32)
+    grid = grid.at[4, 3].set(1)
+    grid = grid.at[5, 3].set(1)
+    grid = grid.at[2, 0].set(1)
+    state = state.replace(object_grid=grid)
 
-    obs = env.get_obs(state, params)
+    chex.assert_trees_all_equal(state.pos, jnp.array([3, 3]))
 
-    # Agent is at the center of the aperture
-    # Wall is at (2, 3), agent at (3, 3). Wall should be at top-center of aperture.
-    expected_aperture = jnp.zeros((3, 3, len(env.object_ids)))
-    expected_aperture = expected_aperture.at[0, 1, WALL.id].set(1)
-    expected_aperture = expected_aperture.at[1, 1, AGENT.id].set(1)
+    # No movement
+    key, step_key = jax.random.split(state.key)
+    obs, state, _, _, _ = env.step_env(step_key, state, Actions.UP, params)
 
-    assert jnp.array_equal(obs, expected_aperture)
+    expected = jnp.zeros((3, 3, 1), dtype=jnp.int32)
+    expected = expected.at[0, 1, 0].set(1)
+
+    chex.assert_trees_all_equal(state.pos, jnp.array([3, 3]))
+    chex.assert_trees_all_equal(obs, expected)
+
+    # Move right
+    key, step_key = jax.random.split(state.key)
+    obs, state, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
+    key, step_key = jax.random.split(state.key)
+    obs, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
+    expected = jnp.zeros((3, 3, 1), dtype=jnp.int32)
+    expected = expected.at[0, 0, 0].set(1)
+    expected = expected.at[1, 0, 0].set(1)
+
+    chex.assert_trees_all_equal(state.pos, jnp.array([4, 4]))
+    chex.assert_trees_all_equal(obs, expected)
 
 
 def test_respawn():
