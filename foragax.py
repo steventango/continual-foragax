@@ -112,7 +112,6 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
         self.biome_object_frequencies = jnp.array(
             [b.object_frequencies for b in biomes]
         )
-        self.biome_object_frequencies = jnp.cumsum(self.biome_object_frequencies, axis=1)
         self.biome_starts = jnp.array(
             [b.start if b.start is not None else (-1, -1) for b in biomes]
         )
@@ -215,7 +214,8 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
         iter_key = subkey
         for i in range(self.biome_object_frequencies.shape[0]):
             iter_key, biome_key = jax.random.split(iter_key)
-
+            # Generate random layout
+            grid_rand = jax.random.uniform(biome_key, (self.size[1], self.size[0]))
 
             # Create mask for the biome
             start = jax.lax.select(
@@ -232,13 +232,6 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
             rows = jnp.arange(self.size[1])[:, None]
             cols = jnp.arange(self.size[0])
 
-            # Generate random layout
-            # Generate linspace(0, 1, num_squares) for each biome and shuffle it
-            num_squares = (stop[1] - start[1]) * (stop[0] - start[0])
-            grid_rand = jnp.linspace(0.0, 1.0, num_squares)
-            grid_rand = jax.random.permutation(biome_key, grid_rand)
-            grid_rand = grid_rand.reshape((stop[1] - start[1], stop[0] - start[0]))
-
             mask = (
                 (rows >= start[1])
                 & (rows < stop[1])
@@ -253,15 +246,15 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
                 object_grid = jnp.where(
                     mask
                     & (grid_rand >= cumulative_freq)
-                    & (grid_rand < cumulative_freq + freq)
-                    & (object_grid == 0),
+                    & (grid_rand < cumulative_freq + freq),
                     obj_id,
                     object_grid,
                 )
                 cumulative_freq += freq
 
-        # Place agent in the center of the world
+        # Place agent in the center of the world and ensure the cell is empty.
         agent_pos = jnp.array([self.size[0] // 2, self.size[1] // 2])
+        object_grid = object_grid.at[agent_pos[1], agent_pos[0]].set(0)
 
         state = EnvState(
             pos=agent_pos,
