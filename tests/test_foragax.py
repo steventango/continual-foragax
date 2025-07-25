@@ -514,6 +514,48 @@ def test_benchmark_big_env(benchmark):
     benchmark(benchmark_fn)
 
 
+def test_benchmark_vmap_env(benchmark):
+    num_envs = 600
+    env = ForagerObject(
+        size=15,
+        aperture_size=1,
+        object_types=(EMPTY, WALL, FLOWER),
+        biomes=(Biome(object_frequencies=(0, 0.05, 0.05)),),
+    )
+    params = env.default_params
+    key = jax.random.PRNGKey(0)
+
+    # Reset is part of the setup, not benchmarked
+    key, reset_key = jax.random.split(key)
+    reset_keys = jax.random.split(reset_key, num_envs)
+    states = jax.vmap(env.reset, in_axes=(0, None))(reset_keys, params)[1]
+
+    @jax.jit
+    def _run(states, key):
+        def f(carry, _):
+            states, key = carry
+            key, step_key = jax.random.split(key, 2)
+            step_keys = jax.random.split(step_key, num_envs)
+            _, new_states, _, _, _ = jax.vmap(env.step, in_axes=(0, 0, None, None))(
+                step_keys, states, Actions.UP, params
+            )
+            return (new_states, key), None
+
+        (final_states, _), _ = jax.lax.scan(f, (states, key), None, length=100)
+        return final_states
+
+    # warm-up compilation
+    key, run_key = jax.random.split(key)
+    _run(states, run_key).pos.block_until_ready()
+
+    def benchmark_fn():
+        # use a fixed key for benchmark consistency
+        key, run_key = jax.random.split(jax.random.PRNGKey(1))
+        _run(states, run_key).pos.block_until_ready()
+
+    benchmark(benchmark_fn)
+
+
 def test_benchmark_small_env_color(benchmark):
     env = ForagerRGB(
         size=1_000,
