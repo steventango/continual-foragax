@@ -78,7 +78,6 @@ class EnvParams(environment.EnvParams):
 class EnvState(environment.EnvState):
     pos: jax.Array
     object_grid: jax.Array
-    respawn_timers: jax.Array
     time: int
     key: jax.Array
 
@@ -134,6 +133,10 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
         params: EnvParams,
     ) -> tuple[jax.Array, EnvState, jax.Array, jax.Array, dict[Any, Any]]:
         """Perform single timestep state transition."""
+        num_obj_types = len(self.object_ids)
+        # Decode the object grid: positive values are objects, negative are timers (treat as empty)
+        current_objects = jnp.maximum(0, state.object_grid)
+
         # 1. UPDATE AGENT POSITION
         direction = DIRECTIONS[action]
         new_pos = state.pos + direction
@@ -142,41 +145,32 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
         new_pos = jnp.mod(new_pos, jnp.array(self.size))
 
         # Check for blocking objects
-        obj_at_new_pos = state.object_grid[new_pos[1], new_pos[0]]
+        obj_at_new_pos = current_objects[new_pos[1], new_pos[0]]
         is_blocking = self.object_blocking[obj_at_new_pos]
         pos = jax.lax.select(is_blocking, state.pos, new_pos)
 
         # 2. HANDLE COLLISIONS AND REWARDS
-        obj_at_pos = state.object_grid[pos[1], pos[0]]
+        obj_at_pos = current_objects[pos[1], pos[0]]
         reward = self.object_rewards[obj_at_pos]
         is_collectable = self.object_collectable[obj_at_pos]
 
         # 3. HANDLE OBJECT COLLECTION AND RESPAWNING
         key, subkey = jax.random.split(state.key)
-        num_obj_types = len(self.object_ids)
 
-        # Decrement timers
-        respawn_timers = jnp.where(
-            state.respawn_timers > -1,
-            state.respawn_timers - num_obj_types,
-            -1,
+        # Decrement timers (stored as negative values)
+        is_timer = state.object_grid < 0
+        object_grid = jnp.where(
+            is_timer, state.object_grid + num_obj_types, state.object_grid
         )
 
-        # Respawn objects
-        respawn_candidates = (respawn_timers > -1) & (respawn_timers < num_obj_types)
-        respawn_obj_ids = jnp.mod(respawn_timers, num_obj_types)
+        # Respawn objects where timers have finished
+        # Timers are finished when they become >= -num_obj_types
+        respawn_candidates = (object_grid < 0) & (object_grid >= -num_obj_types)
+        # Decode object type from timer: -(timer_val + 1)
+        respawn_obj_ids = -(object_grid + 1)
+        object_grid = jnp.where(respawn_candidates, respawn_obj_ids, object_grid)
 
-        object_grid = jnp.where(respawn_candidates, respawn_obj_ids, state.object_grid)
-        respawn_timers = jnp.where(respawn_candidates, -1, respawn_timers)
-
-        # Collect object
-        new_object_grid = jax.lax.select(
-            is_collectable,
-            object_grid.at[pos[1], pos[0]].set(0),
-            object_grid,
-        )
-
-        # Set respawn timer for collected object
+        # Collect object: set a timer
         def get_regen_delay(obj_type):
             key_regen, _ = jax.random.split(subkey)
             regen_delays = self.object_regen_delays
@@ -185,19 +179,17 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
             return jax.random.randint(key_regen, (), min_delay, max_delay)
 
         regen_delay = get_regen_delay(obj_at_pos)
-        encoded_timer = regen_delay * num_obj_types + obj_at_pos
+        # Encode timer: -( (delay * num_obj_types) + obj_id + 1 )
+        encoded_timer = -((regen_delay * num_obj_types) + obj_at_pos + 1)
 
-        new_respawn_timers = jax.lax.select(
-            is_collectable,
-            respawn_timers.at[pos[1], pos[0]].set(encoded_timer),
-            respawn_timers,
-        )
+        # If collected, replace object with timer; otherwise, it's 0 (EMPTY)
+        new_val_at_pos = jax.lax.select(is_collectable, encoded_timer, 0)
+        object_grid = object_grid.at[pos[1], pos[0]].set(new_val_at_pos)
 
         # 4. UPDATE STATE
         state = EnvState(
             pos=pos,
-            object_grid=new_object_grid,
-            respawn_timers=new_respawn_timers,
+            object_grid=object_grid,
             time=state.time + 1,
             key=key,
         )
@@ -267,7 +259,6 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
         state = EnvState(
             pos=agent_pos,
             object_grid=object_grid,
-            respawn_timers=jnp.full((self.size[1], self.size[0]), -1, dtype=jnp.int32),
             time=0,
             key=key,
         )
@@ -304,14 +295,8 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
             {
                 "pos": spaces.Box(0, max(self.size), (2,), jnp.int32),
                 "object_grid": spaces.Box(
-                    0,
+                    -1000 * len(self.object_ids),
                     len(self.object_ids),
-                    (self.size[1], self.size[0]),
-                    jnp.int32,
-                ),
-                "respawn_timers": spaces.Box(
-                    -1,
-                    1000 * len(self.object_ids),
                     (self.size[1], self.size[0]),
                     jnp.int32,
                 ),
@@ -326,9 +311,11 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
 
         # Create an RGB image from the object grid
         img = jnp.zeros((self.size[1], self.size[0], 3))
+        # Decode grid for rendering: non-negative are objects, negative are empty
+        render_grid = jnp.maximum(0, state.object_grid)
         for i, obj_id in enumerate(self.object_ids):
             color = self.object_colors[i]
-            img = img.at[state.object_grid == obj_id].set(jnp.array(color))
+            img = img.at[render_grid == obj_id].set(jnp.array(color))
 
         # Agent color
         agent_color = self.object_colors[-1]
@@ -345,6 +332,8 @@ class ForagerObject(ForagerEnv):
 
     def get_obs(self, state: EnvState, params: EnvParams, key=None) -> jax.Array:
         num_obj_types = len(self.object_ids)
+        # Decode grid for observation
+        obs_grid = jnp.maximum(0, state.object_grid)
 
         # Roll the grid to center the agent's position
         # The agent should be at the center of the aperture, which is aperture_size // 2
@@ -353,7 +342,7 @@ class ForagerObject(ForagerEnv):
         # Note: jnp.roll is on (row, col) but pos is (x, y), so we swap them.
         roll_amount = -(state.pos - jnp.array(self.aperture_size) // 2)
         roll_amount = jnp.array([roll_amount[1], roll_amount[0]])
-        rolled_grid = jnp.roll(state.object_grid, shift=roll_amount, axis=(0, 1))
+        rolled_grid = jnp.roll(obs_grid, shift=roll_amount, axis=(0, 1))
 
         # Extract the aperture
         aperture = jax.lax.dynamic_slice(
@@ -385,8 +374,10 @@ class ForagerRGB(ForagerEnv):
 
     def get_obs(self, state: EnvState, params: EnvParams, key=None) -> jax.Array:
         num_obj_types = len(self.object_ids)
+        # Decode grid for observation
+        obs_grid = jnp.maximum(0, state.object_grid)
         padded_grid = jnp.pad(
-            state.object_grid,
+            obs_grid,
             (
                 (self.aperture_size[1] // 2, self.aperture_size[1] // 2),
                 (self.aperture_size[0] // 2, self.aperture_size[0] // 2),
@@ -421,7 +412,9 @@ class ForagerWorld(ForagerEnv):
 
     def get_obs(self, state: EnvState, params: EnvParams, key=None) -> jax.Array:
         num_obj_types = len(self.object_ids)
-        obs = jax.nn.one_hot(state.object_grid, num_obj_types)
+        # Decode grid for observation
+        obs_grid = jnp.maximum(0, state.object_grid)
+        obs = jax.nn.one_hot(obs_grid, num_obj_types)
         obs = obs.at[state.pos[1], state.pos[0], -1].set(1)
         return obs
 
