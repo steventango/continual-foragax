@@ -96,7 +96,7 @@ def test_add_objects():
     key = jax.random.PRNGKey(0)
     obs, state = env.reset(key, params)
 
-    empirical_freq = jnp.count_nonzero(state.object_grid) / size ** 2
+    empirical_freq = jnp.count_nonzero(state.object_grid) / size**2
     chex.assert_trees_all_close(empirical_freq, freq, rtol=0.1)
     chex.assert_shape(obs, (5, 5, 1))
 
@@ -157,17 +157,18 @@ def test_basic_movement():
 def test_vision():
     """Test the agent's observation."""
     key = jax.random.PRNGKey(0)
-    env = ForagerObject(
-        size=(7, 7), aperture_size=(3, 3), object_types=(EMPTY, WALL)
-    )
+    object_types = (EMPTY, WALL)
+    env = ForagerObject(size=(7, 7), aperture_size=(3, 3), object_types=object_types)
     params = env.default_params
     obs, state = env.reset(key, params)
 
+    wall_id = object_types.index(WALL)
+
     # Create a predictable environment
     grid = jnp.zeros((7, 7), dtype=jnp.int32)
-    grid = grid.at[4, 3].set(1)
-    grid = grid.at[5, 3].set(1)
-    grid = grid.at[2, 0].set(1)
+    grid = grid.at[4, 3].set(wall_id)
+    grid = grid.at[5, 3].set(wall_id)
+    grid = grid.at[2, 0].set(wall_id)
     state = state.replace(object_grid=grid)
 
     chex.assert_trees_all_equal(state.pos, jnp.array([3, 3]))
@@ -198,20 +199,21 @@ def test_vision():
 def test_respawn():
     """Test object respawning."""
     key = jax.random.PRNGKey(0)
+    object_types = (EMPTY, FLOWER)
     env = ForagerObject(
         size=7,
         aperture_size=3,
-        object_types=(EMPTY, FLOWER),
+        object_types=object_types,
     )
     params = env.default_params
     _, state = env.reset_env(key, params)
 
+    flower_id = object_types.index(FLOWER)
+
     # Place a flower and move the agent to it
     grid = jnp.zeros((7, 7), dtype=jnp.int32)
-    grid = grid.at[4, 3].set(1)
-    state = state.replace(
-        object_grid=grid, pos=jnp.array([3, 3])
-    )
+    grid = grid.at[4, 3].set(flower_id)
+    state = state.replace(object_grid=grid, pos=jnp.array([3, 3]))
 
     # Collect the flower
     key, step_key = jax.random.split(state.key)
@@ -227,7 +229,7 @@ def test_respawn():
 
     key, step_key = jax.random.split(state.key)
     _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
-    assert state.object_grid[4, 3] == 1
+    assert state.object_grid[4, 3] == flower_id
 
 
 def test_wrapping_dynamics():
@@ -359,9 +361,10 @@ def test_wrapping_vision():
 
 def test_generate_objects_in_biome():
     """Test generating objects within a specific biome area."""
+    object_types = (EMPTY, WALL, FLOWER, THORNS, MOREL, OYSTER)
     env = ForagerObject(
         size=(10, 10),
-        object_types=(EMPTY, WALL, FLOWER, THORNS, MOREL, OYSTER),
+        object_types=object_types,
         biomes=(
             Biome(
                 object_frequencies=(0.0, 0.0, 0.0, 0.0, 0.1, 0.0),
@@ -375,17 +378,22 @@ def test_generate_objects_in_biome():
 
     _, state = env.reset(key, params)
 
+    morel_id = object_types.index(MOREL)
+    oyster_id = object_types.index(OYSTER)
+    wall_id = object_types.index(WALL)
+    thorns_id = object_types.index(THORNS)
+
     # Check that morels only appear within the biome
-    morel_locations = jnp.argwhere(state.object_grid == 4)
+    morel_locations = jnp.argwhere(state.object_grid == morel_id)
 
     assert jnp.all(morel_locations >= 2)
     assert jnp.all(morel_locations < 6)
 
     # Check that no other objects were generated
     unique_objects = jnp.unique(state.object_grid)
-    assert 5 not in unique_objects
-    assert 2 not in unique_objects
-    assert 3 not in unique_objects
+    assert oyster_id not in unique_objects
+    assert wall_id not in unique_objects
+    assert thorns_id not in unique_objects
 
 
 def test_benchmark_vision(benchmark):
