@@ -376,16 +376,16 @@ def test_generate_objects_in_biome():
     _, state = env.reset(key, params)
 
     # Check that morels only appear within the biome
-    morel_locations = jnp.argwhere(state.object_grid == MOREL.id)
+    morel_locations = jnp.argwhere(state.object_grid == 4)
 
     assert jnp.all(morel_locations >= 2)
     assert jnp.all(morel_locations < 6)
 
     # Check that no other objects were generated
     unique_objects = jnp.unique(state.object_grid)
-    assert OYSTER.id not in unique_objects
-    assert FLOWER.id not in unique_objects
-    assert THORNS.id not in unique_objects
+    assert 5 not in unique_objects
+    assert 2 not in unique_objects
+    assert 3 not in unique_objects
 
 
 def test_benchmark_vision(benchmark):
