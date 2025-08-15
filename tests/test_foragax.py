@@ -198,38 +198,36 @@ def test_vision():
 def test_respawn():
     """Test object respawning."""
     key = jax.random.PRNGKey(0)
-    # predictable respawn
-    flower_with_regen = FLOWER.replace(regen_delay=(5, 6))
     env = ForagerObject(
-        size=(7, 7),
-        object_types=(EMPTY, WALL, flower_with_regen),
+        size=7,
+        aperture_size=3,
+        object_types=(EMPTY, FLOWER),
     )
     params = env.default_params
     _, state = env.reset_env(key, params)
 
     # Place a flower and move the agent to it
     grid = jnp.zeros((7, 7), dtype=jnp.int32)
-    grid = grid.at[3, 4].set(flower_with_regen.id)
+    grid = grid.at[4, 3].set(1)
     state = state.replace(
-        object_grid=grid, original_object_grid=grid, pos=jnp.array([3, 4])
+        object_grid=grid, pos=jnp.array([3, 3])
     )
 
-    # Collect the flower (action is irrelevant, agent is on the flower)
+    # Collect the flower
     key, step_key = jax.random.split(state.key)
-    _, state, reward, _, _ = env.step(step_key, state, 0, params)
-    assert reward == flower_with_regen.reward
-    assert state.object_grid[3, 4] == EMPTY.id
-    assert state.respawn_timers[3, 4] > 0
+    _, state, reward, _, _ = env.step_env(step_key, state, Actions.UP, params)
+    assert reward == FLOWER.reward
+    assert state.object_grid[4, 3] < 0
 
     # Step until it respawns
-    for _ in range(4):
+    for _ in range(92):
         key, step_key = jax.random.split(state.key)
-        _, state, _, _, _ = env.step(step_key, state, 0, params)
-        assert state.object_grid[3, 4] == EMPTY.id
+        _, state, _, _, _ = env.step_env(step_key, state, Actions.UP, params)
+        assert state.object_grid[4, 3] < 0
 
     key, step_key = jax.random.split(state.key)
-    _, state, _, _, _ = env.step(step_key, state, 0, params)
-    assert state.object_grid[3, 4] == flower_with_regen.id
+    _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
+    assert state.object_grid[4, 3] == 1
 
 
 def test_wrapping_dynamics():

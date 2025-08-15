@@ -163,13 +163,6 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
             is_timer, state.object_grid + num_obj_types, state.object_grid
         )
 
-        # Respawn objects where timers have finished
-        # Timers are finished when they become >= -num_obj_types
-        respawn_candidates = (object_grid < 0) & (object_grid >= -num_obj_types)
-        # Decode object type from timer: -(timer_val + 1)
-        respawn_obj_ids = -(object_grid + 1)
-        object_grid = jnp.where(respawn_candidates, respawn_obj_ids, object_grid)
-
         # Collect object: set a timer
         def get_regen_delay(obj_type):
             key_regen, _ = jax.random.split(subkey)
@@ -179,11 +172,11 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
             return jax.random.randint(key_regen, (), min_delay, max_delay)
 
         regen_delay = get_regen_delay(obj_at_pos)
-        # Encode timer: -( (delay * num_obj_types) + obj_id + 1 )
-        encoded_timer = -((regen_delay * num_obj_types) + obj_at_pos + 1)
+        encoded_timer = -((regen_delay * num_obj_types) + obj_at_pos)
 
-        # If collected, replace object with timer; otherwise, it's 0 (EMPTY)
-        new_val_at_pos = jax.lax.select(is_collectable, encoded_timer, 0)
+        # If collected, replace object with timer; otherwise, keep it
+        val_at_pos = object_grid[pos[1], pos[0]]
+        new_val_at_pos = jax.lax.select(is_collectable, encoded_timer, val_at_pos)
         object_grid = object_grid.at[pos[1], pos[0]].set(new_val_at_pos)
 
         # 4. UPDATE STATE
