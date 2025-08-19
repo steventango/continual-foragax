@@ -14,7 +14,7 @@ from flax import struct
 from gymnax.environments import environment, spaces
 
 
-class ObjectType:
+class ForagerObject:
     """Base class for objects in the Forager environment."""
 
     def __init__(
@@ -42,24 +42,24 @@ class ObjectType:
 
 
 # Default object types
-EMPTY = ObjectType()
-WALL = ObjectType(blocking=True, color=(0.5, 0.5, 0.5))
-FLOWER = ObjectType(
+EMPTY = ForagerObject()
+WALL = ForagerObject(blocking=True, color=(0.5, 0.5, 0.5))
+FLOWER = ForagerObject(
     reward=1.0, collectable=True, regen_delay=(10, 100), color=(0.0, 1.0, 0.0)
 )
-THORNS = ObjectType(
+THORNS = ForagerObject(
     reward=-1.0, collectable=True, regen_delay=(10, 100), color=(1.0, 0.0, 0.0)
 )
-MOREL = ObjectType(
+MOREL = ForagerObject(
     reward=10.0, collectable=True, regen_delay=(100, 100), color=(0.25, 0.12, 0.1)
 )
-OYSTER = ObjectType(
+OYSTER = ForagerObject(
     reward=1.0, collectable=True, regen_delay=(10, 10), color=(0.49, 0.24, 0.32)
 )
-DEATHCAP = ObjectType(
+DEATHCAP = ForagerObject(
     reward=-1.0, collectable=True, regen_delay=(10, 10), color=(0.76, 0.7, 0.12)
 )
-AGENT = ObjectType(blocking=True, color=(0.0, 0.0, 1.0))
+AGENT = ForagerObject(blocking=True, color=(0.0, 0.0, 1.0))
 
 
 class Actions(IntEnum):
@@ -106,7 +106,7 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
         self,
         size: Tuple[int, int] | int = (10, 10),
         aperture_size: Tuple[int, int] | int = (5, 5),
-        object_types: Tuple[ObjectType, ...] = (EMPTY,),
+        object_types: Tuple[ForagerObject, ...] = (EMPTY,),
         biomes: Tuple[Biome, ...] = (Biome(object_frequencies=(1.0,)),),
     ):
         super().__init__()
@@ -330,7 +330,7 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
         return fig, ax
 
 
-class ForagerObject(ForagerEnv):
+class ForagerObjectEnv(ForagerEnv):
     """Forager environment with object-based aperture observation."""
 
     def get_obs(self, state: EnvState, params: EnvParams, key=None) -> jax.Array:
@@ -372,7 +372,7 @@ class ForagerObject(ForagerEnv):
         return spaces.Box(0, 1, obs_shape, jnp.float32)
 
 
-class ForagerRGB(ForagerEnv):
+class ForagerRGBEnv(ForagerEnv):
     """Forager environment with color-based aperture observation."""
 
     def get_obs(self, state: EnvState, params: EnvParams, key=None) -> jax.Array:
@@ -410,7 +410,7 @@ class ForagerRGB(ForagerEnv):
         return spaces.Box(0, 1, obs_shape, jnp.float32)
 
 
-class ForagerWorld(ForagerEnv):
+class ForagerWorldEnv(ForagerEnv):
     """Forager environment with world observation."""
 
     def get_obs(self, state: EnvState, params: EnvParams, key=None) -> jax.Array:

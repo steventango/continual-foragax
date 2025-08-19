@@ -15,15 +15,15 @@ from foragax import (
     WALL,
     Actions,
     Biome,
-    ForagerObject,
-    ForagerRGB,
-    ForagerWorld,
+    ForagerObjectEnv,
+    ForagerRGBEnv,
+    ForagerWorldEnv,
 )
 
 
 def test_observation_shape():
     """Test that the observation shape is correct."""
-    env = ForagerObject(
+    env = ForagerObjectEnv(
         size=(500, 500),
         aperture_size=(9, 9),
         object_types=(EMPTY, WALL, FLOWER, THORNS),
@@ -36,7 +36,7 @@ def test_gymnax_api():
     key = jax.random.PRNGKey(0)
     key, key_reset, key_act, key_step = jax.random.split(key, 4)
 
-    env = ForagerObject(size=(5, 5))
+    env = ForagerObjectEnv(size=(5, 5))
     env_params = env.default_params
 
     obs, state = env.reset(key_reset, env_params)
@@ -49,7 +49,7 @@ def test_gymnax_api():
 
 def test_sizes():
     # can specify sizes with integers
-    env = ForagerObject(size=8, aperture_size=3)
+    env = ForagerObjectEnv(size=8, aperture_size=3)
     params = env.default_params
     key = jax.random.PRNGKey(0)
     obs, state = env.reset(key, params)
@@ -61,7 +61,7 @@ def test_sizes():
 
 def test_uneven_sizes():
     # can specify sizes as uneven tuples
-    env = ForagerObject(size=(10, 5), aperture_size=(5, 1))
+    env = ForagerObjectEnv(size=(10, 5), aperture_size=(5, 1))
     params = env.default_params
     key = jax.random.PRNGKey(0)
     obs, state = env.reset(key, params)
@@ -75,7 +75,7 @@ def test_add_objects():
     # can add objects
     size = 100
     freq = 0.1
-    env = ForagerObject(
+    env = ForagerObjectEnv(
         size=size,
         object_types=(
             EMPTY,
@@ -101,7 +101,7 @@ def test_add_objects():
 
 def test_world_observation_mode():
     # can use world observation mode
-    env = ForagerWorld(size=(10, 10))
+    env = ForagerWorldEnv(size=(10, 10))
     params = env.default_params
     key = jax.random.PRNGKey(0)
     obs, state = env.reset(key, params)
@@ -121,7 +121,7 @@ def test_basic_movement():
         start=(3, 4),
         stop=(4, 6),
     )
-    env = ForagerObject(
+    env = ForagerObjectEnv(
         size=7,
         object_types=(
             EMPTY,
@@ -156,7 +156,7 @@ def test_vision():
     """Test the agent's observation."""
     key = jax.random.PRNGKey(0)
     object_types = (EMPTY, WALL)
-    env = ForagerObject(size=(7, 7), aperture_size=(3, 3), object_types=object_types)
+    env = ForagerObjectEnv(size=(7, 7), aperture_size=(3, 3), object_types=object_types)
     params = env.default_params
     obs, state = env.reset(key, params)
 
@@ -198,7 +198,7 @@ def test_respawn():
     """Test object respawning."""
     key = jax.random.PRNGKey(0)
     object_types = (EMPTY, FLOWER)
-    env = ForagerObject(
+    env = ForagerObjectEnv(
         size=7,
         aperture_size=3,
         object_types=object_types,
@@ -233,7 +233,7 @@ def test_respawn():
 def test_wrapping_dynamics():
     """Test that the agent wraps around the environment boundaries."""
     key = jax.random.PRNGKey(0)
-    env = ForagerObject(size=(5, 5), object_types=(EMPTY,))
+    env = ForagerObjectEnv(size=(5, 5), object_types=(EMPTY,))
     params = env.default_params
     _, state = env.reset(key, params)
 
@@ -316,7 +316,9 @@ def test_wrapping_dynamics():
 def test_wrapping_vision():
     """Test that the agent's vision wraps around the environment boundaries."""
     key = jax.random.PRNGKey(0)
-    env = ForagerObject(size=(5, 5), aperture_size=(3, 3), object_types=(EMPTY, FLOWER))
+    env = ForagerObjectEnv(
+        size=(5, 5), aperture_size=(3, 3), object_types=(EMPTY, FLOWER)
+    )
     params = env.default_params
     obs, state = env.reset(key, params)
 
@@ -360,7 +362,7 @@ def test_wrapping_vision():
 def test_generate_objects_in_biome():
     """Test generating objects within a specific biome area."""
     object_types = (EMPTY, WALL, FLOWER, THORNS, MOREL, OYSTER)
-    env = ForagerObject(
+    env = ForagerObjectEnv(
         size=(10, 10),
         object_types=object_types,
         biomes=(
@@ -395,7 +397,7 @@ def test_generate_objects_in_biome():
 
 
 def test_benchmark_vision(benchmark):
-    env = ForagerObject(size=7, aperture_size=3, object_types=(EMPTY, WALL))
+    env = ForagerObjectEnv(size=7, aperture_size=3, object_types=(EMPTY, WALL))
     params = env.default_params
     key = jax.random.PRNGKey(0)
     _, state = env.reset(key, params)
@@ -429,7 +431,7 @@ def test_benchmark_vision(benchmark):
 
 
 def test_benchmark_creation(benchmark):
-    env = ForagerObject(
+    env = ForagerObjectEnv(
         size=1_000,
         aperture_size=31,
         object_types=(EMPTY, WALL, FLOWER),
@@ -451,7 +453,7 @@ def test_benchmark_creation(benchmark):
 
 
 def test_benchmark_small_env(benchmark):
-    env = ForagerObject(
+    env = ForagerObjectEnv(
         size=1_000,
         aperture_size=11,
         object_types=(EMPTY, WALL, FLOWER),
@@ -484,7 +486,7 @@ def test_benchmark_small_env(benchmark):
 
 
 def test_benchmark_big_env(benchmark):
-    env = ForagerObject(
+    env = ForagerObjectEnv(
         size=10_000,
         aperture_size=61,
         object_types=(EMPTY, WALL, FLOWER),
@@ -522,7 +524,7 @@ def test_benchmark_big_env(benchmark):
 
 def test_benchmark_vmap_env(benchmark):
     num_envs = 100
-    env = ForagerObject(
+    env = ForagerObjectEnv(
         size=1_000,
         aperture_size=11,
         object_types=(EMPTY, WALL, FLOWER),
@@ -563,7 +565,7 @@ def test_benchmark_vmap_env(benchmark):
 
 
 def test_benchmark_small_env_color(benchmark):
-    env = ForagerRGB(
+    env = ForagerRGBEnv(
         size=1_000,
         aperture_size=15,
         object_types=(EMPTY, WALL, FLOWER),
@@ -596,7 +598,7 @@ def test_benchmark_small_env_color(benchmark):
 
 
 def test_benchmark_small_env_world(benchmark):
-    env = ForagerWorld(
+    env = ForagerWorldEnv(
         size=1_000,
         object_types=(EMPTY, WALL, FLOWER),
         biomes=(Biome(object_frequencies=(0, 0.05, 0.05)),),
