@@ -12,7 +12,7 @@ import jax.numpy as jnp
 from flax import struct
 from gymnax.environments import environment, spaces
 
-from objects import EMPTY, BaseForagaxObject
+from objects import AGENT, EMPTY, BaseForagaxObject
 
 
 class Actions(IntEnum):
@@ -274,8 +274,7 @@ class ForagaxEnv(environment.Environment[EnvState, EnvParams]):
             img = img.at[render_grid == obj_id].set(jnp.array(color))
 
         # Agent color
-        agent_color = self.object_colors[-1]
-        img = img.at[state.pos[1], state.pos[0]].set(jnp.array(agent_color))
+        img = img.at[state.pos[1], state.pos[0]].set(jnp.array(AGENT.color))
 
         img = img * 255
         img = jax.image.resize(img, (self.size[1] * 24, self.size[0] * 24, 3), jax.image.ResizeMethod.NEAREST)
