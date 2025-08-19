@@ -9,7 +9,7 @@ from foragax import (
     ForagaxRGBEnv,
     ForagaxWorldEnv,
 )
-from objects import EMPTY, FLOWER, MOREL, OYSTER, THORNS, WALL
+from objects import FLOWER, MOREL, OYSTER, THORNS, WALL
 
 
 def test_observation_shape():
@@ -17,7 +17,7 @@ def test_observation_shape():
     env = ForagaxObjectEnv(
         size=(500, 500),
         aperture_size=(9, 9),
-        objects=(EMPTY, WALL, FLOWER, THORNS),
+        objects=(WALL, FLOWER, THORNS),
     )
     params = env.default_params
     assert env.observation_space(params).shape == (9, 9, 3)
@@ -68,18 +68,8 @@ def test_add_objects():
     freq = 0.1
     env = ForagaxObjectEnv(
         size=size,
-        objects=(
-            EMPTY,
-            FLOWER,
-        ),
-        biomes=(
-            Biome(
-                object_frequencies=(
-                    0,
-                    freq,
-                )
-            ),
-        ),
+        objects=(FLOWER,),
+        biomes=(Biome(object_frequencies=(freq,)),),
     )
     params = env.default_params
     key = jax.random.PRNGKey(0)
@@ -105,19 +95,13 @@ def test_basic_movement():
     key = jax.random.PRNGKey(0)
 
     biome = Biome(
-        object_frequencies=(
-            0,
-            1.0,
-        ),
+        object_frequencies=(1.0,),
         start=(3, 4),
         stop=(4, 6),
     )
     env = ForagaxObjectEnv(
         size=7,
-        objects=(
-            EMPTY,
-            WALL,
-        ),
+        objects=(WALL,),
         biomes=(biome,),
     )
     params = env.default_params
@@ -146,12 +130,12 @@ def test_basic_movement():
 def test_vision():
     """Test the agent's observation."""
     key = jax.random.PRNGKey(0)
-    object_types = (EMPTY, WALL)
+    object_types = (WALL,)
     env = ForagaxObjectEnv(size=(7, 7), aperture_size=(3, 3), objects=object_types)
     params = env.default_params
     obs, state = env.reset(key, params)
 
-    wall_id = object_types.index(WALL)
+    wall_id = 1  # 0 is EMPTY
 
     # Create a predictable environment
     grid = jnp.zeros((7, 7), dtype=jnp.int32)
@@ -188,7 +172,7 @@ def test_vision():
 def test_respawn():
     """Test object respawning."""
     key = jax.random.PRNGKey(0)
-    object_types = (EMPTY, FLOWER)
+    object_types = (FLOWER,)
     env = ForagaxObjectEnv(
         size=7,
         aperture_size=3,
@@ -197,7 +181,7 @@ def test_respawn():
     params = env.default_params
     _, state = env.reset_env(key, params)
 
-    flower_id = object_types.index(FLOWER)
+    flower_id = 1  # 0 is EMPTY
 
     # Place a flower and move the agent to it
     grid = jnp.zeros((7, 7), dtype=jnp.int32)
@@ -224,7 +208,7 @@ def test_respawn():
 def test_wrapping_dynamics():
     """Test that the agent wraps around the environment boundaries."""
     key = jax.random.PRNGKey(0)
-    env = ForagaxObjectEnv(size=(5, 5), objects=(EMPTY,))
+    env = ForagaxObjectEnv(size=(5, 5), objects=())
     params = env.default_params
     _, state = env.reset(key, params)
 
@@ -307,7 +291,7 @@ def test_wrapping_dynamics():
 def test_wrapping_vision():
     """Test that the agent's vision wraps around the environment boundaries."""
     key = jax.random.PRNGKey(0)
-    env = ForagaxObjectEnv(size=(5, 5), aperture_size=(3, 3), objects=(EMPTY, FLOWER))
+    env = ForagaxObjectEnv(size=(5, 5), aperture_size=(3, 3), objects=(FLOWER,))
     params = env.default_params
     obs, state = env.reset(key, params)
 
@@ -350,13 +334,13 @@ def test_wrapping_vision():
 
 def test_generate_objects_in_biome():
     """Test generating objects within a specific biome area."""
-    object_types = (EMPTY, WALL, FLOWER, THORNS, MOREL, OYSTER)
+    object_types = (WALL, FLOWER, THORNS, MOREL, OYSTER)
     env = ForagaxObjectEnv(
         size=(10, 10),
         objects=object_types,
         biomes=(
             Biome(
-                object_frequencies=(0.0, 0.0, 0.0, 0.0, 0.1, 0.0),
+                object_frequencies=(0.0, 0.0, 0.0, 0.1, 0.0),
                 start=(2, 2),
                 stop=(6, 6),
             ),
@@ -367,10 +351,10 @@ def test_generate_objects_in_biome():
 
     _, state = env.reset(key, params)
 
-    morel_id = object_types.index(MOREL)
-    oyster_id = object_types.index(OYSTER)
-    wall_id = object_types.index(WALL)
-    thorns_id = object_types.index(THORNS)
+    morel_id = object_types.index(MOREL) + 1
+    oyster_id = object_types.index(OYSTER) + 1
+    wall_id = object_types.index(WALL) + 1
+    thorns_id = object_types.index(THORNS) + 1
 
     # Check that morels only appear within the biome
     morel_locations = jnp.argwhere(state.object_grid == morel_id)
@@ -386,7 +370,7 @@ def test_generate_objects_in_biome():
 
 
 def test_benchmark_vision(benchmark):
-    env = ForagaxObjectEnv(size=7, aperture_size=3, objects=(EMPTY, WALL))
+    env = ForagaxObjectEnv(size=7, aperture_size=3, objects=(WALL,))
     params = env.default_params
     key = jax.random.PRNGKey(0)
     _, state = env.reset(key, params)
@@ -423,8 +407,8 @@ def test_benchmark_creation(benchmark):
     env = ForagaxObjectEnv(
         size=1_000,
         aperture_size=31,
-        objects=(EMPTY, WALL, FLOWER),
-        biomes=(Biome(object_frequencies=(0, 0.05, 0.05)),),
+        objects=(WALL, FLOWER),
+        biomes=(Biome(object_frequencies=(0.05, 0.05)),),
     )
     params = env.default_params
 
@@ -445,8 +429,8 @@ def test_benchmark_small_env(benchmark):
     env = ForagaxObjectEnv(
         size=1_000,
         aperture_size=11,
-        objects=(EMPTY, WALL, FLOWER),
-        biomes=(Biome(object_frequencies=(0, 0.1, 0.1)),),
+        objects=(WALL, FLOWER),
+        biomes=(Biome(object_frequencies=(0.1, 0.1)),),
     )
     params = env.default_params
     key = jax.random.PRNGKey(0)
@@ -478,8 +462,8 @@ def test_benchmark_big_env(benchmark):
     env = ForagaxObjectEnv(
         size=10_000,
         aperture_size=61,
-        objects=(EMPTY, WALL, FLOWER),
-        biomes=(Biome(object_frequencies=(0, 0.05, 0.05)),),
+        objects=(WALL, FLOWER),
+        biomes=(Biome(object_frequencies=(0.05, 0.05)),),
     )
     params = env.default_params
     key = jax.random.PRNGKey(0)
@@ -516,8 +500,8 @@ def test_benchmark_vmap_env(benchmark):
     env = ForagaxObjectEnv(
         size=1_000,
         aperture_size=11,
-        objects=(EMPTY, WALL, FLOWER),
-        biomes=(Biome(object_frequencies=(0, 0.1, 0.1)),),
+        objects=(WALL, FLOWER),
+        biomes=(Biome(object_frequencies=(0.1, 0.1)),),
     )
     params = env.default_params
     key = jax.random.PRNGKey(0)
@@ -557,8 +541,8 @@ def test_benchmark_small_env_color(benchmark):
     env = ForagaxRGBEnv(
         size=1_000,
         aperture_size=15,
-        objects=(EMPTY, WALL, FLOWER),
-        biomes=(Biome(object_frequencies=(0, 0.05, 0.05)),),
+        objects=(WALL, FLOWER),
+        biomes=(Biome(object_frequencies=(0.05, 0.05)),),
     )
     params = env.default_params
     key = jax.random.PRNGKey(0)
@@ -589,8 +573,8 @@ def test_benchmark_small_env_color(benchmark):
 def test_benchmark_small_env_world(benchmark):
     env = ForagaxWorldEnv(
         size=1_000,
-        objects=(EMPTY, WALL, FLOWER),
-        biomes=(Biome(object_frequencies=(0, 0.05, 0.05)),),
+        objects=(WALL, FLOWER),
+        biomes=(Biome(object_frequencies=(0.05, 0.05)),),
     )
     params = env.default_params
     key = jax.random.PRNGKey(0)

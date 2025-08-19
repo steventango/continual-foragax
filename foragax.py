@@ -59,8 +59,8 @@ class ForagaxEnv(environment.Environment[EnvState, EnvParams]):
         self,
         size: Tuple[int, int] | int = (10, 10),
         aperture_size: Tuple[int, int] | int = (5, 5),
-        objects: Tuple[BaseForagaxObject, ...] = (EMPTY,),
-        biomes: Tuple[Biome, ...] = (Biome(object_frequencies=(1.0,)),),
+        objects: Tuple[BaseForagaxObject, ...] = (),
+        biomes: Tuple[Biome, ...] = (Biome(object_frequencies=()),),
     ):
         super().__init__()
         if isinstance(size, int):
@@ -70,6 +70,8 @@ class ForagaxEnv(environment.Environment[EnvState, EnvParams]):
         if isinstance(aperture_size, int):
             aperture_size = (aperture_size, aperture_size)
         self.aperture_size = aperture_size
+
+        objects = (EMPTY,) + objects
 
         # JIT-compatible versions of object and biome properties
         self.object_ids = jnp.arange(len(objects))
@@ -199,17 +201,24 @@ class ForagaxEnv(environment.Environment[EnvState, EnvParams]):
             )
 
             # Generate objects for this biome and update the main grid
-            cumulative_freq = 0.0
-            for j, freq in enumerate(self.biome_object_frequencies[i]):
-                obj_id = self.object_ids[j]
-                object_grid = jnp.where(
-                    mask
-                    & (grid_rand >= cumulative_freq)
-                    & (grid_rand < cumulative_freq + freq),
-                    obj_id,
-                    object_grid,
-                )
-                cumulative_freq += freq
+            biome_freqs = self.biome_object_frequencies[i]
+            empty_freq = 1.0 - jnp.sum(biome_freqs)
+            all_freqs = jnp.concatenate([jnp.array([empty_freq]), biome_freqs])
+
+            cumulative_freqs = jnp.cumsum(
+                jnp.concatenate([jnp.array([0.0]), all_freqs])
+            )
+
+            # Determine which object to place in each cell
+            # The last object ID will be used for any value of grid_rand >= cumulative_freqs[-1]
+            # so we don't need to cap grid_rand
+            obj_ids_for_biome = jnp.arange(len(all_freqs))
+            cell_obj_ids = (
+                jnp.searchsorted(cumulative_freqs, grid_rand, side="right") - 1
+            )
+            biome_objects = obj_ids_for_biome[cell_obj_ids]
+
+            object_grid = jnp.where(mask, biome_objects, object_grid)
 
         # Place agent in the center of the world and ensure the cell is empty.
         agent_pos = jnp.array([self.size[0] // 2, self.size[1] // 2])

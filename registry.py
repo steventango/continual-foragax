@@ -3,18 +3,18 @@
 from typing import Any, Dict
 
 from foragax import Biome, ForagaxEnv, ForagaxObjectEnv, ForagaxRGBEnv, ForagaxWorldEnv
-from objects import EMPTY, MOREL, OYSTER
+from objects import MOREL, OYSTER
 
 ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
     "ForagaxTwoBiomeSmall": {
         "size": (16, 8),
         "aperture_size": (5, 5),
-        "objects": (EMPTY, MOREL, OYSTER),
+        "objects": (MOREL, OYSTER),
         "biomes": (
             # Morel biome
-            Biome(start=(2, 2), stop=(6, 6), object_frequencies=(0.0, 1.0, 0.0, 0.0)),
+            Biome(start=(2, 2), stop=(6, 6), object_frequencies=(1.0, 0.0)),
             # Oyster biome
-            Biome(start=(10, 2), stop=(14, 6), object_frequencies=(0.0, 0.0, 1.0, 0.0)),
+            Biome(start=(10, 2), stop=(14, 6), object_frequencies=(0.0, 1.0)),
         ),
     }
 }
