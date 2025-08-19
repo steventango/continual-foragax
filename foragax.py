@@ -14,13 +14,31 @@ from flax import struct
 from gymnax.environments import environment, spaces
 
 
-@struct.dataclass
 class ObjectType:
-    reward: float = 0.0
-    blocking: bool = False
-    collectable: bool = False
-    regen_delay: Tuple[int, int] = (0, 0)
-    color: Tuple[float, float, float] = (0.0, 0.0, 0.0)
+    """Base class for objects in the Forager environment."""
+
+    def __init__(
+        self,
+        reward: float = 0.0,
+        blocking: bool = False,
+        collectable: bool = False,
+        regen_delay: Tuple[int, int] = (0, 0),
+        color: Tuple[float, float, float] = (0.0, 0.0, 0.0),
+    ):
+        self.reward_val = reward
+        self.blocking = blocking
+        self.collectable = collectable
+        self.regen_delay_range = regen_delay
+        self.color = color
+
+    def reward(self, clock: int, rng: jax.Array) -> float:
+        """Default reward function."""
+        return self.reward_val
+
+    def regen_delay(self, clock: int, rng: jax.Array) -> int:
+        """Default regeneration delay function."""
+        min_delay, max_delay = self.regen_delay_range
+        return jax.random.randint(rng, (), min_delay, max_delay)
 
 
 # Default object types
@@ -79,7 +97,6 @@ class EnvState(environment.EnvState):
     pos: jax.Array
     object_grid: jax.Array
     time: int
-    key: jax.Array
 
 
 class ForagerEnv(environment.Environment[EnvState, EnvParams]):
@@ -103,11 +120,12 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
 
         # JIT-compatible versions of object and biome properties
         self.object_ids = jnp.arange(len(object_types))
-        self.object_rewards = jnp.array([o.reward for o in object_types])
         self.object_blocking = jnp.array([o.blocking for o in object_types])
         self.object_collectable = jnp.array([o.collectable for o in object_types])
-        self.object_regen_delays = jnp.array([o.regen_delay for o in object_types])
         self.object_colors = jnp.array([o.color for o in object_types])
+
+        self.reward_fns = [o.reward for o in object_types]
+        self.regen_delay_fns = [o.regen_delay for o in object_types]
 
         self.biome_object_frequencies = jnp.array(
             [b.object_frequencies for b in biomes]
@@ -151,11 +169,12 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
 
         # 2. HANDLE COLLISIONS AND REWARDS
         obj_at_pos = current_objects[pos[1], pos[0]]
-        reward = self.object_rewards[obj_at_pos]
+        key, subkey = jax.random.split(key)
+        reward = jax.lax.switch(obj_at_pos, self.reward_fns, state.time, subkey)
         is_collectable = self.object_collectable[obj_at_pos]
 
         # 3. HANDLE OBJECT COLLECTION AND RESPAWNING
-        key, subkey = jax.random.split(state.key)
+        key, subkey = jax.random.split(key)
 
         # Decrement timers (stored as negative values)
         is_timer = state.object_grid < 0
@@ -164,14 +183,7 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
         )
 
         # Collect object: set a timer
-        def get_regen_delay(obj_type):
-            key_regen, _ = jax.random.split(subkey)
-            regen_delays = self.object_regen_delays
-            min_delay = regen_delays[obj_type, 0]
-            max_delay = regen_delays[obj_type, 1]
-            return jax.random.randint(key_regen, (), min_delay, max_delay)
-
-        regen_delay = get_regen_delay(obj_at_pos)
+        regen_delay = jax.lax.switch(obj_at_pos, self.regen_delay_fns, state.time, subkey)
         encoded_timer = -((regen_delay * num_obj_types) + obj_at_pos)
 
         # If collected, replace object with timer; otherwise, keep it
@@ -184,7 +196,6 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
             pos=pos,
             object_grid=object_grid,
             time=state.time + 1,
-            key=key,
         )
 
         done = self.is_terminal(state, params)
@@ -253,7 +264,6 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
             pos=agent_pos,
             object_grid=object_grid,
             time=0,
-            key=key,
         )
 
         return self.get_obs(state, params), state

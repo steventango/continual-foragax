@@ -7,7 +7,6 @@ import jax.numpy as jnp
 import pytest
 
 from foragax import (
-    AGENT,
     EMPTY,
     FLOWER,
     MOREL,
@@ -19,7 +18,6 @@ from foragax import (
     ForagerObject,
     ForagerRGB,
     ForagerWorld,
-    ObjectType,
 )
 
 
@@ -137,19 +135,19 @@ def test_basic_movement():
     assert jnp.array_equal(state.pos, jnp.array([3, 3]))
 
     # stays still when bumping into a wall
-    key, step_key = jax.random.split(state.key)
+    key, step_key = jax.random.split(key)
     _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
     assert jnp.array_equal(state.pos, jnp.array([3, 3]))
 
-    key, step_key = jax.random.split(state.key)
+    key, step_key = jax.random.split(key)
     _, state, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
     assert jnp.array_equal(state.pos, jnp.array([4, 3]))
 
-    key, step_key = jax.random.split(state.key)
+    key, step_key = jax.random.split(key)
     _, state, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
     assert jnp.array_equal(state.pos, jnp.array([3, 3]))
 
-    key, step_key = jax.random.split(state.key)
+    key, step_key = jax.random.split(key)
     _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
     assert jnp.array_equal(state.pos, jnp.array([3, 2]))
 
@@ -174,7 +172,7 @@ def test_vision():
     chex.assert_trees_all_equal(state.pos, jnp.array([3, 3]))
 
     # No movement
-    key, step_key = jax.random.split(state.key)
+    key, step_key = jax.random.split(key)
     obs, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
 
     expected = jnp.zeros((3, 3, 1), dtype=jnp.int32)
@@ -184,9 +182,9 @@ def test_vision():
     chex.assert_trees_all_equal(obs, expected)
 
     # Move right
-    key, step_key = jax.random.split(state.key)
+    key, step_key = jax.random.split(key)
     obs, state, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
-    key, step_key = jax.random.split(state.key)
+    key, step_key = jax.random.split(key)
     obs, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
     expected = jnp.zeros((3, 3, 1), dtype=jnp.int32)
     expected = expected.at[0, 0, 0].set(1)
@@ -216,18 +214,18 @@ def test_respawn():
     state = state.replace(object_grid=grid, pos=jnp.array([3, 3]))
 
     # Collect the flower
-    key, step_key = jax.random.split(state.key)
+    key, step_key = jax.random.split(key)
     _, state, reward, _, _ = env.step_env(step_key, state, Actions.UP, params)
-    assert reward == FLOWER.reward
+    assert reward == FLOWER.reward_val
     assert state.object_grid[4, 3] < 0
 
     # Step until it respawns
-    for _ in range(92):
-        key, step_key = jax.random.split(state.key)
+    for _ in range(20):
+        key, step_key = jax.random.split(key)
         _, state, _, _, _ = env.step_env(step_key, state, Actions.UP, params)
         assert state.object_grid[4, 3] < 0
 
-    key, step_key = jax.random.split(state.key)
+    key, step_key = jax.random.split(key)
     _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
     assert state.object_grid[4, 3] == flower_id
 
@@ -241,76 +239,76 @@ def test_wrapping_dynamics():
 
     # Go up
     assert jnp.array_equal(state.pos, jnp.array([2, 2]))
-    key, step_key = jax.random.split(state.key)
+    key, step_key = jax.random.split(key)
     _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 3]))
-    key, step_key = jax.random.split(state.key)
+    key, step_key = jax.random.split(key)
     _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 4]))
-    key, step_key = jax.random.split(state.key)
+    key, step_key = jax.random.split(key)
     _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 0]))
-    key, step_key = jax.random.split(state.key)
+    key, step_key = jax.random.split(key)
     _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 1]))
-    key, step_key = jax.random.split(state.key)
+    key, step_key = jax.random.split(key)
     _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 2]))
 
     # Go down
     _, state = env.reset(key, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 2]))
-    key, step_key = jax.random.split(state.key)
+    key, step_key = jax.random.split(key)
     _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 1]))
-    key, step_key = jax.random.split(state.key)
+    key, step_key = jax.random.split(key)
     _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 0]))
-    key, step_key = jax.random.split(state.key)
+    key, step_key = jax.random.split(key)
     _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 4]))
-    key, step_key = jax.random.split(state.key)
+    key, step_key = jax.random.split(key)
     _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 3]))
-    key, step_key = jax.random.split(state.key)
+    key, step_key = jax.random.split(key)
     _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 2]))
 
     # Go right
     _, state = env.reset(key, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 2]))
-    key, step_key = jax.random.split(state.key)
+    key, step_key = jax.random.split(key)
     _, state, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
     assert jnp.array_equal(state.pos, jnp.array([3, 2]))
-    key, step_key = jax.random.split(state.key)
+    key, step_key = jax.random.split(key)
     _, state, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
     assert jnp.array_equal(state.pos, jnp.array([4, 2]))
-    key, step_key = jax.random.split(state.key)
+    key, step_key = jax.random.split(key)
     _, state, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
     assert jnp.array_equal(state.pos, jnp.array([0, 2]))
-    key, step_key = jax.random.split(state.key)
+    key, step_key = jax.random.split(key)
     _, state, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
     assert jnp.array_equal(state.pos, jnp.array([1, 2]))
-    key, step_key = jax.random.split(state.key)
+    key, step_key = jax.random.split(key)
     _, state, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 2]))
 
     # Go left
     _, state = env.reset(key, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 2]))
-    key, step_key = jax.random.split(state.key)
+    key, step_key = jax.random.split(key)
     _, state, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
     assert jnp.array_equal(state.pos, jnp.array([1, 2]))
-    key, step_key = jax.random.split(state.key)
+    key, step_key = jax.random.split(key)
     _, state, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
     assert jnp.array_equal(state.pos, jnp.array([0, 2]))
-    key, step_key = jax.random.split(state.key)
+    key, step_key = jax.random.split(key)
     _, state, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
     assert jnp.array_equal(state.pos, jnp.array([4, 2]))
-    key, step_key = jax.random.split(state.key)
+    key, step_key = jax.random.split(key)
     _, state, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
     assert jnp.array_equal(state.pos, jnp.array([3, 2]))
-    key, step_key = jax.random.split(state.key)
+    key, step_key = jax.random.split(key)
     _, state, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 2]))
 
@@ -333,11 +331,11 @@ def test_wrapping_vision():
     assert jnp.array_equal(obs, expected)
 
     # go left
-    key, step_key = jax.random.split(state.key)
+    key, step_key = jax.random.split(key)
     _, state, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
 
     # go down
-    key, step_key = jax.random.split(state.key)
+    key, step_key = jax.random.split(key)
     obs, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
 
     expected = jnp.zeros((3, 3, 1), dtype=jnp.int32)
@@ -347,9 +345,9 @@ def test_wrapping_vision():
     assert jnp.array_equal(obs, expected)
 
     # go left , go left
-    key, step_key = jax.random.split(state.key)
+    key, step_key = jax.random.split(key)
     _, state, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
-    key, step_key = jax.random.split(state.key)
+    key, step_key = jax.random.split(key)
     obs, state, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
 
     expected = jnp.zeros((3, 3, 1), dtype=jnp.int32)
