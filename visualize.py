@@ -9,7 +9,7 @@ from registry import make
 def main():
     """Generate a visualization of a Foragax environment under random behavior."""
     key = jax.random.PRNGKey(0)
-    env = make("ForagaxTwoBiomeSmall", observation_type="rgb")
+    env = make("ForagaxTwoBiomeSmall", observation_type="object")
     env_params = env.default_params
 
     frames = []
