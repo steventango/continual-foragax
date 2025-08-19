@@ -17,7 +17,7 @@ def test_observation_shape():
     env = ForagerObjectEnv(
         size=(500, 500),
         aperture_size=(9, 9),
-        object_types=(EMPTY, WALL, FLOWER, THORNS),
+        objects=(EMPTY, WALL, FLOWER, THORNS),
     )
     params = env.default_params
     assert env.observation_space(params).shape == (9, 9, 3)
@@ -68,7 +68,7 @@ def test_add_objects():
     freq = 0.1
     env = ForagerObjectEnv(
         size=size,
-        object_types=(
+        objects=(
             EMPTY,
             FLOWER,
         ),
@@ -114,7 +114,7 @@ def test_basic_movement():
     )
     env = ForagerObjectEnv(
         size=7,
-        object_types=(
+        objects=(
             EMPTY,
             WALL,
         ),
@@ -147,7 +147,7 @@ def test_vision():
     """Test the agent's observation."""
     key = jax.random.PRNGKey(0)
     object_types = (EMPTY, WALL)
-    env = ForagerObjectEnv(size=(7, 7), aperture_size=(3, 3), object_types=object_types)
+    env = ForagerObjectEnv(size=(7, 7), aperture_size=(3, 3), objects=object_types)
     params = env.default_params
     obs, state = env.reset(key, params)
 
@@ -192,7 +192,7 @@ def test_respawn():
     env = ForagerObjectEnv(
         size=7,
         aperture_size=3,
-        object_types=object_types,
+        objects=object_types,
     )
     params = env.default_params
     _, state = env.reset_env(key, params)
@@ -224,7 +224,7 @@ def test_respawn():
 def test_wrapping_dynamics():
     """Test that the agent wraps around the environment boundaries."""
     key = jax.random.PRNGKey(0)
-    env = ForagerObjectEnv(size=(5, 5), object_types=(EMPTY,))
+    env = ForagerObjectEnv(size=(5, 5), objects=(EMPTY,))
     params = env.default_params
     _, state = env.reset(key, params)
 
@@ -307,9 +307,7 @@ def test_wrapping_dynamics():
 def test_wrapping_vision():
     """Test that the agent's vision wraps around the environment boundaries."""
     key = jax.random.PRNGKey(0)
-    env = ForagerObjectEnv(
-        size=(5, 5), aperture_size=(3, 3), object_types=(EMPTY, FLOWER)
-    )
+    env = ForagerObjectEnv(size=(5, 5), aperture_size=(3, 3), objects=(EMPTY, FLOWER))
     params = env.default_params
     obs, state = env.reset(key, params)
 
@@ -355,7 +353,7 @@ def test_generate_objects_in_biome():
     object_types = (EMPTY, WALL, FLOWER, THORNS, MOREL, OYSTER)
     env = ForagerObjectEnv(
         size=(10, 10),
-        object_types=object_types,
+        objects=object_types,
         biomes=(
             Biome(
                 object_frequencies=(0.0, 0.0, 0.0, 0.0, 0.1, 0.0),
@@ -388,7 +386,7 @@ def test_generate_objects_in_biome():
 
 
 def test_benchmark_vision(benchmark):
-    env = ForagerObjectEnv(size=7, aperture_size=3, object_types=(EMPTY, WALL))
+    env = ForagerObjectEnv(size=7, aperture_size=3, objects=(EMPTY, WALL))
     params = env.default_params
     key = jax.random.PRNGKey(0)
     _, state = env.reset(key, params)
@@ -425,7 +423,7 @@ def test_benchmark_creation(benchmark):
     env = ForagerObjectEnv(
         size=1_000,
         aperture_size=31,
-        object_types=(EMPTY, WALL, FLOWER),
+        objects=(EMPTY, WALL, FLOWER),
         biomes=(Biome(object_frequencies=(0, 0.05, 0.05)),),
     )
     params = env.default_params
@@ -447,7 +445,7 @@ def test_benchmark_small_env(benchmark):
     env = ForagerObjectEnv(
         size=1_000,
         aperture_size=11,
-        object_types=(EMPTY, WALL, FLOWER),
+        objects=(EMPTY, WALL, FLOWER),
         biomes=(Biome(object_frequencies=(0, 0.1, 0.1)),),
     )
     params = env.default_params
@@ -480,7 +478,7 @@ def test_benchmark_big_env(benchmark):
     env = ForagerObjectEnv(
         size=10_000,
         aperture_size=61,
-        object_types=(EMPTY, WALL, FLOWER),
+        objects=(EMPTY, WALL, FLOWER),
         biomes=(Biome(object_frequencies=(0, 0.05, 0.05)),),
     )
     params = env.default_params
@@ -518,7 +516,7 @@ def test_benchmark_vmap_env(benchmark):
     env = ForagerObjectEnv(
         size=1_000,
         aperture_size=11,
-        object_types=(EMPTY, WALL, FLOWER),
+        objects=(EMPTY, WALL, FLOWER),
         biomes=(Biome(object_frequencies=(0, 0.1, 0.1)),),
     )
     params = env.default_params
@@ -559,7 +557,7 @@ def test_benchmark_small_env_color(benchmark):
     env = ForagerRGBEnv(
         size=1_000,
         aperture_size=15,
-        object_types=(EMPTY, WALL, FLOWER),
+        objects=(EMPTY, WALL, FLOWER),
         biomes=(Biome(object_frequencies=(0, 0.05, 0.05)),),
     )
     params = env.default_params
@@ -591,7 +589,7 @@ def test_benchmark_small_env_color(benchmark):
 def test_benchmark_small_env_world(benchmark):
     env = ForagerWorldEnv(
         size=1_000,
-        object_types=(EMPTY, WALL, FLOWER),
+        objects=(EMPTY, WALL, FLOWER),
         biomes=(Biome(object_frequencies=(0, 0.05, 0.05)),),
     )
     params = env.default_params

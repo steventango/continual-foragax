@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 from flax import struct
 from gymnax.environments import environment, spaces
 
-from objects import EMPTY, ForagerObject
+from objects import EMPTY, BaseForagerObject
 
 
 class Actions(IntEnum):
@@ -60,7 +60,7 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
         self,
         size: Tuple[int, int] | int = (10, 10),
         aperture_size: Tuple[int, int] | int = (5, 5),
-        object_types: Tuple[ForagerObject, ...] = (EMPTY,),
+        objects: Tuple[BaseForagerObject, ...] = (EMPTY,),
         biomes: Tuple[Biome, ...] = (Biome(object_frequencies=(1.0,)),),
     ):
         super().__init__()
@@ -73,13 +73,13 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
         self.aperture_size = aperture_size
 
         # JIT-compatible versions of object and biome properties
-        self.object_ids = jnp.arange(len(object_types))
-        self.object_blocking = jnp.array([o.blocking for o in object_types])
-        self.object_collectable = jnp.array([o.collectable for o in object_types])
-        self.object_colors = jnp.array([o.color for o in object_types])
+        self.object_ids = jnp.arange(len(objects))
+        self.object_blocking = jnp.array([o.blocking for o in objects])
+        self.object_collectable = jnp.array([o.collectable for o in objects])
+        self.object_colors = jnp.array([o.color for o in objects])
 
-        self.reward_fns = [o.reward for o in object_types]
-        self.regen_delay_fns = [o.regen_delay for o in object_types]
+        self.reward_fns = [o.reward for o in objects]
+        self.regen_delay_fns = [o.regen_delay for o in objects]
 
         self.biome_object_frequencies = jnp.array(
             [b.object_frequencies for b in biomes]
