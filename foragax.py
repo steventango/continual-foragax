@@ -139,7 +139,7 @@ class ForagaxEnv(environment.Environment[EnvState, EnvParams]):
         regen_delay = jax.lax.switch(
             obj_at_pos, self.regen_delay_fns, state.time, subkey
         )
-        encoded_timer = -((regen_delay * num_obj_types) + obj_at_pos)
+        encoded_timer = obj_at_pos - ((regen_delay + 1) * num_obj_types)
 
         # If collected, replace object with timer; otherwise, keep it
         val_at_pos = object_grid[pos[1], pos[0]]

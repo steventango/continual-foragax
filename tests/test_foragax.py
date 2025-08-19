@@ -211,7 +211,7 @@ def test_respawn():
     assert state.object_grid[4, 3] < 0
 
     # Step until it respawns
-    for _ in range(20):
+    for i in range(20):
         key, step_key = jax.random.split(key)
         _, state, _, _, _ = env.step_env(step_key, state, Actions.UP, params)
         assert state.object_grid[4, 3] < 0
