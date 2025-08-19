@@ -250,7 +250,10 @@ class ForagaxEnv(environment.Environment[EnvState, EnvParams]):
         return 4
 
     def action_space(self, params: EnvParams) -> spaces.Discrete:
-        return spaces.Discrete(self.num_actions)
+        action_space = spaces.Discrete(self.num_actions)
+        # TODO: workaround for https://github.com/RobertTLange/gymnax/issues/58
+        action_space.dtype = jnp.int32
+        return action_space
 
     def observation_space(self, params: EnvParams) -> spaces.Box:
         """Observation space of the environment."""
