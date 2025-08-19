@@ -41,7 +41,7 @@ class DefaultForagaxObject(BaseForagaxObject):
         blocking: bool = False,
         collectable: bool = False,
         regen_delay: Tuple[int, int] = (10, 100),
-        color: Tuple[float, float, float] = (0.0, 0.0, 0.0),
+        color: Tuple[float, float, float] = (1.0, 1.0, 1.0),
     ):
         super().__init__(name, blocking, collectable, color)
         self.reward_val = reward
