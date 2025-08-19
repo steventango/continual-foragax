@@ -1,24 +1,15 @@
-import pickle
-
 import chex
-import gymnax
 import jax
 import jax.numpy as jnp
-import pytest
 
 from foragax import (
-    EMPTY,
-    FLOWER,
-    MOREL,
-    OYSTER,
-    THORNS,
-    WALL,
     Actions,
     Biome,
     ForagerObjectEnv,
     ForagerRGBEnv,
     ForagerWorldEnv,
 )
+from objects import EMPTY, FLOWER, MOREL, OYSTER, THORNS, WALL
 
 
 def test_observation_shape():
