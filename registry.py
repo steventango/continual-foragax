@@ -3,13 +3,13 @@
 from typing import Any, Dict
 
 from foragax import Biome, ForagaxEnv, ForagaxObjectEnv, ForagaxRGBEnv, ForagaxWorldEnv
-from objects import AGENT, EMPTY, MOREL, OYSTER
+from objects import EMPTY, MOREL, OYSTER
 
 ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
     "ForagaxTwoBiomeSmall": {
         "size": (16, 8),
         "aperture_size": (5, 5),
-        "objects": (EMPTY, MOREL, OYSTER, AGENT),
+        "objects": (EMPTY, MOREL, OYSTER),
         "biomes": (
             # Morel biome
             Biome(start=(2, 2), stop=(6, 6), object_frequencies=(0.0, 1.0, 0.0, 0.0)),
