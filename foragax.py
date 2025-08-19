@@ -9,7 +9,6 @@ from typing import Any, Tuple
 
 import jax
 import jax.numpy as jnp
-import matplotlib.pyplot as plt
 from flax import struct
 from gymnax.environments import environment, spaces
 
@@ -266,8 +265,6 @@ class ForagaxEnv(environment.Environment[EnvState, EnvParams]):
 
     def render(self, state: EnvState, params: EnvParams):
         """Render the environment state."""
-        fig, ax = plt.subplots()
-
         # Create an RGB image from the object grid
         img = jnp.zeros((self.size[1], self.size[0], 3))
         # Decode grid for rendering: non-negative are objects, negative are empty
@@ -280,10 +277,9 @@ class ForagaxEnv(environment.Environment[EnvState, EnvParams]):
         agent_color = self.object_colors[-1]
         img = img.at[state.pos[1], state.pos[0]].set(jnp.array(agent_color))
 
-        ax.imshow(img)
-        ax.set_xticks([])
-        ax.set_yticks([])
-        return fig, ax
+        img = img * 255
+        img = jax.image.resize(img, (self.size[1] * 24, self.size[0] * 24, 3), jax.image.ResizeMethod.NEAREST)
+        return img
 
 
 class ForagaxObjectEnv(ForagaxEnv):
