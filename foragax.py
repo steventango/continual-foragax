@@ -279,6 +279,13 @@ class ForagaxEnv(environment.Environment[EnvState, EnvParams]):
 
         img = img * 255
         img = jax.image.resize(img, (self.size[1] * 24, self.size[0] * 24, 3), jax.image.ResizeMethod.NEAREST)
+
+        grid_color = jnp.array([0, 0, 0])
+        row_indices = jnp.arange(1, self.size[1]) * 24
+        col_indices = jnp.arange(1, self.size[0]) * 24
+        img = img.at[row_indices, :].set(grid_color)
+        img = img.at[:, col_indices].set(grid_color)
+
         return img
 
 
