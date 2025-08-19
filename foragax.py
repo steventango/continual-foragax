@@ -5,6 +5,7 @@ Source: https://github.com/andnp/Foragax
 
 from dataclasses import dataclass
 from enum import IntEnum
+from functools import partial
 from typing import Any, Tuple
 
 import jax
@@ -275,15 +276,21 @@ class ForagaxEnv(environment.Environment[EnvState, EnvParams]):
             }
         )
 
+    @partial(jax.jit, static_argnames=("self",))
     def render(self, state: EnvState, params: EnvParams):
         """Render the environment state."""
         # Create an RGB image from the object grid
         img = jnp.zeros((self.size[1], self.size[0], 3))
         # Decode grid for rendering: non-negative are objects, negative are empty
         render_grid = jnp.maximum(0, state.object_grid)
-        for i, obj_id in enumerate(self.object_ids):
+
+        def update_image(i, img):
             color = self.object_colors[i]
-            img = img.at[render_grid == obj_id].set(jnp.array(color))
+            mask = render_grid == i
+            img = jnp.where(mask[..., None], color, img)
+            return img
+
+        img = jax.lax.fori_loop(0, len(self.object_ids), update_image, img)
 
         # Agent color
         img = img.at[state.pos[1], state.pos[0]].set(jnp.array(AGENT.color))
