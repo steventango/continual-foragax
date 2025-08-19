@@ -1,20 +1,9 @@
 import os
 
 import jax
-import jax.numpy as jnp
 from gymnasium.utils.save_video import save_video
 
-from foragax import EnvParams, EnvState
 from registry import make
-
-
-def get_obs(self, state: EnvState, params: EnvParams, key=None) -> jax.Array:
-    num_obj_types = len(self.object_ids)
-    # Decode grid for observation
-    obs_grid = jnp.maximum(0, state.object_grid)
-    obs = jax.nn.one_hot(obs_grid, num_obj_types)
-    obs = obs.at[state.pos[1], state.pos[0], -1].set(1)
-    return obs
 
 
 def main():
