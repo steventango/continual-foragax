@@ -30,7 +30,7 @@ def main():
     video_folder = "videos"
     if not os.path.exists(video_folder):
         os.makedirs(video_folder)
-    save_video(frames, video_folder, name_prefix="foragax_test", fps=15)
+    save_video(frames, video_folder, name_prefix="foragax_test", fps=8)
 
 
 if __name__ == "__main__":
