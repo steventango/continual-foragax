@@ -43,7 +43,7 @@ class Biome:
 
 @struct.dataclass
 class EnvParams(environment.EnvParams):
-    max_steps_in_episode: int
+    max_steps_in_episode: int | None
 
 
 @struct.dataclass
@@ -94,7 +94,7 @@ class ForagaxEnv(environment.Environment[EnvState, EnvParams]):
     @property
     def default_params(self) -> EnvParams:
         return EnvParams(
-            max_steps_in_episode=500,
+            max_steps_in_episode=None,
         )
 
     def step_env(
