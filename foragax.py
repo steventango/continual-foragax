@@ -235,7 +235,7 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
     @property
     def name(self) -> str:
         """Environment name."""
-        return "Forager-v0"
+        return "Foragax-v0"
 
     @property
     def num_actions(self) -> int:
