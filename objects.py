@@ -2,6 +2,7 @@ import abc
 from typing import Tuple
 
 import jax
+import jax.numpy as jnp
 
 
 class BaseForagaxObject:
@@ -56,6 +57,34 @@ class DefaultForagaxObject(BaseForagaxObject):
         return jax.random.randint(rng, (), min_delay, max_delay)
 
 
+class NormalRegenForagaxObject(DefaultForagaxObject):
+    """Object with regeneration delay from a normal distribution."""
+
+    def __init__(
+        self,
+        name: str = "empty",
+        reward: float = 0.0,
+        collectable: bool = False,
+        mean_regen_delay: int = 10,
+        std_regen_delay: int = 1,
+        color: Tuple[float, float, float] = (0.0, 0.0, 0.0),
+    ):
+        super().__init__(
+            name=name,
+            reward=reward,
+            collectable=collectable,
+            regen_delay=(mean_regen_delay, mean_regen_delay),
+            color=color,
+        )
+        self.mean_regen_delay = mean_regen_delay
+        self.std_regen_delay = std_regen_delay
+
+    def regen_delay(self, clock: int, rng: jax.Array) -> int:
+        """Regeneration delay from a normal distribution."""
+        delay = self.mean_regen_delay + jax.random.normal(rng) * self.std_regen_delay
+        return jnp.maximum(0, delay).astype(jnp.int32)
+
+
 EMPTY = DefaultForagaxObject()
 WALL = DefaultForagaxObject(name="wall", blocking=True, color=(0.5, 0.5, 0.5))
 FLOWER = DefaultForagaxObject(
@@ -84,6 +113,22 @@ OYSTER = DefaultForagaxObject(
     reward=1.0,
     collectable=True,
     regen_delay=(10, 10),
+    color=(0.49, 0.24, 0.32),
+)
+LARGE_MOREL = NormalRegenForagaxObject(
+    name="large_morel",
+    reward=30.0,
+    collectable=True,
+    mean_regen_delay=300,
+    std_regen_delay=30,
+    color=(0.25, 0.12, 0.1),
+)
+LARGE_OYSTER = NormalRegenForagaxObject(
+    name="large_oyster",
+    reward=1.0,
+    collectable=True,
+    mean_regen_delay=10,
+    std_regen_delay=1,
     color=(0.49, 0.24, 0.32),
 )
 DEATHCAP = DefaultForagaxObject(
