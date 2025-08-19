@@ -19,12 +19,14 @@ class ForagerObject:
 
     def __init__(
         self,
+        name: str = "empty",
         reward: float = 0.0,
         blocking: bool = False,
         collectable: bool = False,
         regen_delay: Tuple[int, int] = (0, 0),
         color: Tuple[float, float, float] = (0.0, 0.0, 0.0),
     ):
+        self.name = name
         self.reward_val = reward
         self.blocking = blocking
         self.collectable = collectable
@@ -43,23 +45,43 @@ class ForagerObject:
 
 # Default object types
 EMPTY = ForagerObject()
-WALL = ForagerObject(blocking=True, color=(0.5, 0.5, 0.5))
+WALL = ForagerObject(name="wall", blocking=True, color=(0.5, 0.5, 0.5))
 FLOWER = ForagerObject(
-    reward=1.0, collectable=True, regen_delay=(10, 100), color=(0.0, 1.0, 0.0)
+    name="flower",
+    reward=1.0,
+    collectable=True,
+    regen_delay=(10, 100),
+    color=(0.0, 1.0, 0.0),
 )
 THORNS = ForagerObject(
-    reward=-1.0, collectable=True, regen_delay=(10, 100), color=(1.0, 0.0, 0.0)
+    name="thorns",
+    reward=-1.0,
+    collectable=True,
+    regen_delay=(10, 100),
+    color=(1.0, 0.0, 0.0),
 )
 MOREL = ForagerObject(
-    reward=10.0, collectable=True, regen_delay=(100, 100), color=(0.25, 0.12, 0.1)
+    name="morel",
+    reward=10.0,
+    collectable=True,
+    regen_delay=(100, 100),
+    color=(0.25, 0.12, 0.1),
 )
 OYSTER = ForagerObject(
-    reward=1.0, collectable=True, regen_delay=(10, 10), color=(0.49, 0.24, 0.32)
+    name="oyster",
+    reward=1.0,
+    collectable=True,
+    regen_delay=(10, 10),
+    color=(0.49, 0.24, 0.32),
 )
 DEATHCAP = ForagerObject(
-    reward=-1.0, collectable=True, regen_delay=(10, 10), color=(0.76, 0.7, 0.12)
+    name="deathcap",
+    reward=-1.0,
+    collectable=True,
+    regen_delay=(10, 10),
+    color=(0.76, 0.7, 0.12),
 )
-AGENT = ForagerObject(blocking=True, color=(0.0, 0.0, 1.0))
+AGENT = ForagerObject(name="agent", blocking=True, color=(0.0, 0.0, 1.0))
 
 
 class Actions(IntEnum):
@@ -183,7 +205,9 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
         )
 
         # Collect object: set a timer
-        regen_delay = jax.lax.switch(obj_at_pos, self.regen_delay_fns, state.time, subkey)
+        regen_delay = jax.lax.switch(
+            obj_at_pos, self.regen_delay_fns, state.time, subkey
+        )
         encoded_timer = -((regen_delay * num_obj_types) + obj_at_pos)
 
         # If collected, replace object with timer; otherwise, keep it
