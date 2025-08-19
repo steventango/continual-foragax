@@ -4,8 +4,8 @@ from typing import Tuple
 import jax
 
 
-class BaseForagerObject:
-    """Base class for objects in the Forager environment."""
+class BaseForagaxObject:
+    """Base class for objects in the Foragax environment."""
 
     def __init__(
         self,
@@ -30,8 +30,8 @@ class BaseForagerObject:
         raise NotImplementedError
 
 
-class DefaultForagerObject(BaseForagerObject):
-    """Base class for default objects in the Forager environment."""
+class DefaultForagaxObject(BaseForagaxObject):
+    """Base class for default objects in the Foragax environment."""
 
     def __init__(
         self,
@@ -56,41 +56,41 @@ class DefaultForagerObject(BaseForagerObject):
         return jax.random.randint(rng, (), min_delay, max_delay)
 
 
-EMPTY = DefaultForagerObject()
-WALL = DefaultForagerObject(name="wall", blocking=True, color=(0.5, 0.5, 0.5))
-FLOWER = DefaultForagerObject(
+EMPTY = DefaultForagaxObject()
+WALL = DefaultForagaxObject(name="wall", blocking=True, color=(0.5, 0.5, 0.5))
+FLOWER = DefaultForagaxObject(
     name="flower",
     reward=1.0,
     collectable=True,
     color=(0.0, 1.0, 0.0),
 )
 
-THORNS = DefaultForagerObject(
+THORNS = DefaultForagaxObject(
     name="thorns",
     reward=-1.0,
     collectable=True,
     color=(1.0, 0.0, 0.0),
 )
 
-MOREL = DefaultForagerObject(
+MOREL = DefaultForagaxObject(
     name="morel",
     reward=10.0,
     collectable=True,
     regen_delay=(100, 100),
     color=(0.25, 0.12, 0.1),
 )
-OYSTER = DefaultForagerObject(
+OYSTER = DefaultForagaxObject(
     name="oyster",
     reward=1.0,
     collectable=True,
     regen_delay=(10, 10),
     color=(0.49, 0.24, 0.32),
 )
-DEATHCAP = DefaultForagerObject(
+DEATHCAP = DefaultForagaxObject(
     name="deathcap",
     reward=-1.0,
     collectable=True,
     regen_delay=(10, 10),
     color=(0.76, 0.7, 0.12),
 )
-AGENT = DefaultForagerObject(name="agent", blocking=True, color=(0.0, 0.0, 1.0))
+AGENT = DefaultForagaxObject(name="agent", blocking=True, color=(0.0, 0.0, 1.0))

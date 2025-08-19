@@ -1,6 +1,6 @@
-"""JAX implementation of Forager environment.
+"""JAX implementation of Foragax environment.
 
-Source: https://github.com/andnp/forager
+Source: https://github.com/andnp/Foragax
 """
 
 from dataclasses import dataclass
@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 from flax import struct
 from gymnax.environments import environment, spaces
 
-from objects import EMPTY, BaseForagerObject
+from objects import EMPTY, BaseForagaxObject
 
 
 class Actions(IntEnum):
@@ -53,14 +53,14 @@ class EnvState(environment.EnvState):
     time: int
 
 
-class ForagerEnv(environment.Environment[EnvState, EnvParams]):
-    """JAX implementation of Forager environment."""
+class ForagaxEnv(environment.Environment[EnvState, EnvParams]):
+    """JAX implementation of Foragax environment."""
 
     def __init__(
         self,
         size: Tuple[int, int] | int = (10, 10),
         aperture_size: Tuple[int, int] | int = (5, 5),
-        objects: Tuple[BaseForagerObject, ...] = (EMPTY,),
+        objects: Tuple[BaseForagaxObject, ...] = (EMPTY,),
         biomes: Tuple[Biome, ...] = (Biome(object_frequencies=(1.0,)),),
     ):
         super().__init__()
@@ -229,7 +229,7 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
         raise NotImplementedError
 
     def is_terminal(self, state: EnvState, params: EnvParams) -> jax.Array:
-        """Forager is a continuing environment."""
+        """Foragax is a continuing environment."""
         return False
 
     @property
@@ -286,8 +286,8 @@ class ForagerEnv(environment.Environment[EnvState, EnvParams]):
         return fig, ax
 
 
-class ForagerObjectEnv(ForagerEnv):
-    """Forager environment with object-based aperture observation."""
+class ForagaxObjectEnv(ForagaxEnv):
+    """Foragax environment with object-based aperture observation."""
 
     def get_obs(self, state: EnvState, params: EnvParams, key=None) -> jax.Array:
         num_obj_types = len(self.object_ids)
@@ -328,8 +328,8 @@ class ForagerObjectEnv(ForagerEnv):
         return spaces.Box(0, 1, obs_shape, jnp.float32)
 
 
-class ForagerRGBEnv(ForagerEnv):
-    """Forager environment with color-based aperture observation."""
+class ForagaxRGBEnv(ForagaxEnv):
+    """Foragax environment with color-based aperture observation."""
 
     def get_obs(self, state: EnvState, params: EnvParams, key=None) -> jax.Array:
         num_obj_types = len(self.object_ids)
@@ -366,8 +366,8 @@ class ForagerRGBEnv(ForagerEnv):
         return spaces.Box(0, 1, obs_shape, jnp.float32)
 
 
-class ForagerWorldEnv(ForagerEnv):
-    """Forager environment with world observation."""
+class ForagaxWorldEnv(ForagaxEnv):
+    """Foragax environment with world observation."""
 
     def get_obs(self, state: EnvState, params: EnvParams, key=None) -> jax.Array:
         num_obj_types = len(self.object_ids)
