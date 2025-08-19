@@ -4,7 +4,7 @@ import jax
 from gymnasium.utils.save_video import save_video
 
 from registry import make
-
+from tqdm import tqdm
 
 def main():
     """Generate a visualization of a Foragax environment under random behavior."""
@@ -15,7 +15,7 @@ def main():
     frames = []
     key, key_reset = jax.random.split(key)
     _, env_state = env.reset(key_reset, env_params)
-    for _ in range(1000):
+    for _ in tqdm(range(1000)):
         frames.append(env.render(env_state, env_params))
         key, key_act, key_step = jax.random.split(key, 3)
         action = env.action_space(env_params).sample(key_act)
