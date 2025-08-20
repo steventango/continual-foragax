@@ -6,6 +6,7 @@ from gymnasium.utils.save_video import save_video
 from foragax.registry import make
 from tqdm import tqdm
 
+
 def main():
     """Generate a visualization of a Foragax environment under random behavior."""
     key = jax.random.PRNGKey(0)

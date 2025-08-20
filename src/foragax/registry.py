@@ -2,7 +2,13 @@
 
 from typing import Any, Dict, Optional, Tuple
 
-from foragax.env import Biome, ForagaxEnv, ForagaxObjectEnv, ForagaxRGBEnv, ForagaxWorldEnv
+from foragax.env import (
+    Biome,
+    ForagaxEnv,
+    ForagaxObjectEnv,
+    ForagaxRGBEnv,
+    ForagaxWorldEnv,
+)
 from foragax.objects import MOREL, OYSTER
 
 ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
