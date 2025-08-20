@@ -2,14 +2,14 @@ import chex
 import jax
 import jax.numpy as jnp
 
-from foragax import (
+from foragax.env import (
     Actions,
     Biome,
     ForagaxObjectEnv,
     ForagaxRGBEnv,
     ForagaxWorldEnv,
 )
-from objects import FLOWER, MOREL, OYSTER, THORNS, WALL
+from foragax.objects import FLOWER, MOREL, OYSTER, THORNS, WALL
 
 
 def test_observation_shape():
