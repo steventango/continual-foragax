@@ -3,7 +3,7 @@ import os
 import jax
 from gymnasium.utils.save_video import save_video
 
-from registry import make
+from foragax.registry import make
 from tqdm import tqdm
 
 def main():

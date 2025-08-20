@@ -13,7 +13,7 @@ import jax.numpy as jnp
 from flax import struct
 from gymnax.environments import environment, spaces
 
-from objects import AGENT, EMPTY, BaseForagaxObject
+from foragax.objects import AGENT, EMPTY, BaseForagaxObject
 
 
 class Actions(IntEnum):
