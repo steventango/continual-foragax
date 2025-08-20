@@ -292,11 +292,38 @@ class ForagaxEnv(environment.Environment[EnvState, EnvParams]):
 
         img = jax.lax.fori_loop(0, len(self.object_ids), update_image, img)
 
+        # Tint the agent's aperture
+        ap_h, ap_w = self.aperture_size
+        start_y = state.pos[1] - ap_h // 2
+        start_x = state.pos[0] - ap_w // 2
+
+        alpha = 0.2
+        agent_color = jnp.array(AGENT.color)
+
+        # Create indices for the aperture
+        y_offsets = jnp.arange(ap_h)
+        x_offsets = jnp.arange(ap_w)
+        y_coords = jnp.mod(start_y + y_offsets[:, None], self.size[1])
+        x_coords = jnp.mod(start_x + x_offsets, self.size[0])
+
+        # Get original colors from the aperture area
+        original_colors = img[y_coords, x_coords]
+
+        # Calculate tinted colors
+        tinted_colors = (1 - alpha) * original_colors + alpha * agent_color
+
+        # Update the image with tinted colors
+        img = img.at[y_coords, x_coords].set(tinted_colors)
+
         # Agent color
         img = img.at[state.pos[1], state.pos[0]].set(jnp.array(AGENT.color))
 
         img = img * 255
-        img = jax.image.resize(img, (self.size[1] * 24, self.size[0] * 24, 3), jax.image.ResizeMethod.NEAREST)
+        img = jax.image.resize(
+            img,
+            (self.size[1] * 24, self.size[0] * 24, 3),
+            jax.image.ResizeMethod.NEAREST,
+        )
 
         grid_color = jnp.array([0, 0, 0])
         row_indices = jnp.arange(1, self.size[1]) * 24
