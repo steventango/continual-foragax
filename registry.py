@@ -1,6 +1,6 @@
 """Factory functions for creating Foragax environment variants."""
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional, Tuple
 
 from foragax import Biome, ForagaxEnv, ForagaxObjectEnv, ForagaxRGBEnv, ForagaxWorldEnv
 from objects import MOREL, OYSTER
@@ -20,12 +20,18 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
 }
 
 
-def make(env_id: str, observation_type: str = "object") -> ForagaxEnv:
+def make(
+    env_id: str,
+    observation_type: str = "object",
+    aperture_size: Optional[Tuple[int, int]] = None,
+) -> ForagaxEnv:
     """Create a Foragax environment.
 
     Args:
         env_id: The ID of the environment to create.
         observation_type: The type of observation to use. One of "object", "rgb", or "world".
+        aperture_size: The size of the agent's observation aperture. If None, the default
+            for the environment is used.
 
     Returns:
         A Foragax environment instance.
@@ -33,7 +39,10 @@ def make(env_id: str, observation_type: str = "object") -> ForagaxEnv:
     if env_id not in ENV_CONFIGS:
         raise ValueError(f"Unknown env_id: {env_id}")
 
-    config = ENV_CONFIGS[env_id]
+    config = ENV_CONFIGS[env_id].copy()
+
+    if aperture_size is not None:
+        config["aperture_size"] = aperture_size
 
     env_class_map = {
         "object": ForagaxObjectEnv,
