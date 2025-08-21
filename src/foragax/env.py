@@ -66,7 +66,7 @@ class ForagaxEnv(environment.Environment[EnvState, EnvParams]):
         super().__init__()
         if isinstance(size, int):
             size = (size, size)
-        self.size = size
+        self.size = jnp.array(size)
 
         if isinstance(aperture_size, int):
             aperture_size = (aperture_size, aperture_size)
@@ -116,7 +116,7 @@ class ForagaxEnv(environment.Environment[EnvState, EnvParams]):
         new_pos = state.pos + direction
 
         # Wrap around boundaries
-        new_pos = jnp.mod(new_pos, jnp.array(self.size))
+        new_pos = jnp.mod(new_pos, self.size)
 
         # Check for blocking objects
         obj_at_new_pos = current_objects[new_pos[1], new_pos[0]]
@@ -187,7 +187,7 @@ class ForagaxEnv(environment.Environment[EnvState, EnvParams]):
             )
             stop = jax.lax.select(
                 self.biome_stops[i, 0] == -1,
-                jnp.array(self.size),
+                self.size,
                 self.biome_stops[i],
             )
 
