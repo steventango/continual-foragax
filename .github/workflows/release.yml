@@ -16,6 +16,8 @@ jobs:
     name: "Bump version and create changelog with commitizen"
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # for commitizen
 
       - name: Create bump and changelog
         uses: commitizen-tools/commitizen-action@master
