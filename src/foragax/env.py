@@ -318,14 +318,13 @@ class ForagaxEnv(environment.Environment[EnvState, EnvParams]):
         # Agent color
         img = img.at[state.pos[1], state.pos[0]].set(jnp.array(AGENT.color))
 
-        img = img * 255
         img = jax.image.resize(
             img,
             (self.size[1] * 24, self.size[0] * 24, 3),
             jax.image.ResizeMethod.NEAREST,
         )
 
-        grid_color = jnp.array([0, 0, 0])
+        grid_color = jnp.zeros(3, dtype=jnp.uint8)
         row_indices = jnp.arange(1, self.size[1]) * 24
         col_indices = jnp.arange(1, self.size[0]) * 24
         img = img.at[row_indices, :].set(grid_color)
@@ -405,7 +404,7 @@ class ForagaxRGBEnv(ForagaxEnv):
         center = (self.aperture_size[0] // 2, self.aperture_size[1] // 2)
         aperture_one_hot = aperture_one_hot.at[center[0], center[1], -1].set(1)
 
-        colors = self.object_colors
+        colors = self.object_colors / 255.0
         obs = jnp.tensordot(aperture_one_hot, colors, axes=1)
         return obs
 

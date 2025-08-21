@@ -13,7 +13,7 @@ class BaseForagaxObject:
         name: str = "empty",
         blocking: bool = False,
         collectable: bool = False,
-        color: Tuple[float, float, float] = (0.0, 0.0, 0.0),
+        color: Tuple[int, int, int] = (0, 0, 0),
     ):
         self.name = name
         self.blocking = blocking
@@ -41,7 +41,7 @@ class DefaultForagaxObject(BaseForagaxObject):
         blocking: bool = False,
         collectable: bool = False,
         regen_delay: Tuple[int, int] = (10, 100),
-        color: Tuple[float, float, float] = (1.0, 1.0, 1.0),
+        color: Tuple[int, int, int] = (255, 255, 255),
     ):
         super().__init__(name, blocking, collectable, color)
         self.reward_val = reward
@@ -67,7 +67,7 @@ class NormalRegenForagaxObject(DefaultForagaxObject):
         collectable: bool = False,
         mean_regen_delay: int = 10,
         std_regen_delay: int = 1,
-        color: Tuple[float, float, float] = (0.0, 0.0, 0.0),
+        color: Tuple[int, int, int] = (0, 0, 0),
     ):
         super().__init__(
             name=name,
@@ -86,19 +86,19 @@ class NormalRegenForagaxObject(DefaultForagaxObject):
 
 
 EMPTY = DefaultForagaxObject()
-WALL = DefaultForagaxObject(name="wall", blocking=True, color=(0.5, 0.5, 0.5))
+WALL = DefaultForagaxObject(name="wall", blocking=True, color=(127, 127, 127))
 FLOWER = DefaultForagaxObject(
     name="flower",
     reward=1.0,
     collectable=True,
-    color=(0.0, 1.0, 0.0),
+    color=(0, 255, 0),
 )
 
 THORNS = DefaultForagaxObject(
     name="thorns",
     reward=-1.0,
     collectable=True,
-    color=(1.0, 0.0, 0.0),
+    color=(255, 0, 0),
 )
 
 MOREL = DefaultForagaxObject(
@@ -106,14 +106,14 @@ MOREL = DefaultForagaxObject(
     reward=10.0,
     collectable=True,
     regen_delay=(100, 100),
-    color=(0.25, 0.12, 0.1),
+    color=(63, 30, 25),
 )
 OYSTER = DefaultForagaxObject(
     name="oyster",
     reward=1.0,
     collectable=True,
     regen_delay=(10, 10),
-    color=(0.49, 0.24, 0.32),
+    color=(124, 61, 81),
 )
 LARGE_MOREL = NormalRegenForagaxObject(
     name="large_morel",
@@ -121,7 +121,7 @@ LARGE_MOREL = NormalRegenForagaxObject(
     collectable=True,
     mean_regen_delay=300,
     std_regen_delay=30,
-    color=(0.25, 0.12, 0.1),
+    color=(63, 30, 25),
 )
 LARGE_OYSTER = NormalRegenForagaxObject(
     name="large_oyster",
@@ -129,13 +129,13 @@ LARGE_OYSTER = NormalRegenForagaxObject(
     collectable=True,
     mean_regen_delay=10,
     std_regen_delay=1,
-    color=(0.49, 0.24, 0.32),
+    color=(124, 61, 81),
 )
 DEATHCAP = DefaultForagaxObject(
     name="deathcap",
     reward=-1.0,
     collectable=True,
     regen_delay=(10, 10),
-    color=(0.76, 0.7, 0.12),
+    color=(193, 178, 30),
 )
-AGENT = DefaultForagaxObject(name="agent", blocking=True, color=(0.0, 0.0, 1.0))
+AGENT = DefaultForagaxObject(name="agent", blocking=True, color=(0, 0, 255))
