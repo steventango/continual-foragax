@@ -264,7 +264,6 @@ class ForagaxEnv(environment.Environment[EnvState, EnvParams]):
                     jnp.int32,
                 ),
                 "time": spaces.Discrete(params.max_steps_in_episode),
-                "key": spaces.PRNGKey(),
             }
         )
 
