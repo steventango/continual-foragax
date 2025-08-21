@@ -233,10 +233,6 @@ class ForagaxEnv(environment.Environment[EnvState, EnvParams]):
 
         return self.get_obs(state, params), state
 
-    def get_obs(self, state: EnvState, params: EnvParams, key=None) -> jax.Array:
-        """Return observation from raw state trafo."""
-        raise NotImplementedError
-
     def is_terminal(self, state: EnvState, params: EnvParams) -> jax.Array:
         """Foragax is a continuing environment."""
         return False
@@ -252,13 +248,9 @@ class ForagaxEnv(environment.Environment[EnvState, EnvParams]):
 
     def action_space(self, params: EnvParams) -> spaces.Discrete:
         action_space = spaces.Discrete(self.num_actions)
-        # TODO: workaround for https://github.com/RobertTLange/gymnax/issues/58
+        # NOTE: workaround for https://github.com/RobertTLange/gymnax/issues/58
         action_space.dtype = jnp.int32
         return action_space
-
-    def observation_space(self, params: EnvParams) -> spaces.Box:
-        """Observation space of the environment."""
-        raise NotImplementedError
 
     def state_space(self, params: EnvParams) -> spaces.Dict:
         """State space of the environment."""
