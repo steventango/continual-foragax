@@ -106,6 +106,32 @@ def test_rgb_observation_mode():
     assert obs.shape == (5, 5, 3)
 
 
+def test_object_observation_mode_large_aperture():
+    env = ForagaxObjectEnv(
+        size=(10, 10),
+        aperture_size=(20, 20),
+        objects=(WALL, FLOWER),
+    )
+    params = env.default_params
+    key = jax.random.PRNGKey(0)
+    obs, state = env.reset(key, params)
+
+    assert obs.shape == (20, 20, 2)
+
+
+def test_rgb_observation_mode_large_aperture():
+    env = ForagaxRGBEnv(
+        size=(10, 10),
+        aperture_size=(20, 20),
+        objects=(WALL, FLOWER),
+    )
+    params = env.default_params
+    key = jax.random.PRNGKey(0)
+    obs, state = env.reset(key, params)
+
+    assert obs.shape == (20, 20, 3)
+
+
 def test_world_observation_mode():
     # can use world observation mode
     env = ForagaxWorldEnv(size=(10, 10))
