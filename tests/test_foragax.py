@@ -80,6 +80,32 @@ def test_add_objects():
     chex.assert_shape(obs, (5, 5, 1))
 
 
+def test_object_observation_mode():
+    env = ForagaxObjectEnv(
+        size=(10, 10),
+        aperture_size=(5, 5),
+        objects=(WALL, FLOWER),
+    )
+    params = env.default_params
+    key = jax.random.PRNGKey(0)
+    obs, state = env.reset(key, params)
+
+    assert obs.shape == (5, 5, 2)
+
+
+def test_rgb_observation_mode():
+    env = ForagaxRGBEnv(
+        size=(10, 10),
+        aperture_size=(5, 5),
+        objects=(WALL, FLOWER),
+    )
+    params = env.default_params
+    key = jax.random.PRNGKey(0)
+    obs, state = env.reset(key, params)
+
+    assert obs.shape == (5, 5, 3)
+
+
 def test_world_observation_mode():
     # can use world observation mode
     env = ForagaxWorldEnv(size=(10, 10))
