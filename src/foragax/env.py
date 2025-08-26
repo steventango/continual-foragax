@@ -267,61 +267,102 @@ class ForagaxEnv(environment.Environment[EnvState, EnvParams]):
             }
         )
 
-    @partial(jax.jit, static_argnames=("self",))
-    def render(self, state: EnvState, params: EnvParams):
-        """Render the environment state."""
-        # Create an RGB image from the object grid
-        img = jnp.zeros((self.size[1], self.size[0], 3))
-        # Decode grid for rendering: non-negative are objects, negative are empty
-        render_grid = jnp.maximum(0, state.object_grid)
-
-        def update_image(i, img):
-            color = self.object_colors[i]
-            mask = render_grid == i
-            img = jnp.where(mask[..., None], color, img)
-            return img
-
-        img = jax.lax.fori_loop(0, len(self.object_ids), update_image, img)
-
-        # Tint the agent's aperture
+    def _get_aperture(self, object_grid: jax.Array, pos: jax.Array) -> jax.Array:
+        """Extract the aperture view from the object grid."""
         ap_h, ap_w = self.aperture_size
-        start_y = state.pos[1] - ap_h // 2
-        start_x = state.pos[0] - ap_w // 2
+        start_y = pos[1] - ap_h // 2
+        start_x = pos[0] - ap_w // 2
 
-        alpha = 0.2
-        agent_color = jnp.array(AGENT.color)
-
-        # Create indices for the aperture
         y_offsets = jnp.arange(ap_h)
         x_offsets = jnp.arange(ap_w)
         y_coords = jnp.mod(start_y + y_offsets[:, None], self.size[1])
         x_coords = jnp.mod(start_x + x_offsets, self.size[0])
 
-        # Get original colors from the aperture area
-        original_colors = img[y_coords, x_coords]
+        return object_grid[y_coords, x_coords]
 
-        # Calculate tinted colors
-        tinted_colors = (1 - alpha) * original_colors + alpha * agent_color
+    @partial(jax.jit, static_argnames=("self", "render_mode"))
+    def render(self, state: EnvState, params: EnvParams, render_mode: str = "world"):
+        """Render the environment state."""
+        if render_mode == "world":
+            # Create an RGB image from the object grid
+            img = jnp.zeros((self.size[1], self.size[0], 3))
+            # Decode grid for rendering: non-negative are objects, negative are empty
+            render_grid = jnp.maximum(0, state.object_grid)
 
-        # Update the image with tinted colors
-        img = img.at[y_coords, x_coords].set(tinted_colors)
+            def update_image(i, img):
+                color = self.object_colors[i]
+                mask = render_grid == i
+                img = jnp.where(mask[..., None], color, img)
+                return img
 
-        # Agent color
-        img = img.at[state.pos[1], state.pos[0]].set(jnp.array(AGENT.color))
+            img = jax.lax.fori_loop(0, len(self.object_ids), update_image, img)
 
-        img = jax.image.resize(
-            img,
-            (self.size[1] * 24, self.size[0] * 24, 3),
-            jax.image.ResizeMethod.NEAREST,
-        )
+            # Tint the agent's aperture
+            ap_h, ap_w = self.aperture_size
+            start_y = state.pos[1] - ap_h // 2
+            start_x = state.pos[0] - ap_w // 2
 
-        grid_color = jnp.zeros(3, dtype=jnp.uint8)
-        row_indices = jnp.arange(1, self.size[1]) * 24
-        col_indices = jnp.arange(1, self.size[0]) * 24
-        img = img.at[row_indices, :].set(grid_color)
-        img = img.at[:, col_indices].set(grid_color)
+            alpha = 0.2
+            agent_color = jnp.array(AGENT.color)
 
-        return img
+            # Create indices for the aperture
+            y_offsets = jnp.arange(ap_h)
+            x_offsets = jnp.arange(ap_w)
+            y_coords = jnp.mod(start_y + y_offsets[:, None], self.size[1])
+            x_coords = jnp.mod(start_x + x_offsets, self.size[0])
+
+            # Get original colors from the aperture area
+            original_colors = img[y_coords, x_coords]
+
+            # Calculate tinted colors
+            tinted_colors = (1 - alpha) * original_colors + alpha * agent_color
+
+            # Update the image with tinted colors
+            img = img.at[y_coords, x_coords].set(tinted_colors)
+
+            # Agent color
+            img = img.at[state.pos[1], state.pos[0]].set(jnp.array(AGENT.color))
+
+            img = jax.image.resize(
+                img,
+                (self.size[1] * 24, self.size[0] * 24, 3),
+                jax.image.ResizeMethod.NEAREST,
+            )
+
+            grid_color = jnp.zeros(3, dtype=jnp.uint8)
+            row_indices = jnp.arange(1, self.size[1]) * 24
+            col_indices = jnp.arange(1, self.size[0]) * 24
+            img = img.at[row_indices, :].set(grid_color)
+            img = img.at[:, col_indices].set(grid_color)
+
+            return img
+
+        elif render_mode == "aperture":
+            obs_grid = jnp.maximum(0, state.object_grid)
+            aperture = self._get_aperture(obs_grid, state.pos)
+            aperture_one_hot = jax.nn.one_hot(aperture, len(self.object_ids))
+            img = jnp.tensordot(aperture_one_hot, self.object_colors, axes=1)
+
+            # Draw agent in the center
+            center_y, center_x = self.aperture_size[1] // 2, self.aperture_size[0] // 2
+            img = img.at[center_y, center_x].set(jnp.array(AGENT.color))
+
+            img = img.astype(jnp.uint8)
+            img = jax.image.resize(
+                img,
+                (self.aperture_size[0] * 24, self.aperture_size[1] * 24, 3),
+                jax.image.ResizeMethod.NEAREST,
+            )
+
+            grid_color = jnp.zeros(3, dtype=jnp.uint8)
+            row_indices = jnp.arange(1, self.aperture_size[0]) * 24
+            col_indices = jnp.arange(1, self.aperture_size[1]) * 24
+            img = img.at[row_indices, :].set(grid_color)
+            img = img.at[:, col_indices].set(grid_color)
+
+            return img
+        else:
+            raise ValueError(f"Unknown render_mode: {render_mode}")
 
 
 class ForagaxObjectEnv(ForagaxEnv):
@@ -331,26 +372,10 @@ class ForagaxObjectEnv(ForagaxEnv):
         num_obj_types = len(self.object_ids)
         # Decode grid for observation
         obs_grid = jnp.maximum(0, state.object_grid)
-
-        # Calculate aperture coordinates
-        ap_h, ap_w = self.aperture_size
-        start_y = state.pos[1] - ap_h // 2
-        start_x = state.pos[0] - ap_w // 2
-
-        y_offsets = jnp.arange(ap_h)
-        x_offsets = jnp.arange(ap_w)
-        y_coords = jnp.mod(start_y + y_offsets[:, None], self.size[1])
-        x_coords = jnp.mod(start_x + x_offsets, self.size[0])
-
-        # Extract aperture
-        aperture = obs_grid[y_coords, x_coords]
-
+        aperture = self._get_aperture(obs_grid, state.pos)
         aperture = jnp.flip(aperture, axis=0)
-
         obs = jax.nn.one_hot(aperture, num_obj_types)
-
         obs = obs[:, :, 1:]
-
         return obs
 
     def observation_space(self, params: EnvParams) -> spaces.Box:
@@ -370,20 +395,7 @@ class ForagaxRGBEnv(ForagaxEnv):
         num_obj_types = len(self.object_ids)
         # Decode grid for observation
         obs_grid = jnp.maximum(0, state.object_grid)
-
-        # Calculate aperture coordinates
-        ap_h, ap_w = self.aperture_size
-        start_y = state.pos[1] - ap_h // 2
-        start_x = state.pos[0] - ap_w // 2
-
-        y_offsets = jnp.arange(ap_h)
-        x_offsets = jnp.arange(ap_w)
-        y_coords = jnp.mod(start_y + y_offsets[:, None], self.size[1])
-        x_coords = jnp.mod(start_x + x_offsets, self.size[0])
-
-        # Extract aperture
-        aperture = obs_grid[y_coords, x_coords]
-
+        aperture = self._get_aperture(obs_grid, state.pos)
         aperture_one_hot = jax.nn.one_hot(aperture, num_obj_types)
 
         # Agent position is always at the center of the aperture
