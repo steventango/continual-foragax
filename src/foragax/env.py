@@ -332,21 +332,18 @@ class ForagaxObjectEnv(ForagaxEnv):
         # Decode grid for observation
         obs_grid = jnp.maximum(0, state.object_grid)
 
-        # Roll the grid to center the agent's position
-        # The agent should be at the center of the aperture, which is aperture_size // 2
-        # We want to move the agent's position (state.pos) to the center.
-        # The amount to roll is -(state.pos - aperture_size // 2)
-        # Note: jnp.roll is on (row, col) but pos is (x, y), so we swap them.
-        roll_amount = -(state.pos - jnp.array(self.aperture_size) // 2)
-        roll_amount = jnp.array([roll_amount[1], roll_amount[0]])
-        rolled_grid = jnp.roll(obs_grid, shift=roll_amount, axis=(0, 1))
+        # Calculate aperture coordinates
+        ap_h, ap_w = self.aperture_size
+        start_y = state.pos[1] - ap_h // 2
+        start_x = state.pos[0] - ap_w // 2
 
-        # Extract the aperture
-        aperture = jax.lax.dynamic_slice(
-            rolled_grid,
-            (0, 0),
-            self.aperture_size,
-        )
+        y_offsets = jnp.arange(ap_h)
+        x_offsets = jnp.arange(ap_w)
+        y_coords = jnp.mod(start_y + y_offsets[:, None], self.size[1])
+        x_coords = jnp.mod(start_x + x_offsets, self.size[0])
+
+        # Extract aperture
+        aperture = obs_grid[y_coords, x_coords]
 
         aperture = jnp.flip(aperture, axis=0)
 
@@ -373,26 +370,25 @@ class ForagaxRGBEnv(ForagaxEnv):
         num_obj_types = len(self.object_ids)
         # Decode grid for observation
         obs_grid = jnp.maximum(0, state.object_grid)
-        padded_grid = jnp.pad(
-            obs_grid,
-            (
-                (self.aperture_size[1] // 2, self.aperture_size[1] // 2),
-                (self.aperture_size[0] // 2, self.aperture_size[0] // 2),
-            ),
-            "constant",
-            constant_values=0,
-        )
 
-        aperture = jax.lax.dynamic_slice(
-            padded_grid,
-            (state.pos[1], state.pos[0]),
-            (self.aperture_size[1], self.aperture_size[0]),
-        )
+        # Calculate aperture coordinates
+        ap_h, ap_w = self.aperture_size
+        start_y = state.pos[1] - ap_h // 2
+        start_x = state.pos[0] - ap_w // 2
+
+        y_offsets = jnp.arange(ap_h)
+        x_offsets = jnp.arange(ap_w)
+        y_coords = jnp.mod(start_y + y_offsets[:, None], self.size[1])
+        x_coords = jnp.mod(start_x + x_offsets, self.size[0])
+
+        # Extract aperture
+        aperture = obs_grid[y_coords, x_coords]
 
         aperture_one_hot = jax.nn.one_hot(aperture, num_obj_types)
 
         # Agent position is always at the center of the aperture
-        center = (self.aperture_size[0] // 2, self.aperture_size[1] // 2)
+        center = (self.aperture_size[1] // 2, self.aperture_size[0] // 2)
+        aperture_one_hot = aperture_one_hot.at[center[0], center[1], :].set(0)
         aperture_one_hot = aperture_one_hot.at[center[0], center[1], -1].set(1)
 
         colors = self.object_colors / 255.0
