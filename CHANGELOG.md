@@ -1,3 +1,9 @@
+## 0.3.1 (2025-08-27)
+
+### Fix
+
+- use Large Morel and Large Oyster in TwoBiomeSmall environment
+
 ## 0.3.0 (2025-08-26)
 
 ### Feat
