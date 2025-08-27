@@ -9,13 +9,13 @@ from foragax.env import (
     ForagaxRGBEnv,
     ForagaxWorldEnv,
 )
-from foragax.objects import MOREL, OYSTER
+from foragax.objects import LARGE_MOREL, LARGE_OYSTER
 
 ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
     "ForagaxTwoBiomeSmall": {
         "size": (16, 8),
         "aperture_size": (5, 5),
-        "objects": (MOREL, OYSTER),
+        "objects": (LARGE_MOREL, LARGE_OYSTER),
         "biomes": (
             # Morel biome
             Biome(start=(2, 2), stop=(6, 6), object_frequencies=(1.0, 0.0)),
