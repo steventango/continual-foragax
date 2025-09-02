@@ -171,7 +171,7 @@ class ForagaxEnv(environment.Environment[EnvState, EnvParams]):
         """Reset environment state."""
         key, subkey = jax.random.split(key)
 
-        object_grid = jnp.zeros((self.size[1], self.size[0]), dtype=jnp.int32)
+        object_grid = jnp.zeros((self.size[1], self.size[0]), dtype=jnp.int_)
 
         iter_key = subkey
         for i in range(self.biome_object_frequencies.shape[0]):
@@ -249,19 +249,19 @@ class ForagaxEnv(environment.Environment[EnvState, EnvParams]):
     def action_space(self, params: EnvParams) -> spaces.Discrete:
         action_space = spaces.Discrete(self.num_actions)
         # NOTE: workaround for https://github.com/RobertTLange/gymnax/issues/58
-        action_space.dtype = jnp.int32
+        action_space.dtype = jnp.int_
         return action_space
 
     def state_space(self, params: EnvParams) -> spaces.Dict:
         """State space of the environment."""
         return spaces.Dict(
             {
-                "pos": spaces.Box(0, max(self.size), (2,), jnp.int32),
+                "pos": spaces.Box(0, max(self.size), (2,), jnp.int_),
                 "object_grid": spaces.Box(
                     -1000 * len(self.object_ids),
                     len(self.object_ids),
                     (self.size[1], self.size[0]),
-                    jnp.int32,
+                    jnp.int_,
                 ),
                 "time": spaces.Discrete(params.max_steps_in_episode),
             }
