@@ -1,3 +1,10 @@
+## 0.3.2 (2025-09-02)
+
+### Fix
+
+- use dtype int_ instead of int32
+- use new-style RNG keys
+
 ## 0.3.1 (2025-08-27)
 
 ### Fix
