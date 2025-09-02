@@ -385,7 +385,7 @@ class ForagaxObjectEnv(ForagaxEnv):
             self.aperture_size[1],
             num_obj_types - 1,
         )
-        return spaces.Box(0, 1, obs_shape, jnp.float32)
+        return spaces.Box(0, 1, obs_shape, jnp.float_)
 
 
 class ForagaxRGBEnv(ForagaxEnv):
@@ -409,7 +409,7 @@ class ForagaxRGBEnv(ForagaxEnv):
 
     def observation_space(self, params: EnvParams) -> spaces.Box:
         obs_shape = (self.aperture_size[0], self.aperture_size[1], 3)
-        return spaces.Box(0, 1, obs_shape, jnp.float32)
+        return spaces.Box(0, 1, obs_shape, jnp.float_)
 
 
 class ForagaxWorldEnv(ForagaxEnv):
@@ -426,4 +426,4 @@ class ForagaxWorldEnv(ForagaxEnv):
     def observation_space(self, params: EnvParams) -> spaces.Box:
         num_obj_types = len(self.object_ids)
         obs_shape = (self.size[1], self.size[0], num_obj_types)
-        return spaces.Box(0, 1, obs_shape, jnp.float32)
+        return spaces.Box(0, 1, obs_shape, jnp.float_)
