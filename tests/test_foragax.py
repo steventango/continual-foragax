@@ -24,7 +24,7 @@ def test_observation_shape():
 
 
 def test_gymnax_api():
-    key = jax.random.PRNGKey(0)
+    key = jax.random.key(0)
     key, key_reset, key_act, key_step = jax.random.split(key, 4)
 
     env = ForagaxObjectEnv(size=(5, 5))
@@ -42,7 +42,7 @@ def test_sizes():
     # can specify sizes with integers
     env = ForagaxObjectEnv(size=8, aperture_size=3)
     params = env.default_params
-    key = jax.random.PRNGKey(0)
+    key = jax.random.key(0)
     obs, state = env.reset(key, params)
     assert jnp.array_equal(state.pos, jnp.array([4, 4]))
     assert env.size == (8, 8)
@@ -54,7 +54,7 @@ def test_uneven_sizes():
     # can specify sizes as uneven tuples
     env = ForagaxObjectEnv(size=(10, 5), aperture_size=(5, 1))
     params = env.default_params
-    key = jax.random.PRNGKey(0)
+    key = jax.random.key(0)
     obs, state = env.reset(key, params)
     assert jnp.array_equal(state.pos, jnp.array([5, 2]))
     assert env.size == (10, 5)
@@ -72,7 +72,7 @@ def test_add_objects():
         biomes=(Biome(object_frequencies=(freq,)),),
     )
     params = env.default_params
-    key = jax.random.PRNGKey(0)
+    key = jax.random.key(0)
     obs, state = env.reset(key, params)
 
     empirical_freq = jnp.count_nonzero(state.object_grid) / size**2
@@ -87,7 +87,7 @@ def test_object_observation_mode():
         objects=(WALL, FLOWER),
     )
     params = env.default_params
-    key = jax.random.PRNGKey(0)
+    key = jax.random.key(0)
     obs, state = env.reset(key, params)
 
     assert obs.shape == (5, 5, 2)
@@ -100,7 +100,7 @@ def test_rgb_observation_mode():
         objects=(WALL, FLOWER),
     )
     params = env.default_params
-    key = jax.random.PRNGKey(0)
+    key = jax.random.key(0)
     obs, state = env.reset(key, params)
 
     assert obs.shape == (5, 5, 3)
@@ -113,7 +113,7 @@ def test_object_observation_mode_large_aperture():
         objects=(WALL, FLOWER),
     )
     params = env.default_params
-    key = jax.random.PRNGKey(0)
+    key = jax.random.key(0)
     obs, state = env.reset(key, params)
 
     assert obs.shape == (20, 20, 2)
@@ -126,7 +126,7 @@ def test_rgb_observation_mode_large_aperture():
         objects=(WALL, FLOWER),
     )
     params = env.default_params
-    key = jax.random.PRNGKey(0)
+    key = jax.random.key(0)
     obs, state = env.reset(key, params)
 
     assert obs.shape == (20, 20, 3)
@@ -136,7 +136,7 @@ def test_world_observation_mode():
     # can use world observation mode
     env = ForagaxWorldEnv(size=(10, 10))
     params = env.default_params
-    key = jax.random.PRNGKey(0)
+    key = jax.random.key(0)
     obs, state = env.reset(key, params)
 
     assert obs.shape == (10, 10, 1)
@@ -144,7 +144,7 @@ def test_world_observation_mode():
 
 def test_basic_movement():
     """Test agent movement and collision with walls."""
-    key = jax.random.PRNGKey(0)
+    key = jax.random.key(0)
 
     biome = Biome(
         object_frequencies=(1.0,),
@@ -181,7 +181,7 @@ def test_basic_movement():
 
 def test_vision():
     """Test the agent's observation."""
-    key = jax.random.PRNGKey(0)
+    key = jax.random.key(0)
     object_types = (WALL,)
     env = ForagaxObjectEnv(size=(7, 7), aperture_size=(3, 3), objects=object_types)
     params = env.default_params
@@ -223,7 +223,7 @@ def test_vision():
 
 def test_respawn():
     """Test object respawning."""
-    key = jax.random.PRNGKey(0)
+    key = jax.random.key(0)
     object_types = (FLOWER,)
     env = ForagaxObjectEnv(
         size=7,
@@ -259,7 +259,7 @@ def test_respawn():
 
 def test_wrapping_dynamics():
     """Test that the agent wraps around the environment boundaries."""
-    key = jax.random.PRNGKey(0)
+    key = jax.random.key(0)
     env = ForagaxObjectEnv(size=(5, 5), objects=())
     params = env.default_params
     _, state = env.reset(key, params)
@@ -342,7 +342,7 @@ def test_wrapping_dynamics():
 
 def test_wrapping_vision():
     """Test that the agent's vision wraps around the environment boundaries."""
-    key = jax.random.PRNGKey(0)
+    key = jax.random.key(0)
     env = ForagaxObjectEnv(size=(5, 5), aperture_size=(3, 3), objects=(FLOWER,))
     params = env.default_params
     obs, state = env.reset(key, params)
@@ -398,7 +398,7 @@ def test_generate_objects_in_biome():
             ),
         ),
     )
-    key = jax.random.PRNGKey(0)
+    key = jax.random.key(0)
     params = env.default_params
 
     _, state = env.reset(key, params)
@@ -424,7 +424,7 @@ def test_generate_objects_in_biome():
 def test_benchmark_vision(benchmark):
     env = ForagaxObjectEnv(size=7, aperture_size=3, objects=(WALL,))
     params = env.default_params
-    key = jax.random.PRNGKey(0)
+    key = jax.random.key(0)
     _, state = env.reset(key, params)
 
     grid = jnp.zeros((7, 7), dtype=jnp.int32)
@@ -450,7 +450,7 @@ def test_benchmark_vision(benchmark):
 
     def benchmark_fn():
         # use a fixed key for benchmark consistency
-        _run(state, jax.random.PRNGKey(1))[0].block_until_ready()
+        _run(state, jax.random.key(1))[0].block_until_ready()
 
     benchmark(benchmark_fn)
 
@@ -472,7 +472,7 @@ def test_benchmark_creation(benchmark):
     # no warm-up
 
     def benchmark_fn():
-        _build(jax.random.PRNGKey(1)).pos.block_until_ready()
+        _build(jax.random.key(1)).pos.block_until_ready()
 
     benchmark(benchmark_fn)
 
@@ -485,7 +485,7 @@ def test_benchmark_small_env(benchmark):
         biomes=(Biome(object_frequencies=(0.1, 0.1)),),
     )
     params = env.default_params
-    key = jax.random.PRNGKey(0)
+    key = jax.random.key(0)
     key, reset_key = jax.random.split(key)
     _, state = env.reset(reset_key, params)
 
@@ -504,7 +504,7 @@ def test_benchmark_small_env(benchmark):
     _run(state, run_key).pos.block_until_ready()
 
     def benchmark_fn():
-        key, run_key = jax.random.split(jax.random.PRNGKey(1))
+        key, run_key = jax.random.split(jax.random.key(1))
         _run(state, run_key).pos.block_until_ready()
 
     benchmark(benchmark_fn)
@@ -518,7 +518,7 @@ def test_benchmark_big_env(benchmark):
         biomes=(Biome(object_frequencies=(0.05, 0.05)),),
     )
     params = env.default_params
-    key = jax.random.PRNGKey(0)
+    key = jax.random.key(0)
 
     # Reset is part of the setup, not benchmarked
     key, reset_key = jax.random.split(key)
@@ -541,7 +541,7 @@ def test_benchmark_big_env(benchmark):
 
     def benchmark_fn():
         # use a fixed key for benchmark consistency
-        key, run_key = jax.random.split(jax.random.PRNGKey(1))
+        key, run_key = jax.random.split(jax.random.key(1))
         _run(state, run_key).pos.block_until_ready()
 
     benchmark(benchmark_fn)
@@ -556,7 +556,7 @@ def test_benchmark_vmap_env(benchmark):
         biomes=(Biome(object_frequencies=(0.1, 0.1)),),
     )
     params = env.default_params
-    key = jax.random.PRNGKey(0)
+    key = jax.random.key(0)
 
     # Reset is part of the setup, not benchmarked
     key, reset_key = jax.random.split(key)
@@ -583,7 +583,7 @@ def test_benchmark_vmap_env(benchmark):
 
     def benchmark_fn():
         # use a fixed key for benchmark consistency
-        key, run_key = jax.random.split(jax.random.PRNGKey(1))
+        key, run_key = jax.random.split(jax.random.key(1))
         _run(states, run_key).pos.block_until_ready()
 
     benchmark(benchmark_fn)
@@ -597,7 +597,7 @@ def test_benchmark_small_env_color(benchmark):
         biomes=(Biome(object_frequencies=(0.05, 0.05)),),
     )
     params = env.default_params
-    key = jax.random.PRNGKey(0)
+    key = jax.random.key(0)
     key, reset_key = jax.random.split(key)
     _, state = env.reset(reset_key, params)
 
@@ -616,7 +616,7 @@ def test_benchmark_small_env_color(benchmark):
     _run(state, run_key).pos.block_until_ready()
 
     def benchmark_fn():
-        key, run_key = jax.random.split(jax.random.PRNGKey(1))
+        key, run_key = jax.random.split(jax.random.key(1))
         _run(state, run_key).pos.block_until_ready()
 
     benchmark(benchmark_fn)
@@ -629,7 +629,7 @@ def test_benchmark_small_env_world(benchmark):
         biomes=(Biome(object_frequencies=(0.05, 0.05)),),
     )
     params = env.default_params
-    key = jax.random.PRNGKey(0)
+    key = jax.random.key(0)
     key, reset_key = jax.random.split(key)
     _, state = env.reset(reset_key, params)
 
@@ -648,7 +648,7 @@ def test_benchmark_small_env_world(benchmark):
     _run(state, run_key).pos.block_until_ready()
 
     def benchmark_fn():
-        key, run_key = jax.random.split(jax.random.PRNGKey(1))
+        key, run_key = jax.random.split(jax.random.key(1))
         _run(state, run_key).pos.block_until_ready()
 
     benchmark(benchmark_fn)
