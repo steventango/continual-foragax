@@ -9,7 +9,7 @@ from foragax.env import (
     ForagaxRGBEnv,
     ForagaxWorldEnv,
 )
-from foragax.objects import LARGE_MOREL, LARGE_OYSTER
+from foragax.objects import LARGE_MOREL, LARGE_OYSTER, MEDIUM_MOREL
 
 ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
     "ForagaxTwoBiomeSmall": {
@@ -22,7 +22,18 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
             # Oyster biome
             Biome(start=(10, 2), stop=(14, 6), object_frequencies=(0.0, 1.0)),
         ),
-    }
+    },
+    "ForagaxTwoBiomeSmall100": {
+        "size": (16, 8),
+        "aperture_size": (5, 5),
+        "objects": (MEDIUM_MOREL, LARGE_OYSTER),
+        "biomes": (
+            # Morel biome
+            Biome(start=(2, 2), stop=(6, 6), object_frequencies=(1.0, 0.0)),
+            # Oyster biome
+            Biome(start=(10, 2), stop=(14, 6), object_frequencies=(0.0, 1.0)),
+        ),
+    },
 }
 
 

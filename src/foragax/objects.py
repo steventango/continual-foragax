@@ -123,6 +123,14 @@ LARGE_MOREL = NormalRegenForagaxObject(
     std_regen_delay=30,
     color=(63, 30, 25),
 )
+MEDIUM_MOREL = NormalRegenForagaxObject(
+    name="medium_morel",
+    reward=10.0,
+    collectable=True,
+    mean_regen_delay=100,
+    std_regen_delay=10,
+    color=(63, 30, 25),
+)
 LARGE_OYSTER = NormalRegenForagaxObject(
     name="large_oyster",
     reward=1.0,
