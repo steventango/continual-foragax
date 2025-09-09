@@ -1,3 +1,13 @@
+## 0.4.0 (2025-09-09)
+
+### Feat
+
+- add ForagaxTwoBiomeSmall100 config
+
+### Fix
+
+- use dtype float_ instead of float32
+
 ## 0.3.2 (2025-09-02)
 
 ### Fix
