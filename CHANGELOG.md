@@ -1,3 +1,9 @@
+## 0.4.1 (2025-09-10)
+
+### Fix
+
+- use python types to avoid warning
+
 ## 0.4.0 (2025-09-09)
 
 ### Feat
