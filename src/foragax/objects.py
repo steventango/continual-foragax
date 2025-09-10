@@ -82,7 +82,7 @@ class NormalRegenForagaxObject(DefaultForagaxObject):
     def regen_delay(self, clock: int, rng: jax.Array) -> int:
         """Regeneration delay from a normal distribution."""
         delay = self.mean_regen_delay + jax.random.normal(rng) * self.std_regen_delay
-        return jnp.maximum(0, delay).astype(jnp.int_)
+        return jnp.maximum(0, delay).astype(int)
 
 
 EMPTY = DefaultForagaxObject()

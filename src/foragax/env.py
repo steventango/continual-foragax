@@ -171,7 +171,7 @@ class ForagaxEnv(environment.Environment[EnvState, EnvParams]):
         """Reset environment state."""
         key, subkey = jax.random.split(key)
 
-        object_grid = jnp.zeros((self.size[1], self.size[0]), dtype=jnp.int_)
+        object_grid = jnp.zeros((self.size[1], self.size[0]), dtype=int)
 
         iter_key = subkey
         for i in range(self.biome_object_frequencies.shape[0]):
@@ -249,19 +249,19 @@ class ForagaxEnv(environment.Environment[EnvState, EnvParams]):
     def action_space(self, params: EnvParams) -> spaces.Discrete:
         action_space = spaces.Discrete(self.num_actions)
         # NOTE: workaround for https://github.com/RobertTLange/gymnax/issues/58
-        action_space.dtype = jnp.int_
+        action_space.dtype = int
         return action_space
 
     def state_space(self, params: EnvParams) -> spaces.Dict:
         """State space of the environment."""
         return spaces.Dict(
             {
-                "pos": spaces.Box(0, max(self.size), (2,), jnp.int_),
+                "pos": spaces.Box(0, max(self.size), (2,), int),
                 "object_grid": spaces.Box(
                     -1000 * len(self.object_ids),
                     len(self.object_ids),
                     (self.size[1], self.size[0]),
-                    jnp.int_,
+                    int,
                 ),
                 "time": spaces.Discrete(params.max_steps_in_episode),
             }
@@ -385,7 +385,7 @@ class ForagaxObjectEnv(ForagaxEnv):
             self.aperture_size[1],
             num_obj_types - 1,
         )
-        return spaces.Box(0, 1, obs_shape, jnp.float_)
+        return spaces.Box(0, 1, obs_shape, float)
 
 
 class ForagaxRGBEnv(ForagaxEnv):
@@ -409,7 +409,7 @@ class ForagaxRGBEnv(ForagaxEnv):
 
     def observation_space(self, params: EnvParams) -> spaces.Box:
         obs_shape = (self.aperture_size[0], self.aperture_size[1], 3)
-        return spaces.Box(0, 1, obs_shape, jnp.float_)
+        return spaces.Box(0, 1, obs_shape, float)
 
 
 class ForagaxWorldEnv(ForagaxEnv):
@@ -426,4 +426,4 @@ class ForagaxWorldEnv(ForagaxEnv):
     def observation_space(self, params: EnvParams) -> spaces.Box:
         num_obj_types = len(self.object_ids)
         obs_shape = (self.size[1], self.size[0], num_obj_types)
-        return spaces.Box(0, 1, obs_shape, jnp.float_)
+        return spaces.Box(0, 1, obs_shape, float)

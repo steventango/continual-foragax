@@ -190,7 +190,7 @@ def test_vision():
     wall_id = 1  # 0 is EMPTY
 
     # Create a predictable environment
-    grid = jnp.zeros((7, 7), dtype=jnp.int_)
+    grid = jnp.zeros((7, 7), dtype=int)
     grid = grid.at[4, 3].set(wall_id)
     grid = grid.at[5, 3].set(wall_id)
     grid = grid.at[2, 0].set(wall_id)
@@ -202,7 +202,7 @@ def test_vision():
     key, step_key = jax.random.split(key)
     obs, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
 
-    expected = jnp.zeros((3, 3, 1), dtype=jnp.int_)
+    expected = jnp.zeros((3, 3, 1), dtype=int)
     expected = expected.at[0, 1, 0].set(1)
 
     chex.assert_trees_all_equal(state.pos, jnp.array([3, 3]))
@@ -213,7 +213,7 @@ def test_vision():
     obs, state, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
     key, step_key = jax.random.split(key)
     obs, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
-    expected = jnp.zeros((3, 3, 1), dtype=jnp.int_)
+    expected = jnp.zeros((3, 3, 1), dtype=int)
     expected = expected.at[0, 0, 0].set(1)
     expected = expected.at[1, 0, 0].set(1)
 
@@ -236,7 +236,7 @@ def test_respawn():
     flower_id = 1  # 0 is EMPTY
 
     # Place a flower and move the agent to it
-    grid = jnp.zeros((7, 7), dtype=jnp.int_)
+    grid = jnp.zeros((7, 7), dtype=int)
     grid = grid.at[4, 3].set(flower_id)
     state = state.replace(object_grid=grid, pos=jnp.array([3, 3]))
 
@@ -348,13 +348,13 @@ def test_wrapping_vision():
     obs, state = env.reset(key, params)
 
     # Create a predictable environment with a flower at (0, 0)
-    grid = jnp.zeros((5, 5), dtype=jnp.int_)
+    grid = jnp.zeros((5, 5), dtype=int)
     grid = grid.at[0, 0].set(1)
     state = state.replace(object_grid=grid)
 
     obs = env.get_obs(state, params)
 
-    expected = jnp.zeros((3, 3, 1), dtype=jnp.int_)
+    expected = jnp.zeros((3, 3, 1), dtype=int)
     assert jnp.array_equal(obs, expected)
 
     # go left
@@ -365,7 +365,7 @@ def test_wrapping_vision():
     key, step_key = jax.random.split(key)
     obs, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
 
-    expected = jnp.zeros((3, 3, 1), dtype=jnp.int_)
+    expected = jnp.zeros((3, 3, 1), dtype=int)
     expected = expected.at[2, 0, 0].set(1)
 
     assert jnp.array_equal(state.pos, jnp.array([1, 1]))
@@ -377,7 +377,7 @@ def test_wrapping_vision():
     key, step_key = jax.random.split(key)
     obs, state, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
 
-    expected = jnp.zeros((3, 3, 1), dtype=jnp.int_)
+    expected = jnp.zeros((3, 3, 1), dtype=int)
     expected = expected.at[2, 2, 0].set(1)
 
     assert jnp.array_equal(state.pos, jnp.array([4, 1]))
@@ -427,7 +427,7 @@ def test_benchmark_vision(benchmark):
     key = jax.random.key(0)
     _, state = env.reset(key, params)
 
-    grid = jnp.zeros((7, 7), dtype=jnp.int_)
+    grid = jnp.zeros((7, 7), dtype=int)
     grid = grid.at[4, 3].set(1)
     grid = grid.at[5, 3].set(1)
     grid = grid.at[2, 0].set(1)
@@ -442,7 +442,7 @@ def test_benchmark_vision(benchmark):
     # warm-up
     obs, new_state = _run(state, key)
 
-    expected = jnp.zeros((3, 3, 1), dtype=jnp.int_)
+    expected = jnp.zeros((3, 3, 1), dtype=int)
     expected = expected.at[0, 1, 0].set(1)
 
     chex.assert_trees_all_equal(new_state.pos, jnp.array([3, 3]))
