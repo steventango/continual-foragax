@@ -1,3 +1,10 @@
+## 0.5.0 (2025-09-15)
+
+### Feat
+
+- remove ForagaxTwoBiomeSmall100
+- ForagaxTwoBiomeSmall-v2
+
 ## 0.4.1 (2025-09-10)
 
 ### Fix
