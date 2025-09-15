@@ -23,6 +23,17 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
             Biome(start=(10, 2), stop=(14, 6), object_frequencies=(0.0, 1.0)),
         ),
     },
+    "ForagaxTwoBiomeSmall-v2": {
+        "size": (16, 8),
+        "aperture_size": (5, 5),
+        "objects": (MEDIUM_MOREL, LARGE_OYSTER),
+        "biomes": (
+            # Morel biome
+            Biome(start=(3, 3), stop=(6, 6), object_frequencies=(1.0, 0.0)),
+            # Oyster biome
+            Biome(start=(11, 3), stop=(14, 6), object_frequencies=(0.0, 1.0)),
+        ),
+    },
     "ForagaxTwoBiomeSmall100": {
         "size": (16, 8),
         "aperture_size": (5, 5),

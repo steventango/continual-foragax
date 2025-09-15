@@ -11,7 +11,7 @@ from foragax.registry import make
 def main():
     """Generate a visualization of a Foragax environment under random behavior."""
     key = jax.random.key(0)
-    env = make("ForagaxTwoBiomeSmall", aperture_size=11, observation_type="object")
+    env = make("ForagaxTwoBiomeSmall-v2", aperture_size=5, observation_type="object")
     env_params = env.default_params
 
     frames = defaultdict(list)
