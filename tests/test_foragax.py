@@ -246,8 +246,10 @@ def test_respawn():
     assert reward == FLOWER.reward_val
     assert state.object_grid[4, 3] < 0
 
+    steps_until_respawn = -state.object_grid[4, 3] // 2
+
     # Step until it respawns
-    for i in range(20):
+    for i in range(steps_until_respawn):
         key, step_key = jax.random.split(key)
         _, state, _, _, _ = env.step_env(step_key, state, Actions.UP, params)
         assert state.object_grid[4, 3] < 0

@@ -6,7 +6,7 @@ Source: https://github.com/andnp/Foragax
 from dataclasses import dataclass
 from enum import IntEnum
 from functools import partial
-from typing import Any, Tuple
+from typing import Any, Tuple, Union
 
 import jax
 import jax.numpy as jnp
@@ -37,13 +37,13 @@ DIRECTIONS = jnp.array(
 class Biome:
     # Object generation frequencies for this biome
     object_frequencies: Tuple[float, ...] = ()
-    start: Tuple[int, int] | None = None
-    stop: Tuple[int, int] | None = None
+    start: Union[Tuple[int, int], None] = None
+    stop: Union[Tuple[int, int], None] = None
 
 
 @struct.dataclass
 class EnvParams(environment.EnvParams):
-    max_steps_in_episode: int | None
+    max_steps_in_episode: Union[int, None]
 
 
 @struct.dataclass
@@ -53,13 +53,13 @@ class EnvState(environment.EnvState):
     time: int
 
 
-class ForagaxEnv(environment.Environment[EnvState, EnvParams]):
+class ForagaxEnv(environment.Environment):
     """JAX implementation of Foragax environment."""
 
     def __init__(
         self,
-        size: Tuple[int, int] | int = (10, 10),
-        aperture_size: Tuple[int, int] | int = (5, 5),
+        size: Union[Tuple[int, int], int] = (10, 10),
+        aperture_size: Union[Tuple[int, int], int] = (5, 5),
         objects: Tuple[BaseForagaxObject, ...] = (),
         biomes: Tuple[Biome, ...] = (Biome(object_frequencies=()),),
     ):
@@ -103,7 +103,7 @@ class ForagaxEnv(environment.Environment[EnvState, EnvParams]):
         self,
         key: jax.Array,
         state: EnvState,
-        action: int | float | jax.Array,
+        action: Union[int, float, jax.Array],
         params: EnvParams,
     ) -> tuple[jax.Array, EnvState, jax.Array, jax.Array, dict[Any, Any]]:
         """Perform single timestep state transition."""
