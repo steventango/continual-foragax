@@ -1,3 +1,14 @@
+## 0.7.0 (2025-09-17)
+
+### Feat
+
+- add Python 3.8 to the test matrix
+- support Python 3.8
+
+### Fix
+
+- remove version constraints
+
 ## 0.6.0 (2025-09-17)
 
 ### Feat
