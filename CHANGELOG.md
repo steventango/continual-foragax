@@ -1,3 +1,15 @@
+## 0.6.0 (2025-09-17)
+
+### Feat
+
+- support Python 3.9
+- rename ForagaxTwoBiomeSmall to ForagaxTwoBiomeSmall-v1
+
+### Fix
+
+- add six dependency for python3.9
+- lock env for python3.9
+
 ## 0.5.0 (2025-09-15)
 
 ### Feat
