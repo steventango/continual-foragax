@@ -6,7 +6,7 @@ Source: https://github.com/andnp/Foragax
 from dataclasses import dataclass
 from enum import IntEnum
 from functools import partial
-from typing import Any, Tuple, Union
+from typing import Any, Dict, Tuple, Union
 
 import jax
 import jax.numpy as jnp
@@ -105,7 +105,7 @@ class ForagaxEnv(environment.Environment):
         state: EnvState,
         action: Union[int, float, jax.Array],
         params: EnvParams,
-    ) -> tuple[jax.Array, EnvState, jax.Array, jax.Array, dict[Any, Any]]:
+    ) -> Tuple[jax.Array, EnvState, jax.Array, jax.Array, Dict[Any, Any]]:
         """Perform single timestep state transition."""
         num_obj_types = len(self.object_ids)
         # Decode the object grid: positive values are objects, negative are timers (treat as empty)
@@ -167,7 +167,7 @@ class ForagaxEnv(environment.Environment):
 
     def reset_env(
         self, key: jax.Array, params: EnvParams
-    ) -> tuple[jax.Array, EnvState]:
+    ) -> Tuple[jax.Array, EnvState]:
         """Reset environment state."""
         key, subkey = jax.random.split(key)
 
