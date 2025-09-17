@@ -12,7 +12,7 @@ from foragax.env import (
 from foragax.objects import LARGE_MOREL, LARGE_OYSTER, MEDIUM_MOREL
 
 ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
-    "ForagaxTwoBiomeSmall": {
+    "ForagaxTwoBiomeSmall-v1": {
         "size": (16, 8),
         "aperture_size": (5, 5),
         "objects": (LARGE_MOREL, LARGE_OYSTER),
