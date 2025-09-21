@@ -1,3 +1,9 @@
+## 0.8.2 (2025-09-21)
+
+### Fix
+
+- add package-data configuration
+
 ## 0.8.1 (2025-09-21)
 
 ### Fix
