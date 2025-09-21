@@ -13,7 +13,8 @@ import jax.numpy as jnp
 from flax import struct
 from gymnax.environments import environment, spaces
 
-from foragax.objects import AGENT, EMPTY, BaseForagaxObject
+from foragax.objects import AGENT, EMPTY, BaseForagaxObject, WeatherObject
+from foragax.weather import get_temperature
 
 
 class Actions(IntEnum):
@@ -71,8 +72,13 @@ class ForagaxEnv(environment.Environment):
         if isinstance(aperture_size, int):
             aperture_size = (aperture_size, aperture_size)
         self.aperture_size = aperture_size
-
         objects = (EMPTY,) + objects
+        self.objects = objects
+        self.weather_object = None
+        for o in objects:
+            if isinstance(o, WeatherObject):
+                self.weather_object = o
+                break
 
         # JIT-compatible versions of object and biome properties
         self.object_ids = jnp.arange(len(objects))
@@ -149,6 +155,12 @@ class ForagaxEnv(environment.Environment):
         new_val_at_pos = jax.lax.select(is_collectable, encoded_timer, val_at_pos)
         object_grid = object_grid.at[pos[1], pos[0]].set(new_val_at_pos)
 
+        info = {"discount": self.discount(state, params)}
+        if self.weather_object is not None:
+            info["temperature"] = get_temperature(
+                self.weather_object.rewards, state.time, self.weather_object.repeat
+            )
+
         # 4. UPDATE STATE
         state = EnvState(
             pos=pos,
@@ -162,7 +174,7 @@ class ForagaxEnv(environment.Environment):
             jax.lax.stop_gradient(state),
             reward,
             done,
-            {"discount": self.discount(state, params)},
+            info,
         )
 
     def reset_env(
