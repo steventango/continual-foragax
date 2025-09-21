@@ -17,6 +17,8 @@ def load_data(file_path: str):
         for _ in range(21):
             next(f)
         reader = csv.DictReader(f)
+        if reader.fieldnames:
+            reader.fieldnames = [fn.strip() for fn in reader.fieldnames]
         tg = []
         for row in reader:
             if not row or row["Q_TG"].strip() != "0":
