@@ -4,6 +4,8 @@ from typing import Tuple
 import jax
 import jax.numpy as jnp
 
+from foragax.weather import FILE_PATHS, get_temperature, load_data
+
 
 class BaseForagaxObject:
     """Base class for objects in the Foragax environment."""
@@ -85,6 +87,35 @@ class NormalRegenForagaxObject(DefaultForagaxObject):
         return jnp.maximum(0, delay).astype(int)
 
 
+class WeatherObject(NormalRegenForagaxObject):
+    """Object with reward based on temperature data."""
+
+    def __init__(
+        self,
+        name: str,
+        rewards: jnp.ndarray,
+        repeat: int,
+        multiplier: float = 1.0,
+        mean_regen_delay: int = 10,
+        std_regen_delay: int = 1,
+        color: Tuple[int, int, int] = (0, 0, 0),
+    ):
+        super().__init__(
+            name=name,
+            collectable=True,
+            mean_regen_delay=mean_regen_delay,
+            std_regen_delay=std_regen_delay,
+            color=color,
+        )
+        self.rewards = rewards
+        self.repeat = repeat
+        self.multiplier = multiplier
+
+    def reward(self, clock: int, rng: jax.Array) -> float:
+        """Reward is based on temperature."""
+        return get_temperature(self.rewards, clock, self.repeat) * self.multiplier
+
+
 EMPTY = DefaultForagaxObject()
 WALL = DefaultForagaxObject(name="wall", blocking=True, color=(127, 127, 127))
 FLOWER = DefaultForagaxObject(
@@ -147,3 +178,42 @@ DEATHCAP = DefaultForagaxObject(
     color=(193, 178, 30),
 )
 AGENT = DefaultForagaxObject(name="agent", blocking=True, color=(0, 0, 255))
+# TODO: allow this to be configured
+def create_weather_objects(
+    file_index: int = 0, repeat: int = 100, multiplier: float = 1.0
+):
+    """Create HOT and COLD WeatherObject instances using the specified file.
+
+    Args:
+        file_index: Index into `FILE_PATHS` to select the temperature file.
+        repeat: How many steps each temperature value repeats for.
+        multiplier: Base multiplier applied to HOT; COLD will use -multiplier.
+
+    Returns:
+        A tuple (HOT, COLD) of WeatherObject instances.
+    """
+    # Clamp file_index
+    if file_index < 0 or file_index >= len(FILE_PATHS):
+        raise IndexError(
+            f"file_index {file_index} out of range (0..{len(FILE_PATHS) - 1})"
+        )
+
+    rewards = load_data(FILE_PATHS[file_index])
+
+    hot = WeatherObject(
+        name="hot",
+        rewards=rewards,
+        repeat=repeat,
+        multiplier=multiplier,
+        color=(255, 0, 255),
+    )
+
+    cold = WeatherObject(
+        name="cold",
+        rewards=rewards,
+        repeat=repeat,
+        multiplier=-multiplier,
+        color=(0, 255, 255),
+    )
+
+    return hot, cold

@@ -33,3 +33,9 @@ name = "cz_conventional_commits"
 version = "0.7.0"
 tag_format = "$version"
 version_files = ["pyproject.toml"]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.package-data]
+"foragax" = ["../data/ECA_non-blended_custom/*"]
