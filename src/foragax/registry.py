@@ -17,7 +17,7 @@ from foragax.objects import (
 )
 
 ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
-    "ForagerWeather-v1": {
+    "ForagaxWeather-v1": {
         "size": (15, 15),
         "aperture_size": None,
         "objects": None,
@@ -77,7 +77,7 @@ def make(
 
     config["aperture_size"] = aperture_size
 
-    if env_id == "ForagerWeather-v1":
+    if env_id.startswith("ForagaxWeather"):
         hot, cold = create_weather_objects(file_index=file_index)
         config["objects"] = (hot, cold)
 
