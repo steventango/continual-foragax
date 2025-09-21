@@ -18,7 +18,7 @@ def main():
 
     for aperture_size in aperture_sizes:
         env = make(
-            "ForagaxTwoBiomeSmall-v2",
+            "ForagaxWeather-v1",
             aperture_size=aperture_size,
             observation_type="object",
         )
@@ -37,10 +37,7 @@ def main():
             _, next_env_state, reward, done, info = env.step(
                 key_step, env_state, action, env_params
             )
-            if done:
-                break
-            else:
-                env_state = next_env_state
+            env_state = next_env_state
 
         for render_mode in ("world", "aperture"):
             save_video(
