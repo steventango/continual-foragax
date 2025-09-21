@@ -92,5 +92,4 @@ def make(
 
     env_class = env_class_map[observation_type]
 
-
     return env_class(**config)
