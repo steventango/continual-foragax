@@ -1,12 +1,13 @@
 """Helper functions for loading temperature data for the ForagerWeather env."""
 
 import csv
+import os
 from glob import glob
 
 import jax.numpy as jnp
 import numpy as np
 
-DATA_PATH = "data/ECA_non-blended_custom"
+DATA_PATH = os.path.join(os.path.dirname(__file__), "data", "ECA_non-blended_custom")
 FILE_PATHS = sorted(glob(f"{DATA_PATH}/TG_*.txt"))
 
 
