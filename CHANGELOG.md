@@ -1,3 +1,19 @@
+## 0.8.0 (2025-09-21)
+
+### Feat
+
+- add temperature into info
+- implement ForagerWeather
+
+### Fix
+
+- ensure fieldnames are stripped of whitespace in load_data function
+- rename Forager to Foragax
+
+### Refactor
+
+- remove TODO comment
+
 ## 0.7.0 (2025-09-17)
 
 ### Feat
