@@ -180,7 +180,6 @@ DEATHCAP = DefaultForagaxObject(
 AGENT = DefaultForagaxObject(name="agent", blocking=True, color=(0, 0, 255))
 
 
-# TODO: allow this to be configured
 def create_weather_objects(
     file_index: int = 0, repeat: int = 100, multiplier: float = 1.0
 ):
