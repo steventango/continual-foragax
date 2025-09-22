@@ -9,7 +9,10 @@ from foragax.colors import hsv_to_rgb_255
 
 
 def apply_true_borders(
-    base_img: jax.Array, true_grid: jax.Array, grid_size: Tuple[int, int]
+    base_img: jax.Array,
+    true_grid: jax.Array,
+    grid_size: Tuple[int, int],
+    num_objects: int,
 ) -> jax.Array:
     """Apply true object borders by overlaying HSV border colors on border pixels.
 
@@ -17,12 +20,12 @@ def apply_true_borders(
         base_img: Base image with object colors
         true_grid: Grid of object IDs for determining border colors
         grid_size: (height, width) of the grid
+        num_objects: Number of object types
 
     Returns:
         Image with HSV borders overlaid on border pixels
     """
     # Create HSV border colors for each object type
-    num_objects = true_grid.max() + 1  # Assume object IDs start from 0
     hues = jnp.linspace(0, 1, num_objects, endpoint=False)
 
     # Convert HSV to RGB for border colors
