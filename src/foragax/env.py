@@ -434,7 +434,6 @@ class ForagaxObjectEnv(ForagaxEnv):
         # Decode grid for observation
         obs_grid = jnp.maximum(0, state.object_grid)
         aperture = self._get_aperture(obs_grid, state.pos)
-        aperture = jnp.flip(aperture, axis=0)
 
         # Handle case with no objects (only EMPTY)
         if self.num_color_channels == 0:

@@ -225,7 +225,7 @@ def test_vision():
     obs, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
 
     expected = jnp.zeros((3, 3, 1), dtype=int)
-    expected = expected.at[0, 1, 0].set(1)
+    expected = expected.at[2, 1, 0].set(1)
 
     chex.assert_trees_all_equal(state.pos, jnp.array([3, 3]))
     chex.assert_trees_all_equal(obs, expected)
@@ -236,8 +236,8 @@ def test_vision():
     key, step_key = jax.random.split(key)
     obs, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
     expected = jnp.zeros((3, 3, 1), dtype=int)
-    expected = expected.at[0, 0, 0].set(1)
     expected = expected.at[1, 0, 0].set(1)
+    expected = expected.at[2, 0, 0].set(1)
 
     chex.assert_trees_all_equal(state.pos, jnp.array([4, 4]))
     chex.assert_trees_all_equal(obs, expected)
@@ -390,7 +390,7 @@ def test_wrapping_vision():
     obs, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
 
     expected = jnp.zeros((3, 3, 1), dtype=int)
-    expected = expected.at[2, 0, 0].set(1)
+    expected = expected.at[0, 0, 0].set(1)
 
     assert jnp.array_equal(state.pos, jnp.array([1, 1]))
     assert jnp.array_equal(obs, expected)
@@ -402,7 +402,7 @@ def test_wrapping_vision():
     obs, state, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
 
     expected = jnp.zeros((3, 3, 1), dtype=int)
-    expected = expected.at[2, 2, 0].set(1)
+    expected = expected.at[0, 2, 0].set(1)
 
     assert jnp.array_equal(state.pos, jnp.array([4, 1]))
     assert jnp.array_equal(obs, expected)
@@ -476,7 +476,7 @@ def test_color_based_partial_observability():
     center_obs = obs[2, 2, :]  # MOREL at center
     morel_obs = obs[2, 3, :]  # LARGE_MOREL
     med_morel_obs = obs[2, 4, :]  # MEDIUM_MOREL
-    flower_obs = obs[1, 2, :]  # FLOWER (flipped coordinates)
+    flower_obs = obs[3, 2, :]  # FLOWER (flipped coordinates)
 
     # All morels should have the same observation (channel 0 activated)
     chex.assert_trees_all_equal(center_obs, jnp.array([1.0, 0.0]))
@@ -623,7 +623,7 @@ def test_benchmark_vision(benchmark):
     obs, new_state = _run(state, key)
 
     expected = jnp.zeros((3, 3, 1), dtype=int)
-    expected = expected.at[0, 1, 0].set(1)
+    expected = expected.at[2, 1, 0].set(1)
 
     chex.assert_trees_all_equal(new_state.pos, jnp.array([3, 3]))
     chex.assert_trees_all_equal(obs, expected)
