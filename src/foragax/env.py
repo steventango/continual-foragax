@@ -19,9 +19,9 @@ from foragax.weather import get_temperature
 
 
 class Actions(IntEnum):
-    UP = 0
+    DOWN = 0
     RIGHT = 1
-    DOWN = 2
+    UP = 2
     LEFT = 3
 
 

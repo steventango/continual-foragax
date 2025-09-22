@@ -185,7 +185,7 @@ def test_basic_movement():
 
     # stays still when bumping into a wall
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
+    _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
     assert jnp.array_equal(state.pos, jnp.array([3, 3]))
 
     key, step_key = jax.random.split(key)
@@ -197,7 +197,7 @@ def test_basic_movement():
     assert jnp.array_equal(state.pos, jnp.array([3, 3]))
 
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+    _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
     assert jnp.array_equal(state.pos, jnp.array([3, 2]))
 
 
@@ -222,7 +222,7 @@ def test_vision():
 
     # No movement
     key, step_key = jax.random.split(key)
-    obs, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
+    obs, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
 
     expected = jnp.zeros((3, 3, 1), dtype=int)
     expected = expected.at[2, 1, 0].set(1)
@@ -234,7 +234,7 @@ def test_vision():
     key, step_key = jax.random.split(key)
     obs, state, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
     key, step_key = jax.random.split(key)
-    obs, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
+    obs, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
     expected = jnp.zeros((3, 3, 1), dtype=int)
     expected = expected.at[1, 0, 0].set(1)
     expected = expected.at[2, 0, 0].set(1)
@@ -264,7 +264,7 @@ def test_respawn():
 
     # Collect the flower
     key, step_key = jax.random.split(key)
-    _, state, reward, _, _ = env.step_env(step_key, state, Actions.UP, params)
+    _, state, reward, _, _ = env.step_env(step_key, state, Actions.DOWN, params)
     assert reward == FLOWER.reward_val
     assert state.object_grid[4, 3] < 0
 
@@ -273,11 +273,11 @@ def test_respawn():
     # Step until it respawns
     for i in range(steps_until_respawn):
         key, step_key = jax.random.split(key)
-        _, state, _, _, _ = env.step_env(step_key, state, Actions.UP, params)
+        _, state, _, _, _ = env.step_env(step_key, state, Actions.DOWN, params)
         assert state.object_grid[4, 3] < 0
 
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
+    _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
     assert state.object_grid[4, 3] == flower_id
 
 
@@ -291,38 +291,38 @@ def test_wrapping_dynamics():
     # Go up
     assert jnp.array_equal(state.pos, jnp.array([2, 2]))
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
+    _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 3]))
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
+    _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 4]))
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
+    _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 0]))
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
+    _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 1]))
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
+    _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 2]))
 
     # Go down
     _, state = env.reset(key, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 2]))
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+    _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 1]))
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+    _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 0]))
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+    _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 4]))
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+    _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 3]))
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+    _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 2]))
 
     # Go right
@@ -387,7 +387,7 @@ def test_wrapping_vision():
 
     # go down
     key, step_key = jax.random.split(key)
-    obs, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+    obs, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
 
     expected = jnp.zeros((3, 3, 1), dtype=int)
     expected = expected.at[0, 0, 0].set(1)
@@ -616,7 +616,7 @@ def test_benchmark_vision(benchmark):
     @jax.jit
     def _run(state, key):
         key, step_key = jax.random.split(key)
-        obs, new_state, _, _, _ = env.step(step_key, state, Actions.UP, params)
+        obs, new_state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
         return obs, new_state
 
     # warm-up
@@ -674,7 +674,7 @@ def test_benchmark_small_env(benchmark):
         def f(carry, _):
             state, key = carry
             key, step_key = jax.random.split(key, 2)
-            _, new_state, _, _, _ = env.step(step_key, state, Actions.UP, params)
+            _, new_state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
             return (new_state, key), None
 
         (final_state, _), _ = jax.lax.scan(f, (state, key), None, length=1000)
@@ -709,7 +709,7 @@ def test_benchmark_big_env(benchmark):
         def f(carry, _):
             state, key = carry
             key, step_key = jax.random.split(key, 2)
-            _, new_state, _, _, _ = env.step(step_key, state, Actions.UP, params)
+            _, new_state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
             return (new_state, key), None
 
         (final_state, _), _ = jax.lax.scan(f, (state, key), None, length=100)
@@ -750,7 +750,7 @@ def test_benchmark_vmap_env(benchmark):
             key, step_key = jax.random.split(key, 2)
             step_keys = jax.random.split(step_key, num_envs)
             _, new_states, _, _, _ = jax.vmap(env.step, in_axes=(0, 0, None, None))(
-                step_keys, states, Actions.UP, params
+                step_keys, states, Actions.DOWN, params
             )
             return (new_states, key), None
 
@@ -786,7 +786,7 @@ def test_benchmark_small_env_color(benchmark):
         def f(carry, _):
             state, key = carry
             key, step_key = jax.random.split(key, 2)
-            _, new_state, _, _, _ = env.step(step_key, state, Actions.UP, params)
+            _, new_state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
             return (new_state, key), None
 
         (final_state, _), _ = jax.lax.scan(f, (state, key), None, length=100)
@@ -818,7 +818,7 @@ def test_benchmark_small_env_world(benchmark):
         def f(carry, _):
             state, key = carry
             key, step_key = jax.random.split(key, 2)
-            _, new_state, _, _, _ = env.step(step_key, state, Actions.UP, params)
+            _, new_state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
             return (new_state, key), None
 
         (final_state, _), _ = jax.lax.scan(f, (state, key), None, length=100)
