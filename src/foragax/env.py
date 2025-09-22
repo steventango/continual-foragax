@@ -348,7 +348,9 @@ class ForagaxEnv(environment.Environment):
 
             if is_true_mode:
                 # Apply true object borders by overlaying true colors on border pixels
-                img = apply_true_borders(img, render_grid, self.size)
+                img = apply_true_borders(
+                    img, render_grid, self.size, len(self.object_ids)
+                )
 
             # Add grid lines for world mode
             grid_color = jnp.zeros(3, dtype=jnp.uint8)
@@ -376,7 +378,9 @@ class ForagaxEnv(environment.Environment):
 
             if is_true_mode:
                 # Apply true object borders by overlaying true colors on border pixels
-                img = apply_true_borders(img, aperture, self.aperture_size)
+                img = apply_true_borders(
+                    img, aperture, self.aperture_size, len(self.object_ids)
+                )
 
             # Add grid lines for aperture mode
             grid_color = jnp.zeros(3, dtype=jnp.uint8)
