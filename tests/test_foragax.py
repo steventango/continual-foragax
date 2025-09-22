@@ -143,12 +143,25 @@ def test_rgb_observation_mode_large_aperture():
 
 def test_world_observation_mode():
     # can use world observation mode
-    env = ForagaxWorldEnv(size=(10, 10))
+    env = ForagaxWorldEnv(
+        size=(10, 10),
+        aperture_size=5,
+        objects=(WALL, FLOWER),
+        biomes=(Biome(object_frequencies=(0.1, 0.1)),),
+    )
     params = env.default_params
     key = jax.random.key(0)
     obs, state = env.reset(key, params)
 
-    assert obs.shape == (10, 10, 1)
+    assert obs.shape == (10, 10, 3)
+    # Check agent channel (last channel) is 0 except 1 at agent position
+    agent_channel = obs[:, :, 2]
+    assert jnp.sum(agent_channel) == 1
+    assert agent_channel[state.pos[1], state.pos[0]] == 1
+
+    # check non-zero values in other channels
+    assert jnp.sum(obs[:, :, 0]) > 0
+    assert jnp.sum(obs[:, :, 1]) > 0
 
 
 def test_basic_movement():

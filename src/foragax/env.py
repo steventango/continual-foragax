@@ -492,7 +492,14 @@ class ForagaxWorldEnv(ForagaxEnv):
         num_obj_types = len(self.object_ids)
         # Decode grid for observation
         obs_grid = jnp.maximum(0, state.object_grid)
-        obs = jax.nn.one_hot(obs_grid, num_obj_types)
+        obs = jnp.zeros((self.size[1], self.size[0], num_obj_types), dtype=jnp.float32)
+
+        num_object_channels = num_obj_types - 1
+        # create masks for all objects at once
+        object_ids = jnp.arange(1, num_obj_types)
+        object_masks = obs_grid[..., None] == object_ids[None, None, :]
+        obs = obs.at[:, :, :num_object_channels].set(object_masks.astype(float))
+
         obs = obs.at[state.pos[1], state.pos[0], -1].set(1)
         return obs
 
