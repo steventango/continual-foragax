@@ -11,7 +11,8 @@ from foragax.registry import make
 def main():
     """Generate a visualization of a Foragax environment under random behavior."""
     key = jax.random.key(0)
-    aperture_sizes = [3, 5, 7, 9, 11, 13, 15]
+    aperture_sizes = [5, 9]
+    render_modes = ["world", "world_true", "aperture", "aperture_true"]
     video_folder = "videos"
     if not os.path.exists(video_folder):
         os.makedirs(video_folder)
@@ -27,8 +28,8 @@ def main():
         frames = defaultdict(list)
         key, key_reset = jax.random.split(key)
         _, env_state = env.reset(key_reset, env_params)
-        for _ in tqdm(range(1000), desc=f"Aperture {aperture_size}"):
-            for render_mode in ("world", "aperture"):
+        for _ in tqdm(range(100), desc=f"Aperture {aperture_size}"):
+            for render_mode in render_modes:
                 frames[render_mode].append(
                     env.render(env_state, env_params, render_mode=render_mode)
                 )
@@ -39,7 +40,7 @@ def main():
             )
             env_state = next_env_state
 
-        for render_mode in ("world", "aperture"):
+        for render_mode in render_modes:
             save_video(
                 frames[render_mode],
                 video_folder,
