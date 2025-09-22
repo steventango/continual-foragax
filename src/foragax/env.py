@@ -14,6 +14,7 @@ from flax import struct
 from gymnax.environments import environment, spaces
 
 from foragax.objects import AGENT, EMPTY, BaseForagaxObject, WeatherObject
+from foragax.rendering import apply_true_borders
 from foragax.weather import get_temperature
 
 
@@ -279,111 +280,6 @@ class ForagaxEnv(environment.Environment):
             }
         )
 
-    def _apply_true_borders(
-        self, base_img: jax.Array, true_grid: jax.Array, grid_size: Tuple[int, int]
-    ) -> jax.Array:
-        """Apply true object borders by overlaying HSV border colors on border pixels."""
-        # Create HSV border colors for each object type
-        num_objects = len(self.object_ids)
-        hues = jnp.linspace(0, 1, num_objects, endpoint=False)
-        saturation = 0.9
-        value = 0.8
-
-        # Convert HSV to RGB for border colors
-        h = hues[true_grid]
-        c = value * saturation
-        x = c * (1 - jnp.abs(jnp.mod(h * 6, 2) - 1))
-        m = value - c
-
-        # Create RGB border colors based on hue
-        r_border = jnp.zeros_like(h)
-        g_border = jnp.zeros_like(h)
-        b_border = jnp.zeros_like(h)
-
-        # Sector 0: 0-60 degrees (red to yellow)
-        mask0 = h < 1 / 6
-        r_border = jnp.where(mask0, c, r_border)
-        g_border = jnp.where(mask0, x, g_border)
-
-        # Sector 1: 60-120 degrees (yellow to green)
-        mask1 = (h >= 1 / 6) & (h < 2 / 6)
-        r_border = jnp.where(mask1, x, r_border)
-        g_border = jnp.where(mask1, c, g_border)
-
-        # Sector 2: 120-180 degrees (green to cyan)
-        mask2 = (h >= 2 / 6) & (h < 3 / 6)
-        g_border = jnp.where(mask2, c, g_border)
-        b_border = jnp.where(mask2, x, b_border)
-
-        # Sector 3: 180-240 degrees (cyan to blue)
-        mask3 = (h >= 3 / 6) & (h < 4 / 6)
-        g_border = jnp.where(mask3, x, g_border)
-        b_border = jnp.where(mask3, c, b_border)
-
-        # Sector 4: 240-300 degrees (blue to magenta)
-        mask4 = (h >= 4 / 6) & (h < 5 / 6)
-        r_border = jnp.where(mask4, x, r_border)
-        b_border = jnp.where(mask4, c, b_border)
-
-        # Sector 5: 300-360 degrees (magenta to red)
-        mask5 = h >= 5 / 6
-        r_border = jnp.where(mask5, c, r_border)
-        b_border = jnp.where(mask5, x, b_border)
-
-        # Add value offset and convert to 0-255 range
-        border_colors = (
-            jnp.stack([r_border + m, g_border + m, b_border + m], axis=-1) * 255
-        ).astype(jnp.uint8)
-
-        # Resize border colors to match rendered image size
-        border_img = jax.image.resize(
-            border_colors,
-            (grid_size[0] * 24, grid_size[1] * 24, 3),
-            jax.image.ResizeMethod.NEAREST,
-        )
-
-        # Create border mask (2-pixel thick borders) - vectorized like grid lines
-        height, width = grid_size
-        img_height, img_width = height * 24, width * 24
-
-        border_mask = jnp.zeros((img_height, img_width), dtype=bool)
-
-        # Create border row and column indices for all cells at once
-        cell_rows = jnp.arange(height)
-        cell_cols = jnp.arange(width)
-
-        # Top border rows: 2 rows per cell
-        top_border_rows = cell_rows[:, None] * 24 + jnp.arange(2)[None, :]
-        top_border_rows_flat = top_border_rows.flatten()
-
-        # Bottom border rows: 2 rows per cell
-        bottom_border_rows = cell_rows[:, None] * 24 + 22 + jnp.arange(2)[None, :]
-        bottom_border_rows_flat = bottom_border_rows.flatten()
-
-        # Left border columns: 2 columns per cell
-        left_border_cols = cell_cols[:, None] * 24 + jnp.arange(2)[None, :]
-        left_border_cols_flat = left_border_cols.flatten()
-
-        # Right border columns: 2 columns per cell
-        right_border_cols = cell_cols[:, None] * 24 + 22 + jnp.arange(2)[None, :]
-        right_border_cols_flat = right_border_cols.flatten()
-
-        # Set top and bottom borders (full width rectangles)
-        all_border_rows = jnp.concatenate(
-            [top_border_rows_flat, bottom_border_rows_flat]
-        )
-        border_mask = border_mask.at[all_border_rows, :].set(True)
-
-        # Set left and right borders (full height rectangles)
-        all_border_cols = jnp.concatenate(
-            [left_border_cols_flat, right_border_cols_flat]
-        )
-        border_mask = border_mask.at[:, all_border_cols].set(True)
-
-        # Apply border mask: use HSV border colors for border pixels, base colors elsewhere
-        result_img = jnp.where(border_mask[..., None], border_img, base_img)
-        return result_img
-
     def _get_aperture(self, object_grid: jax.Array, pos: jax.Array) -> jax.Array:
         """Extract the aperture view from the object grid."""
         ap_h, ap_w = self.aperture_size
@@ -452,7 +348,7 @@ class ForagaxEnv(environment.Environment):
 
             if is_true_mode:
                 # Apply true object borders by overlaying true colors on border pixels
-                img = self._apply_true_borders(img, render_grid, self.size)
+                img = apply_true_borders(img, render_grid, self.size)
 
             # Add grid lines for world mode
             grid_color = jnp.zeros(3, dtype=jnp.uint8)
@@ -480,7 +376,7 @@ class ForagaxEnv(environment.Environment):
 
             if is_true_mode:
                 # Apply true object borders by overlaying true colors on border pixels
-                img = self._apply_true_borders(img, aperture, self.aperture_size)
+                img = apply_true_borders(img, aperture, self.aperture_size)
 
             # Add grid lines for aperture mode
             grid_color = jnp.zeros(3, dtype=jnp.uint8)
