@@ -181,7 +181,7 @@ AGENT = DefaultForagaxObject(name="agent", blocking=True, color=(0, 0, 255))
 
 
 def create_weather_objects(
-    file_index: int = 0, repeat: int = 100, multiplier: float = 1.0
+    file_index: int = 0, repeat: int = 500, multiplier: float = 1.0
 ):
     """Create HOT and COLD WeatherObject instances using the specified file.
 
