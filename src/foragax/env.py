@@ -14,6 +14,7 @@ from flax import struct
 from gymnax.environments import environment, spaces
 
 from foragax.objects import AGENT, EMPTY, BaseForagaxObject, WeatherObject
+from foragax.rendering import apply_true_borders
 from foragax.weather import get_temperature
 
 
@@ -295,7 +296,11 @@ class ForagaxEnv(environment.Environment):
     @partial(jax.jit, static_argnames=("self", "render_mode"))
     def render(self, state: EnvState, params: EnvParams, render_mode: str = "world"):
         """Render the environment state."""
-        if render_mode == "world":
+        is_world_mode = render_mode in ("world", "world_true")
+        is_aperture_mode = render_mode in ("aperture", "aperture_true")
+        is_true_mode = render_mode in ("world_true", "aperture_true")
+
+        if is_world_mode:
             # Create an RGB image from the object grid
             img = jnp.zeros((self.size[1], self.size[0], 3))
             # Decode grid for rendering: non-negative are objects, negative are empty
@@ -341,15 +346,18 @@ class ForagaxEnv(environment.Environment):
                 jax.image.ResizeMethod.NEAREST,
             )
 
+            if is_true_mode:
+                # Apply true object borders by overlaying true colors on border pixels
+                img = apply_true_borders(img, render_grid, self.size)
+
+            # Add grid lines for world mode
             grid_color = jnp.zeros(3, dtype=jnp.uint8)
             row_indices = jnp.arange(1, self.size[1]) * 24
             col_indices = jnp.arange(1, self.size[0]) * 24
             img = img.at[row_indices, :].set(grid_color)
             img = img.at[:, col_indices].set(grid_color)
 
-            return img
-
-        elif render_mode == "aperture":
+        elif is_aperture_mode:
             obs_grid = jnp.maximum(0, state.object_grid)
             aperture = self._get_aperture(obs_grid, state.pos)
             aperture_one_hot = jax.nn.one_hot(aperture, len(self.object_ids))
@@ -366,15 +374,21 @@ class ForagaxEnv(environment.Environment):
                 jax.image.ResizeMethod.NEAREST,
             )
 
+            if is_true_mode:
+                # Apply true object borders by overlaying true colors on border pixels
+                img = apply_true_borders(img, aperture, self.aperture_size)
+
+            # Add grid lines for aperture mode
             grid_color = jnp.zeros(3, dtype=jnp.uint8)
             row_indices = jnp.arange(1, self.aperture_size[0]) * 24
             col_indices = jnp.arange(1, self.aperture_size[1]) * 24
             img = img.at[row_indices, :].set(grid_color)
             img = img.at[:, col_indices].set(grid_color)
 
-            return img
         else:
             raise ValueError(f"Unknown render_mode: {render_mode}")
+
+        return img
 
 
 class ForagaxObjectEnv(ForagaxEnv):

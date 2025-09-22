@@ -13,7 +13,7 @@ from foragax.objects import (
     FLOWER,
     LARGE_MOREL,
     MEDIUM_MOREL,
-    MOREL, 
+    MOREL,
     OYSTER,
     THORNS,
     WALL,
