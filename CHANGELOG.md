@@ -1,3 +1,18 @@
+## 0.10.0 (2025-09-22)
+
+### Feat
+
+- rendering of underlying state with color partial observability
+
+### Fix
+
+- repeat for ForagerWeather should be 500
+- correct formatting of import statements
+
+### Refactor
+
+- extract out border and color conversion logic
+
 ## 0.9.0 (2025-09-22)
 
 ### Feat
