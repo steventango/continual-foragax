@@ -9,7 +9,16 @@ from foragax.env import (
     ForagaxRGBEnv,
     ForagaxWorldEnv,
 )
-from foragax.objects import FLOWER, MOREL, OYSTER, THORNS, WALL
+from foragax.objects import (
+    FLOWER,
+    LARGE_MOREL,
+    MEDIUM_MOREL,
+    MOREL, 
+    OYSTER,
+    THORNS,
+    WALL,
+    DefaultForagaxObject,
+)
 
 
 def test_observation_shape():
@@ -421,6 +430,162 @@ def test_generate_objects_in_biome():
     assert oyster_id not in unique_objects
     assert wall_id not in unique_objects
     assert thorns_id not in unique_objects
+
+
+def test_color_based_partial_observability():
+    """Test that objects with the same color are grouped into the same observation channel."""
+    env = ForagaxObjectEnv(
+        size=(10, 10),
+        aperture_size=(5, 5),
+        objects=(MOREL, LARGE_MOREL, MEDIUM_MOREL, FLOWER),
+    )
+    params = env.default_params
+    key = jax.random.key(0)
+
+    # Check that morels (all same color) use 1 channel, plus flower = 2 total
+    assert env.num_color_channels == 2
+
+    # Create a state with different morels and a flower
+    state = env.reset(key, params)[1]
+
+    # Manually place objects
+    grid = jnp.zeros((10, 10), dtype=int)
+    grid = grid.at[5, 5].set(1)  # MOREL
+    grid = grid.at[5, 6].set(2)  # LARGE_MOREL
+    grid = grid.at[5, 7].set(3)  # MEDIUM_MOREL
+    grid = grid.at[6, 5].set(4)  # FLOWER
+    state = state.replace(object_grid=grid)
+
+    obs = env.get_obs(state, params)
+
+    # All morels should activate the same channel (channel 0 for brown)
+    # Flower should activate channel 1 (green)
+    center_obs = obs[2, 2, :]  # MOREL at center
+    morel_obs = obs[2, 3, :]  # LARGE_MOREL
+    med_morel_obs = obs[2, 4, :]  # MEDIUM_MOREL
+    flower_obs = obs[1, 2, :]  # FLOWER (flipped coordinates)
+
+    # All morels should have the same observation (channel 0 activated)
+    chex.assert_trees_all_equal(center_obs, jnp.array([1.0, 0.0]))
+    chex.assert_trees_all_equal(center_obs, morel_obs)
+    chex.assert_trees_all_equal(center_obs, med_morel_obs)
+
+    # Flower should have different observation (channel 1 activated)
+    chex.assert_trees_all_equal(flower_obs, jnp.array([0.0, 1.0]))
+
+
+def test_color_channel_mapping():
+    """Test that the color channel mapping is correct."""
+    env = ForagaxObjectEnv(
+        size=(10, 10),
+        aperture_size=(3, 3),
+        objects=(WALL, FLOWER, THORNS),
+    )
+
+    # WALL (gray), FLOWER (green), THORNS (red) - all different colors
+    assert env.num_color_channels == 3
+
+    # Check that unique colors are correctly identified in order of first appearance
+    expected_colors = jnp.array(
+        [
+            [127, 127, 127],  # gray (WALL) - appears first
+            [0, 255, 0],  # green (FLOWER) - appears second
+            [255, 0, 0],  # red (THORNS) - appears third
+        ]
+    )
+    chex.assert_trees_all_equal(env.unique_colors, expected_colors)
+
+
+def test_same_color_objects_same_channel():
+    """Test that objects with identical colors produce identical observations."""
+    obj1 = DefaultForagaxObject(name="obj1", color=(100, 50, 25))
+    obj2 = DefaultForagaxObject(name="obj2", color=(100, 50, 25))  # Same color
+    obj3 = DefaultForagaxObject(name="obj3", color=(200, 100, 50))  # Different color
+
+    env = ForagaxObjectEnv(
+        size=(7, 7),
+        aperture_size=(3, 3),
+        objects=(obj1, obj2, obj3),
+    )
+    params = env.default_params
+
+    # Should have 2 color channels
+    assert env.num_color_channels == 2
+
+    # Create test state
+    key = jax.random.key(0)
+    state = env.reset(key, params)[1]
+
+    # Place objects
+    grid = jnp.zeros((7, 7), dtype=int)
+    grid = grid.at[3, 3].set(1)  # obj1
+    grid = grid.at[3, 4].set(2)  # obj2 (same color as obj1)
+    grid = grid.at[4, 3].set(3)  # obj3 (different color)
+    state = state.replace(object_grid=grid)
+
+    obs = env.get_obs(state, params)
+
+    # obj1 and obj2 should have identical observations
+    obj1_obs = obs[1, 1, :]  # Center
+    obj2_obs = obs[1, 2, :]  # Right of center
+    obj3_obs = obs[2, 1, :]  # Below center
+
+    chex.assert_trees_all_equal(obj1_obs, obj2_obs)
+    assert not jnp.allclose(obj1_obs, obj3_obs)
+
+
+def test_empty_environment_observation():
+    """Test observation shape when no objects are present."""
+    env = ForagaxObjectEnv(
+        size=(5, 5),
+        aperture_size=(3, 3),
+        objects=(),  # No objects
+    )
+    params = env.default_params
+    key = jax.random.key(0)
+    obs, state = env.reset(key, params)
+
+    # Should have 0 color channels
+    assert env.num_color_channels == 0
+    assert obs.shape == (3, 3, 0)
+
+
+def test_single_color_all_objects():
+    """Test when all objects have the same color."""
+    # Create multiple objects with same color
+    from foragax.objects import DefaultForagaxObject
+
+    obj1 = DefaultForagaxObject(name="obj1", color=(50, 100, 150))
+    obj2 = DefaultForagaxObject(name="obj2", color=(50, 100, 150))
+    obj3 = DefaultForagaxObject(name="obj3", color=(50, 100, 150))
+
+    env = ForagaxObjectEnv(
+        size=(7, 7),
+        aperture_size=(3, 3),
+        objects=(obj1, obj2, obj3),
+    )
+    params = env.default_params
+
+    # Should have 1 color channel
+    assert env.num_color_channels == 1
+
+    # Create test state
+    key = jax.random.key(0)
+    state = env.reset(key, params)[1]
+
+    # Place all objects
+    grid = jnp.zeros((7, 7), dtype=int)
+    grid = grid.at[3, 2].set(1)  # obj1
+    grid = grid.at[3, 3].set(2)  # obj2
+    grid = grid.at[3, 4].set(3)  # obj3
+    state = state.replace(object_grid=grid)
+
+    obs = env.get_obs(state, params)
+
+    # All objects should activate the same channel
+    for i in range(3):
+        obj_obs = obs[1, i, :]  # Row 1, columns 0-2
+        chex.assert_trees_all_equal(obj_obs, jnp.array([1.0]))
 
 
 def test_benchmark_vision(benchmark):
