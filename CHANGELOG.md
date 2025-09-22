@@ -1,3 +1,9 @@
+## 0.10.2 (2025-09-22)
+
+### Fix
+
+- JIT for true rendering modes
+
 ## 0.10.1 (2025-09-22)
 
 ### Fix
