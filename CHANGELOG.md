@@ -1,3 +1,10 @@
+## 0.10.3 (2025-09-22)
+
+### Fix
+
+- rename up / down for consistency
+- unflip observation in object mode for consistency
+
 ## 0.10.2 (2025-09-22)
 
 ### Fix
