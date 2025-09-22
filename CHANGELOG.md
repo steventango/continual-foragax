@@ -1,3 +1,9 @@
+## 0.9.0 (2025-09-22)
+
+### Feat
+
+- add color based partial observability
+
 ## 0.8.2 (2025-09-21)
 
 ### Fix
