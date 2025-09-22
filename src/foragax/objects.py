@@ -179,6 +179,37 @@ DEATHCAP = DefaultForagaxObject(
 )
 AGENT = DefaultForagaxObject(name="agent", blocking=True, color=(0, 0, 255))
 
+BROWN_MOREL = NormalRegenForagaxObject(
+    name="brown_morel",
+    reward=30.0,
+    collectable=True,
+    color=(63, 30, 25),
+    mean_regen_delay=300,
+    std_regen_delay=30,
+)
+BROWN_OYSTER = NormalRegenForagaxObject(
+    name="brown_oyster",
+    reward=1.0,
+    collectable=True,
+    color=(63, 30, 25),
+    mean_regen_delay=10,
+    std_regen_delay=1,
+)
+GREEN_DEATHCAP = DefaultForagaxObject(
+    name="green_deathcap",
+    reward=-1.0,
+    collectable=True,
+    color=(0, 255, 0),
+    regen_delay=(10, 10),
+)
+GREEN_FAKE = DefaultForagaxObject(
+    name="green_fake",
+    reward=0.0,
+    collectable=True,
+    color=(0, 255, 0),
+    regen_delay=(10, 10),
+)
+
 
 def create_weather_objects(
     file_index: int = 0, repeat: int = 500, multiplier: float = 1.0
