@@ -31,6 +31,19 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
             # Cold biome
             Biome(start=(0, 10), stop=(15, 12), object_frequencies=(0.0, 0.5)),
         ),
+        "nowrap": False,
+    },
+    "ForagaxWeather-v2": {
+        "size": (15, 15),
+        "aperture_size": None,
+        "objects": None,
+        "biomes": (
+            # Hot biome
+            Biome(start=(0, 3), stop=(15, 5), object_frequencies=(0.5, 0.0)),
+            # Cold biome
+            Biome(start=(0, 10), stop=(15, 12), object_frequencies=(0.0, 0.5)),
+        ),
+        "nowrap": True,
     },
     "ForagaxTwoBiome-v1": {
         "size": (15, 15),
@@ -44,6 +57,7 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
                 start=(10, 0), stop=(12, 15), object_frequencies=(0.0, 0.5, 0.0, 0.25)
             ),
         ),
+        "nowrap": False,
     },
     "ForagaxTwoBiomeSmall-v1": {
         "size": (16, 8),
@@ -55,6 +69,7 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
             # Oyster biome
             Biome(start=(10, 2), stop=(14, 6), object_frequencies=(0.0, 1.0)),
         ),
+        "nowrap": False,
     },
     "ForagaxTwoBiomeSmall-v2": {
         "size": (16, 8),
@@ -66,6 +81,19 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
             # Oyster biome
             Biome(start=(11, 3), stop=(14, 6), object_frequencies=(0.0, 1.0)),
         ),
+        "nowrap": False,
+    },
+    "ForagaxTwoBiomeSmall-v3": {
+        "size": (16, 8),
+        "aperture_size": None,
+        "objects": (MEDIUM_MOREL, LARGE_OYSTER),
+        "biomes": (
+            # Morel biome
+            Biome(start=(3, 3), stop=(6, 6), object_frequencies=(1.0, 0.0)),
+            # Oyster biome
+            Biome(start=(11, 3), stop=(14, 6), object_frequencies=(0.0, 1.0)),
+        ),
+        "nowrap": True,
     },
 }
 
@@ -75,7 +103,7 @@ def make(
     observation_type: str = "object",
     aperture_size: Optional[Tuple[int, int]] = (5, 5),
     file_index: int = 0,
-    nowrap: bool = False,
+    nowrap: Optional[bool] = None,
 ) -> ForagaxEnv:
     """Create a Foragax environment.
 
@@ -84,8 +112,9 @@ def make(
         observation_type: The type of observation to use. One of "object", "rgb", or "world".
         aperture_size: The size of the agent's observation aperture. If None, the default
             for the environment is used.
-        file_index: File index for weather objects.
-        nowrap: If True, disables wrapping around environment boundaries.
+        file_index: File index for weather objects. nowrap: If True, disables
+        wrapping around environment boundaries. If None, uses defaults per
+        environment.
 
     Returns:
         A Foragax environment instance.
@@ -96,10 +125,12 @@ def make(
     config = ENV_CONFIGS[env_id].copy()
 
     config["aperture_size"] = aperture_size
-    config["nowrap"] = nowrap
+    if nowrap is not None:
+        config["nowrap"] = nowrap
 
     if env_id.startswith("ForagaxWeather"):
-        hot, cold = create_weather_objects(file_index=file_index)
+        same_color = env_id == "ForagaxWeather-v2"
+        hot, cold = create_weather_objects(file_index=file_index, same_color=same_color)
         config["objects"] = (hot, cold)
 
     env_class_map = {
