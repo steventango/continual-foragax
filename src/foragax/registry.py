@@ -33,6 +33,18 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
         ),
         "nowrap": False,
     },
+    "ForagaxWeather-v2": {
+        "size": (15, 15),
+        "aperture_size": None,
+        "objects": None,
+        "biomes": (
+            # Hot biome
+            Biome(start=(0, 3), stop=(15, 5), object_frequencies=(0.5, 0.0)),
+            # Cold biome
+            Biome(start=(0, 10), stop=(15, 12), object_frequencies=(0.0, 0.5)),
+        ),
+        "nowrap": True,
+    },
     "ForagaxTwoBiome-v1": {
         "size": (15, 15),
         "aperture_size": None,
@@ -117,7 +129,8 @@ def make(
         config["nowrap"] = nowrap
 
     if env_id.startswith("ForagaxWeather"):
-        hot, cold = create_weather_objects(file_index=file_index)
+        same_color = env_id == "ForagaxWeather-v2"
+        hot, cold = create_weather_objects(file_index=file_index, same_color=same_color)
         config["objects"] = (hot, cold)
 
     env_class_map = {
