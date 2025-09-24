@@ -1,3 +1,10 @@
+## 0.12.0 (2025-09-24)
+
+### Feat
+
+- implement nowrap vision
+- add nowrap dynamics
+
 ## 0.11.0 (2025-09-22)
 
 ### Feat
