@@ -364,6 +364,63 @@ def test_wrapping_dynamics():
     assert jnp.array_equal(state.pos, jnp.array([2, 2]))
 
 
+def test_no_wrapping_dynamics():
+    """Test that the agent does not wrap around the environment boundaries when nowrap=True."""
+    key = jax.random.key(0)
+    env = ForagaxObjectEnv(size=(5, 5), objects=(), nowrap=True)
+    params = env.default_params
+    _, state = env.reset(key, params)
+
+    # Agent starts at center (2,2)
+
+    # Move to top edge
+    for _ in range(2):
+        key, step_key = jax.random.split(key)
+        _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
+    assert jnp.array_equal(state.pos, jnp.array([2, 0]))  # at top
+
+    # Try to move up again, should stay put
+    key, step_key = jax.random.split(key)
+    _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
+    assert jnp.array_equal(state.pos, jnp.array([2, 0]))  # still at top
+
+    # Move to bottom edge
+    _, state = env.reset(key, params)
+    for _ in range(2):
+        key, step_key = jax.random.split(key)
+        _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+    assert jnp.array_equal(state.pos, jnp.array([2, 4]))  # at bottom
+
+    # Try to move down again, should stay put
+    key, step_key = jax.random.split(key)
+    _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+    assert jnp.array_equal(state.pos, jnp.array([2, 4]))  # still at bottom
+
+    # Move to left edge
+    _, state = env.reset(key, params)
+    for _ in range(2):
+        key, step_key = jax.random.split(key)
+        _, state, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
+    assert jnp.array_equal(state.pos, jnp.array([0, 2]))  # at left
+
+    # Try to move left again, should stay put
+    key, step_key = jax.random.split(key)
+    _, state, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
+    assert jnp.array_equal(state.pos, jnp.array([0, 2]))  # still at left
+
+    # Move to right edge
+    _, state = env.reset(key, params)
+    for _ in range(2):
+        key, step_key = jax.random.split(key)
+        _, state, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
+    assert jnp.array_equal(state.pos, jnp.array([4, 2]))  # at right
+
+    # Try to move right again, should stay put
+    key, step_key = jax.random.split(key)
+    _, state, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
+    assert jnp.array_equal(state.pos, jnp.array([4, 2]))  # still at right
+
+
 def test_wrapping_vision():
     """Test that the agent's vision wraps around the environment boundaries."""
     key = jax.random.key(0)

@@ -64,6 +64,7 @@ class ForagaxEnv(environment.Environment):
         aperture_size: Union[Tuple[int, int], int] = (5, 5),
         objects: Tuple[BaseForagaxObject, ...] = (),
         biomes: Tuple[Biome, ...] = (Biome(object_frequencies=()),),
+        nowrap: bool = False,
     ):
         super().__init__()
         if isinstance(size, int):
@@ -80,6 +81,8 @@ class ForagaxEnv(environment.Environment):
             if isinstance(o, WeatherObject):
                 self.weather_object = o
                 break
+
+        self.nowrap = nowrap
 
         # JIT-compatible versions of object and biome properties
         self.object_ids = jnp.arange(len(objects))
@@ -122,8 +125,12 @@ class ForagaxEnv(environment.Environment):
         direction = DIRECTIONS[action]
         new_pos = state.pos + direction
 
-        # Wrap around boundaries
-        new_pos = jnp.mod(new_pos, jnp.array(self.size))
+        if self.nowrap:
+            in_bounds = jnp.all((new_pos >= 0) & (new_pos < jnp.array(self.size)))
+            new_pos = jnp.where(in_bounds, new_pos, state.pos)
+        else:
+            # Wrap around boundaries
+            new_pos = jnp.mod(new_pos, jnp.array(self.size))
 
         # Check for blocking objects
         obj_at_new_pos = current_objects[new_pos[1], new_pos[0]]
@@ -404,8 +411,9 @@ class ForagaxObjectEnv(ForagaxEnv):
         aperture_size: Union[Tuple[int, int], int] = (5, 5),
         objects: Tuple[BaseForagaxObject, ...] = (),
         biomes: Tuple[Biome, ...] = (Biome(object_frequencies=()),),
+        nowrap: bool = False,
     ):
-        super().__init__(size, aperture_size, objects, biomes)
+        super().__init__(size, aperture_size, objects, biomes, nowrap)
 
         # Compute unique colors and mapping for partial observability
         # Exclude EMPTY (index 0) from color channels
