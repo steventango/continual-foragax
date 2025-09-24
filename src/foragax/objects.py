@@ -179,6 +179,8 @@ DEATHCAP = DefaultForagaxObject(
 )
 AGENT = DefaultForagaxObject(name="agent", blocking=True, color=(0, 0, 255))
 
+PADDING = DefaultForagaxObject(name="padding", blocking=True, color=(0, 0, 0))
+
 BROWN_MOREL = NormalRegenForagaxObject(
     name="brown_morel",
     reward=30.0,

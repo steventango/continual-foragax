@@ -75,6 +75,7 @@ def make(
     observation_type: str = "object",
     aperture_size: Optional[Tuple[int, int]] = (5, 5),
     file_index: int = 0,
+    nowrap: bool = False,
 ) -> ForagaxEnv:
     """Create a Foragax environment.
 
@@ -83,6 +84,8 @@ def make(
         observation_type: The type of observation to use. One of "object", "rgb", or "world".
         aperture_size: The size of the agent's observation aperture. If None, the default
             for the environment is used.
+        file_index: File index for weather objects.
+        nowrap: If True, disables wrapping around environment boundaries.
 
     Returns:
         A Foragax environment instance.
@@ -93,6 +96,7 @@ def make(
     config = ENV_CONFIGS[env_id].copy()
 
     config["aperture_size"] = aperture_size
+    config["nowrap"] = nowrap
 
     if env_id.startswith("ForagaxWeather"):
         hot, cold = create_weather_objects(file_index=file_index)

@@ -364,6 +364,63 @@ def test_wrapping_dynamics():
     assert jnp.array_equal(state.pos, jnp.array([2, 2]))
 
 
+def test_no_wrapping_dynamics():
+    """Test that the agent does not wrap around the environment boundaries when nowrap=True."""
+    key = jax.random.key(0)
+    env = ForagaxObjectEnv(size=(5, 5), objects=(), nowrap=True)
+    params = env.default_params
+    _, state = env.reset(key, params)
+
+    # Agent starts at center (2,2)
+
+    # Move to top edge
+    for _ in range(2):
+        key, step_key = jax.random.split(key)
+        _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
+    assert jnp.array_equal(state.pos, jnp.array([2, 0]))  # at top
+
+    # Try to move up again, should stay put
+    key, step_key = jax.random.split(key)
+    _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
+    assert jnp.array_equal(state.pos, jnp.array([2, 0]))  # still at top
+
+    # Move to bottom edge
+    _, state = env.reset(key, params)
+    for _ in range(2):
+        key, step_key = jax.random.split(key)
+        _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+    assert jnp.array_equal(state.pos, jnp.array([2, 4]))  # at bottom
+
+    # Try to move down again, should stay put
+    key, step_key = jax.random.split(key)
+    _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+    assert jnp.array_equal(state.pos, jnp.array([2, 4]))  # still at bottom
+
+    # Move to left edge
+    _, state = env.reset(key, params)
+    for _ in range(2):
+        key, step_key = jax.random.split(key)
+        _, state, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
+    assert jnp.array_equal(state.pos, jnp.array([0, 2]))  # at left
+
+    # Try to move left again, should stay put
+    key, step_key = jax.random.split(key)
+    _, state, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
+    assert jnp.array_equal(state.pos, jnp.array([0, 2]))  # still at left
+
+    # Move to right edge
+    _, state = env.reset(key, params)
+    for _ in range(2):
+        key, step_key = jax.random.split(key)
+        _, state, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
+    assert jnp.array_equal(state.pos, jnp.array([4, 2]))  # at right
+
+    # Try to move right again, should stay put
+    key, step_key = jax.random.split(key)
+    _, state, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
+    assert jnp.array_equal(state.pos, jnp.array([4, 2]))  # still at right
+
+
 def test_wrapping_vision():
     """Test that the agent's vision wraps around the environment boundaries."""
     key = jax.random.key(0)
@@ -406,6 +463,40 @@ def test_wrapping_vision():
 
     assert jnp.array_equal(state.pos, jnp.array([4, 1]))
     assert jnp.array_equal(obs, expected)
+
+
+def test_no_wrapping_vision():
+    """Test that the agent's vision does not wrap around boundaries when nowrap=True."""
+    key = jax.random.key(0)
+    object_types = (FLOWER,)
+    env_no_wrap = ForagaxObjectEnv(
+        size=(7, 7), aperture_size=(3, 3), objects=object_types, nowrap=True
+    )
+    params = env_no_wrap.default_params
+
+    # Place a flower at the opposite corner (6,6)
+    grid = jnp.zeros((7, 7), dtype=int)
+    grid = grid.at[6, 6].set(1)  # FLOWER
+
+    # Agent at (0,0)
+    state = env_no_wrap.reset(key, params)[1]
+    state = state.replace(object_grid=grid, pos=jnp.array([0, 0]))
+
+    # With no wrapping, should not see the flower, see padding
+    obs_no_wrap = env_no_wrap.get_obs(state, params)
+    assert env_no_wrap.num_color_channels == 2  # Flower + padding
+    # Check that padding channel is activated for out of bound positions
+    padding_mask = jnp.array(
+        [
+            [1, 1, 1],
+            [1, 0, 0],
+            [1, 0, 0],
+        ],
+        dtype=bool,
+    )
+    assert jnp.all(obs_no_wrap[padding_mask, 1] == 1)
+    # And flower not visible
+    assert jnp.all(obs_no_wrap[:, :, 0] == 0)
 
 
 def test_generate_objects_in_biome():
