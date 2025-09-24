@@ -214,7 +214,10 @@ GREEN_FAKE = DefaultForagaxObject(
 
 
 def create_weather_objects(
-    file_index: int = 0, repeat: int = 500, multiplier: float = 1.0
+    file_index: int = 0,
+    repeat: int = 500,
+    multiplier: float = 1.0,
+    same_color: bool = False,
 ):
     """Create HOT and COLD WeatherObject instances using the specified file.
 
@@ -222,6 +225,7 @@ def create_weather_objects(
         file_index: Index into `FILE_PATHS` to select the temperature file.
         repeat: How many steps each temperature value repeats for.
         multiplier: Base multiplier applied to HOT; COLD will use -multiplier.
+        same_color: If True, both HOT and COLD use the same color.
 
     Returns:
         A tuple (HOT, COLD) of WeatherObject instances.
@@ -234,20 +238,25 @@ def create_weather_objects(
 
     rewards = load_data(FILE_PATHS[file_index])
 
+    hot_color = (
+        (63, 30, 25) if same_color else (255, 0, 255)
+    )
+
     hot = WeatherObject(
         name="hot",
         rewards=rewards,
         repeat=repeat,
         multiplier=multiplier,
-        color=(255, 0, 255),
+        color=hot_color,
     )
 
+    cold_color = hot_color if same_color else (0, 255, 255)
     cold = WeatherObject(
         name="cold",
         rewards=rewards,
         repeat=repeat,
         multiplier=-multiplier,
-        color=(0, 255, 255),
+        color=cold_color,
     )
 
     return hot, cold
