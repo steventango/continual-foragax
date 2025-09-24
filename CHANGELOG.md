@@ -1,3 +1,9 @@
+## 0.14.0 (2025-09-24)
+
+### Feat
+
+- add ForagaxTwoBiome-v2 that defaults nowrap to true
+
 ## 0.13.0 (2025-09-24)
 
 ### Feat
