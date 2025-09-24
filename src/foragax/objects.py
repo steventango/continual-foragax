@@ -238,9 +238,7 @@ def create_weather_objects(
 
     rewards = load_data(FILE_PATHS[file_index])
 
-    hot_color = (
-        (63, 30, 25) if same_color else (255, 0, 255)
-    )
+    hot_color = (63, 30, 25) if same_color else (255, 0, 255)
 
     hot = WeatherObject(
         name="hot",
