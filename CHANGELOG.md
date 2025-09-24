@@ -1,3 +1,12 @@
+## 0.13.0 (2025-09-24)
+
+### Feat
+
+- add ForagaxWeather-v2
+- ad ForagaxTwoBiomeSmall-v3 that defaults nowrap to true
+- add default nowrap configuration to Foragax environment variants
+- support same_color option in create_weather_objects
+
 ## 0.12.0 (2025-09-24)
 
 ### Feat
