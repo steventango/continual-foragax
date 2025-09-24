@@ -13,7 +13,13 @@ import jax.numpy as jnp
 from flax import struct
 from gymnax.environments import environment, spaces
 
-from foragax.objects import AGENT, EMPTY, BaseForagaxObject, WeatherObject
+from foragax.objects import (
+    AGENT,
+    EMPTY,
+    PADDING,
+    BaseForagaxObject,
+    WeatherObject,
+)
 from foragax.rendering import apply_true_borders
 from foragax.weather import get_temperature
 
@@ -74,15 +80,16 @@ class ForagaxEnv(environment.Environment):
         if isinstance(aperture_size, int):
             aperture_size = (aperture_size, aperture_size)
         self.aperture_size = aperture_size
+        self.nowrap = nowrap
         objects = (EMPTY,) + objects
+        if self.nowrap:
+            objects = objects + (PADDING,)
         self.objects = objects
         self.weather_object = None
         for o in objects:
             if isinstance(o, WeatherObject):
                 self.weather_object = o
                 break
-
-        self.nowrap = nowrap
 
         # JIT-compatible versions of object and biome properties
         self.object_ids = jnp.arange(len(objects))
@@ -295,10 +302,26 @@ class ForagaxEnv(environment.Environment):
 
         y_offsets = jnp.arange(ap_h)
         x_offsets = jnp.arange(ap_w)
-        y_coords = jnp.mod(start_y + y_offsets[:, None], self.size[1])
-        x_coords = jnp.mod(start_x + x_offsets, self.size[0])
+        y_coords = start_y + y_offsets[:, None]
+        x_coords = start_x + x_offsets
 
-        return object_grid[y_coords, x_coords]
+        if self.nowrap:
+            # Clamp coordinates to bounds
+            y_coords_clamped = jnp.clip(y_coords, 0, self.size[1] - 1)
+            x_coords_clamped = jnp.clip(x_coords, 0, self.size[0] - 1)
+            values = object_grid[y_coords_clamped, x_coords_clamped]
+            # Mark out-of-bounds positions with -1
+            y_out = (y_coords < 0) | (y_coords >= self.size[1])
+            x_out = (x_coords < 0) | (x_coords >= self.size[0])
+            out_of_bounds = y_out | x_out
+            padding_index = self.object_ids[-1]
+            aperture = jnp.where(out_of_bounds, padding_index, values)
+        else:
+            y_coords_mod = jnp.mod(y_coords, self.size[1])
+            x_coords_mod = jnp.mod(x_coords, self.size[0])
+            aperture = object_grid[y_coords_mod, x_coords_mod]
+
+        return aperture
 
     @partial(jax.jit, static_argnames=("self", "render_mode"))
     def render(self, state: EnvState, params: EnvParams, render_mode: str = "world"):
