@@ -355,17 +355,31 @@ class ForagaxEnv(environment.Environment):
             # Create indices for the aperture
             y_offsets = jnp.arange(ap_h)
             x_offsets = jnp.arange(ap_w)
-            y_coords = jnp.mod(start_y + y_offsets[:, None], self.size[1])
-            x_coords = jnp.mod(start_x + x_offsets, self.size[0])
+            y_coords_original = start_y + y_offsets[:, None]
+            x_coords_original = start_x + x_offsets
 
-            # Get original colors from the aperture area
-            original_colors = img[y_coords, x_coords]
-
-            # Calculate tinted colors
-            tinted_colors = (1 - alpha) * original_colors + alpha * agent_color
-
-            # Update the image with tinted colors
-            img = img.at[y_coords, x_coords].set(tinted_colors)
+            if self.nowrap:
+                y_coords = jnp.clip(y_coords_original, 0, self.size[1] - 1)
+                x_coords = jnp.clip(x_coords_original, 0, self.size[0] - 1)
+                in_bounds = (
+                    (y_coords_original >= 0)
+                    & (y_coords_original < self.size[1])
+                    & (x_coords_original >= 0)
+                    & (x_coords_original < self.size[0])
+                )
+                original_colors = img[y_coords, x_coords]
+                tinted_colors = (1 - alpha) * original_colors + alpha * agent_color
+                img = img.at[y_coords, x_coords].set(
+                    jnp.where(
+                        in_bounds[..., None], tinted_colors, img[y_coords, x_coords]
+                    )
+                )
+            else:
+                y_coords = jnp.mod(y_coords_original, self.size[1])
+                x_coords = jnp.mod(x_coords_original, self.size[0])
+                original_colors = img[y_coords, x_coords]
+                tinted_colors = (1 - alpha) * original_colors + alpha * agent_color
+                img = img.at[y_coords, x_coords].set(tinted_colors)
 
             # Agent color
             img = img.at[state.pos[1], state.pos[0]].set(jnp.array(AGENT.color))
