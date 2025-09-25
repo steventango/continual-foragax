@@ -219,7 +219,7 @@ GREEN_DEATHCAP_2 = DefaultForagaxObject(
     color=(0, 255, 0),
     regen_delay=(10, 10),
 )
-GREEN_DEATHCAP_3 = DefaultForagaxObject(
+GREEN_DEATHCAP_3 = NormalRegenForagaxObject(
     name="green_deathcap",
     reward=-5.0,
     collectable=True,
@@ -234,7 +234,7 @@ GREEN_FAKE = DefaultForagaxObject(
     color=(0, 255, 0),
     regen_delay=(10, 10),
 )
-GREEN_FAKE_2 = DefaultForagaxObject(
+GREEN_FAKE_2 = NormalRegenForagaxObject(
     name="green_fake",
     reward=0.0,
     collectable=True,
