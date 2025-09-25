@@ -133,6 +133,13 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
         ),
         "nowrap": True,
     },
+    "ForagaxTwoBiome-v7": {
+        "size": None,
+        "aperture_size": None,
+        "objects": (BROWN_MOREL_2, BROWN_OYSTER, GREEN_DEATHCAP_3, GREEN_FAKE_2),
+        "biomes": None,
+        "nowrap": True,
+    },
     "ForagaxTwoBiomeSmall-v1": {
         "size": (16, 8),
         "aperture_size": None,
@@ -197,10 +204,22 @@ def make(
         raise ValueError(f"Unknown env_id: {env_id}")
 
     config = ENV_CONFIGS[env_id].copy()
-
+    if isinstance(aperture_size, int):
+        aperture_size = (aperture_size, aperture_size)
     config["aperture_size"] = aperture_size
     if nowrap is not None:
         config["nowrap"] = nowrap
+
+    if env_id == "ForagaxTwoBiome-v7":
+        margin = aperture_size[1] // 2 + 1
+        width = 2 * margin + 9
+        config["size"] = (width, 15)
+        config["biomes"] = (
+            # Morel biome
+            Biome(start=(margin, 0), stop=(margin + 2, 15), object_frequencies=(0.25, 0.0, 0.5, 0.0)),
+            # Oyster biome
+            Biome(start=(margin + 7, 0), stop=(margin + 9, 15), object_frequencies=(0.0, 0.25, 0.0, 0.5)),
+        )
 
     if env_id.startswith("ForagaxWeather"):
         same_color = env_id == "ForagaxWeather-v2"
