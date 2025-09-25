@@ -119,6 +119,20 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
         ),
         "nowrap": True,
     },
+    "ForagaxTwoBiome-v6": {
+        "size": (15, 15),
+        "aperture_size": None,
+        "objects": (BROWN_MOREL_2, BROWN_OYSTER, GREEN_DEATHCAP_3, GREEN_FAKE_2),
+        "biomes": (
+            # Morel biome
+            Biome(start=(3, 0), stop=(5, 15), object_frequencies=(0.25, 0.0, 0.5, 0.0)),
+            # Oyster biome
+            Biome(
+                start=(10, 0), stop=(12, 15), object_frequencies=(0.0, 0.25, 0.0, 0.5)
+            ),
+        ),
+        "nowrap": True,
+    },
     "ForagaxTwoBiomeSmall-v1": {
         "size": (16, 8),
         "aperture_size": None,
