@@ -11,15 +11,15 @@ from foragax.registry import make
 def main():
     """Generate a visualization of a Foragax environment under random behavior."""
     key = jax.random.key(0)
-    aperture_sizes = [5, 9]
-    render_modes = ["world", "world_true", "aperture", "aperture_true"]
+    aperture_sizes = [3, 5, 7, 9, 11, 13, 15]
+    render_modes = ["world", "aperture"]
     video_folder = "videos"
     if not os.path.exists(video_folder):
         os.makedirs(video_folder)
 
     for aperture_size in aperture_sizes:
         env = make(
-            "ForagaxWeather-v1",
+            "ForagaxTwoBiome-v7",
             aperture_size=aperture_size,
             observation_type="object",
         )
