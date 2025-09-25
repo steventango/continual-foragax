@@ -1,3 +1,9 @@
+## 0.17.0 (2025-09-25)
+
+### Feat
+
+- ForagaxTwoBiome-v5 with different morel biome distribution
+
 ## 0.16.1 (2025-09-25)
 
 ### Fix
