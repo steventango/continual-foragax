@@ -1,3 +1,9 @@
+## 0.18.0 (2025-09-25)
+
+### Feat
+
+- ForagaxTwoBiome-v6 with different oyster biome distribution
+
 ## 0.17.0 (2025-09-25)
 
 ### Feat
