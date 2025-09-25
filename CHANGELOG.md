@@ -1,3 +1,9 @@
+## 0.16.1 (2025-09-25)
+
+### Fix
+
+- change to NormalRegenForagaxObject
+
 ## 0.16.0 (2025-09-25)
 
 ### Feat
