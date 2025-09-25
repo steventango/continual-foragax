@@ -1,3 +1,9 @@
+## 0.16.0 (2025-09-25)
+
+### Feat
+
+- create ForagerTwoBiome-v4 with more frequently respawning morels
+
 ## 0.15.0 (2025-09-25)
 
 ### Feat
