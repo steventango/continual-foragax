@@ -11,10 +11,13 @@ from foragax.env import (
 )
 from foragax.objects import (
     BROWN_MOREL,
+    BROWN_MOREL_2,
     BROWN_OYSTER,
     GREEN_DEATHCAP,
     GREEN_DEATHCAP_2,
+    GREEN_DEATHCAP_3,
     GREEN_FAKE,
+    GREEN_FAKE_2,
     LARGE_MOREL,
     LARGE_OYSTER,
     MEDIUM_MOREL,
@@ -78,6 +81,20 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
         "size": (15, 15),
         "aperture_size": None,
         "objects": (BROWN_MOREL, BROWN_OYSTER, GREEN_DEATHCAP_2, GREEN_FAKE),
+        "biomes": (
+            # Morel biome
+            Biome(start=(3, 0), stop=(5, 15), object_frequencies=(0.5, 0.0, 0.25, 0.0)),
+            # Oyster biome
+            Biome(
+                start=(10, 0), stop=(12, 15), object_frequencies=(0.0, 0.5, 0.0, 0.25)
+            ),
+        ),
+        "nowrap": True,
+    },
+    "ForagaxTwoBiome-v4": {
+        "size": (15, 15),
+        "aperture_size": None,
+        "objects": (BROWN_MOREL_2, BROWN_OYSTER, GREEN_DEATHCAP_3, GREEN_FAKE_2),
         "biomes": (
             # Morel biome
             Biome(start=(3, 0), stop=(5, 15), object_frequencies=(0.5, 0.0, 0.25, 0.0)),

@@ -189,6 +189,14 @@ BROWN_MOREL = NormalRegenForagaxObject(
     mean_regen_delay=300,
     std_regen_delay=30,
 )
+BROWN_MOREL_2 = NormalRegenForagaxObject(
+    name="brown_morel",
+    reward=10.0,
+    collectable=True,
+    color=(63, 30, 25),
+    mean_regen_delay=100,
+    std_regen_delay=10,
+)
 BROWN_OYSTER = NormalRegenForagaxObject(
     name="brown_oyster",
     reward=1.0,
@@ -211,12 +219,28 @@ GREEN_DEATHCAP_2 = DefaultForagaxObject(
     color=(0, 255, 0),
     regen_delay=(10, 10),
 )
+GREEN_DEATHCAP_3 = DefaultForagaxObject(
+    name="green_deathcap",
+    reward=-5.0,
+    collectable=True,
+    color=(0, 255, 0),
+    mean_regen_delay=10,
+    std_regen_delay=1,
+)
 GREEN_FAKE = DefaultForagaxObject(
     name="green_fake",
     reward=0.0,
     collectable=True,
     color=(0, 255, 0),
     regen_delay=(10, 10),
+)
+GREEN_FAKE_2 = DefaultForagaxObject(
+    name="green_fake",
+    reward=0.0,
+    collectable=True,
+    color=(0, 255, 0),
+    mean_regen_delay=10,
+    std_regen_delay=1,
 )
 
 
