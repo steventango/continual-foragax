@@ -1,3 +1,9 @@
+## 0.15.0 (2025-09-25)
+
+### Feat
+
+- create ForagaxTwoBiome-v3 with deathcaps with reward=-5
+
 ## 0.14.0 (2025-09-24)
 
 ### Feat
