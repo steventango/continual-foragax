@@ -49,6 +49,13 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
         ),
         "nowrap": True,
     },
+    "ForagaxWeather-v3": {
+        "size": None,
+        "aperture_size": None,
+        "objects": None,
+        "biomes": None,
+        "nowrap": True,
+    },
     "ForagaxTwoBiome-v1": {
         "size": (15, 15),
         "aperture_size": None,
@@ -216,13 +223,40 @@ def make(
         config["size"] = (width, 15)
         config["biomes"] = (
             # Morel biome
-            Biome(start=(margin, 0), stop=(margin + 2, 15), object_frequencies=(0.25, 0.0, 0.5, 0.0)),
+            Biome(
+                start=(margin, 0),
+                stop=(margin + 2, 15),
+                object_frequencies=(0.25, 0.0, 0.5, 0.0),
+            ),
             # Oyster biome
-            Biome(start=(margin + 7, 0), stop=(margin + 9, 15), object_frequencies=(0.0, 0.25, 0.0, 0.5)),
+            Biome(
+                start=(margin + 7, 0),
+                stop=(margin + 9, 15),
+                object_frequencies=(0.0, 0.25, 0.0, 0.5),
+            ),
+        )
+
+    if env_id == "ForagaxWeather-v3":
+        margin = aperture_size[1] // 2 + 1
+        width = 2 * margin + 9
+        config["size"] = (15, width)
+        config["biomes"] = (
+            # Hot biome
+            Biome(
+                start=(0, margin),
+                stop=(15, margin + 2),
+                object_frequencies=(0.5, 0.0),
+            ),
+            # Cold biome
+            Biome(
+                start=(0, margin + 7),
+                stop=(15, margin + 9),
+                object_frequencies=(0.0, 0.5),
+            ),
         )
 
     if env_id.startswith("ForagaxWeather"):
-        same_color = env_id == "ForagaxWeather-v2"
+        same_color = env_id in ("ForagaxWeather-v2", "ForagaxWeather-v3")
         hot, cold = create_weather_objects(file_index=file_index, same_color=same_color)
         config["objects"] = (hot, cold)
 

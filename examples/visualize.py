@@ -19,7 +19,7 @@ def main():
 
     for aperture_size in aperture_sizes:
         env = make(
-            "ForagaxTwoBiome-v7",
+            "ForagaxWeather-v3",
             aperture_size=aperture_size,
             observation_type="object",
         )
