@@ -1,3 +1,13 @@
+## 0.19.0 (2025-09-25)
+
+### Feat
+
+- ForagaxTwoBiome-v7 with dynamic margin
+
+### Fix
+
+- world rendering with nowrap
+
 ## 0.18.0 (2025-09-25)
 
 ### Feat
