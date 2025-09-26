@@ -1,3 +1,9 @@
+## 0.20.1 (2025-09-26)
+
+### Fix
+
+- aperture tint in render_mode world
+
 ## 0.20.0 (2025-09-26)
 
 ### Feat
