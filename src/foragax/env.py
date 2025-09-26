@@ -361,19 +361,13 @@ class ForagaxEnv(environment.Environment):
             if self.nowrap:
                 y_coords = jnp.clip(y_coords_original, 0, self.size[1] - 1)
                 x_coords = jnp.clip(x_coords_original, 0, self.size[0] - 1)
-                in_bounds = (
-                    (y_coords_original >= 0)
-                    & (y_coords_original < self.size[1])
-                    & (x_coords_original >= 0)
-                    & (x_coords_original < self.size[0])
-                )
-                original_colors = img[y_coords, x_coords]
+                # Create tint mask: any in-bounds original position maps to a cell makes it tinted
+                tint_mask = jnp.zeros((self.size[1], self.size[0]), dtype=int)
+                tint_mask = tint_mask.at[y_coords, x_coords].set(1)
+                # Apply tint to masked positions
+                original_colors = img
                 tinted_colors = (1 - alpha) * original_colors + alpha * agent_color
-                img = img.at[y_coords, x_coords].set(
-                    jnp.where(
-                        in_bounds[..., None], tinted_colors, img[y_coords, x_coords]
-                    )
-                )
+                img = jnp.where(tint_mask[..., None], tinted_colors, img)
             else:
                 y_coords = jnp.mod(y_coords_original, self.size[1])
                 x_coords = jnp.mod(x_coords_original, self.size[0])
