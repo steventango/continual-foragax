@@ -242,7 +242,34 @@ GREEN_FAKE_2 = NormalRegenForagaxObject(
     mean_regen_delay=10,
     std_regen_delay=1,
 )
-
+BROWN_MOREL_UNIFORM = DefaultForagaxObject(
+    name="brown_morel",
+    reward=10.0,
+    collectable=True,
+    color=(63, 30, 25),
+    regen_delay=(90, 110),
+)
+BROWN_OYSTER_UNIFORM = DefaultForagaxObject(
+    name="brown_oyster",
+    reward=1.0,
+    collectable=True,
+    color=(63, 30, 25),
+    regen_delay=(9, 11),
+)
+GREEN_DEATHCAP_UNIFORM = DefaultForagaxObject(
+    name="green_deathcap",
+    reward=-5.0,
+    collectable=True,
+    color=(0, 255, 0),
+    regen_delay=(9, 11),
+)
+GREEN_FAKE_UNIFORM = DefaultForagaxObject(
+    name="green_fake",
+    reward=0.0,
+    collectable=True,
+    color=(0, 255, 0),
+    regen_delay=(9, 11),
+)
 
 def create_weather_objects(
     file_index: int = 0,
