@@ -271,6 +271,7 @@ GREEN_FAKE_UNIFORM = DefaultForagaxObject(
     regen_delay=(9, 11),
 )
 
+
 def create_weather_objects(
     file_index: int = 0,
     repeat: int = 500,
