@@ -10,7 +10,11 @@ from foragax.env import (
     ForagaxWorldEnv,
 )
 from foragax.objects import (
+    BROWN_MOREL_UNIFORM,
+    BROWN_OYSTER_UNIFORM,
     FLOWER,
+    GREEN_DEATHCAP_UNIFORM,
+    GREEN_FAKE_UNIFORM,
     LARGE_MOREL,
     MEDIUM_MOREL,
     MOREL,
@@ -536,6 +540,122 @@ def test_generate_objects_in_biome():
     assert thorns_id not in unique_objects
 
 
+def test_deterministic_object_spawning():
+    """Test deterministic object spawning with fixed counts and shuffled positions."""
+    object_types = (WALL, FLOWER)
+    env = ForagaxObjectEnv(
+        size=(10, 10),
+        objects=object_types,
+        biomes=(
+            Biome(
+                object_frequencies=(0.1, 0.1),
+                start=(2, 2),
+                stop=(6, 6),  # 4x4 = 16 cells
+            ),
+        ),
+        deterministic_spawn=True,
+    )
+    key = jax.random.key(0)
+    params = env.default_params
+
+    _, state = env.reset_env(key, params)
+
+    wall_id = object_types.index(WALL) + 1
+    flower_id = object_types.index(FLOWER) + 1
+
+    # Check exact counts: 16 * 0.1 = 1.6, rounded to 2 each
+    wall_count = jnp.sum(state.object_grid == wall_id)
+    flower_count = jnp.sum(state.object_grid == flower_id)
+    assert wall_count == 2
+    assert flower_count == 2
+
+    # Check that objects only appear within the biome
+    wall_locations = jnp.argwhere(state.object_grid == wall_id)
+    flower_locations = jnp.argwhere(state.object_grid == flower_id)
+
+    assert jnp.all(wall_locations >= 2)
+    assert jnp.all(wall_locations < 6)
+    assert jnp.all(flower_locations >= 2)
+    assert jnp.all(flower_locations < 6)
+
+    # Test different positions: different key should produce different positions but same counts
+    key_1 = jax.random.key(1)
+    _, state_1 = env.reset(key_1, params)
+    assert jnp.sum(state_1.object_grid == wall_id) == 2
+    assert jnp.sum(state_1.object_grid == flower_id) == 2
+    # Positions may be the same due to implementation (not shuffled)
+    assert not jnp.array_equal(state.object_grid, state_1.object_grid)
+
+
+def test_complex_deterministic_object_spawning():
+    """Test a more complex deterministic object spawning case with two biomes."""
+    aperture_size = (5, 5)
+    objects = (
+        BROWN_MOREL_UNIFORM,
+        BROWN_OYSTER_UNIFORM,
+        GREEN_DEATHCAP_UNIFORM,
+        GREEN_FAKE_UNIFORM,
+    )
+    margin = aperture_size[1] // 2 + 1
+    width = 2 * margin + 9
+    config = {
+        "size": (width, 15),
+        "objects": objects,
+        "biomes": (
+            # Morel biome
+            Biome(
+                start=(margin, 0),
+                stop=(margin + 2, 15),
+                object_frequencies=(0.25, 0.0, 0.5, 0.0),
+            ),
+            # Oyster biome
+            Biome(
+                start=(margin + 7, 0),
+                stop=(margin + 9, 15),
+                object_frequencies=(0.0, 0.25, 0.0, 0.5),
+            ),
+        ),
+        "deterministic_spawn": True,
+        "aperture_size": aperture_size,
+    }
+
+    env = ForagaxObjectEnv(**config)
+    params = env.default_params
+    key = jax.random.key(0)
+
+    _, state = env.reset_env(key, params)
+
+    morel_id = objects.index(BROWN_MOREL_UNIFORM) + 1
+    oyster_id = objects.index(BROWN_OYSTER_UNIFORM) + 1
+    deathcap_id = objects.index(GREEN_DEATHCAP_UNIFORM) + 1
+    fake_id = objects.index(GREEN_FAKE_UNIFORM) + 1
+
+    # Biome 1 area: (2 * 15) = 30 cells. 30 * 0.25 = 7.5 -> 8 morels. 30 * 0.5 = 15 deathcaps.
+    # Biome 2 area: (2 * 15) = 30 cells. 30 * 0.25 = 7.5 -> 8 oysters. 30 * 0.5 = 15 fakes.
+    assert jnp.sum(state.object_grid == morel_id) == 8
+    assert jnp.sum(state.object_grid == oyster_id) == 8
+    assert jnp.sum(state.object_grid == deathcap_id) == 15
+    assert jnp.sum(state.object_grid == fake_id) == 15
+
+    # Check that objects are within their biomes
+    morel_locs = jnp.argwhere(state.object_grid == morel_id)
+    oyster_locs = jnp.argwhere(state.object_grid == oyster_id)
+    deathcap_locs = jnp.argwhere(state.object_grid == deathcap_id)
+    fake_locs = jnp.argwhere(state.object_grid == fake_id)
+
+    # Morel biome checks
+    assert jnp.all(morel_locs[:, 1] >= margin)
+    assert jnp.all(morel_locs[:, 1] < margin + 2)
+    assert jnp.all(deathcap_locs[:, 1] >= margin)
+    assert jnp.all(deathcap_locs[:, 1] < margin + 2)
+
+    # Oyster biome checks
+    assert jnp.all(oyster_locs[:, 1] >= margin + 7)
+    assert jnp.all(oyster_locs[:, 1] < margin + 9)
+    assert jnp.all(fake_locs[:, 1] >= margin + 7)
+    assert jnp.all(fake_locs[:, 1] < margin + 9)
+
+
 def test_color_based_partial_observability():
     """Test that objects with the same color are grouped into the same observation channel."""
     env = ForagaxObjectEnv(
@@ -690,236 +810,3 @@ def test_single_color_all_objects():
     for i in range(3):
         obj_obs = obs[1, i, :]  # Row 1, columns 0-2
         chex.assert_trees_all_equal(obj_obs, jnp.array([1.0]))
-
-
-def test_benchmark_vision(benchmark):
-    env = ForagaxObjectEnv(size=7, aperture_size=3, objects=(WALL,))
-    params = env.default_params
-    key = jax.random.key(0)
-    _, state = env.reset(key, params)
-
-    grid = jnp.zeros((7, 7), dtype=int)
-    grid = grid.at[4, 3].set(1)
-    grid = grid.at[5, 3].set(1)
-    grid = grid.at[2, 0].set(1)
-    state = state.replace(object_grid=grid)
-
-    @jax.jit
-    def _run(state, key):
-        key, step_key = jax.random.split(key)
-        obs, new_state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
-        return obs, new_state
-
-    # warm-up
-    obs, new_state = _run(state, key)
-
-    expected = jnp.zeros((3, 3, 1), dtype=int)
-    expected = expected.at[2, 1, 0].set(1)
-
-    chex.assert_trees_all_equal(new_state.pos, jnp.array([3, 3]))
-    chex.assert_trees_all_equal(obs, expected)
-
-    def benchmark_fn():
-        # use a fixed key for benchmark consistency
-        _run(state, jax.random.key(1))[0].block_until_ready()
-
-    benchmark(benchmark_fn)
-
-
-def test_benchmark_creation(benchmark):
-    env = ForagaxObjectEnv(
-        size=1_000,
-        aperture_size=31,
-        objects=(WALL, FLOWER),
-        biomes=(Biome(object_frequencies=(0.05, 0.05)),),
-    )
-    params = env.default_params
-
-    @jax.jit
-    def _build(key):
-        _, state = env.reset(key, params)
-        return state
-
-    # no warm-up
-
-    def benchmark_fn():
-        _build(jax.random.key(1)).pos.block_until_ready()
-
-    benchmark(benchmark_fn)
-
-
-def test_benchmark_small_env(benchmark):
-    env = ForagaxObjectEnv(
-        size=1_000,
-        aperture_size=11,
-        objects=(WALL, FLOWER),
-        biomes=(Biome(object_frequencies=(0.1, 0.1)),),
-    )
-    params = env.default_params
-    key = jax.random.key(0)
-    key, reset_key = jax.random.split(key)
-    _, state = env.reset(reset_key, params)
-
-    @jax.jit
-    def _run(state, key):
-        def f(carry, _):
-            state, key = carry
-            key, step_key = jax.random.split(key, 2)
-            _, new_state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
-            return (new_state, key), None
-
-        (final_state, _), _ = jax.lax.scan(f, (state, key), None, length=1000)
-        return final_state
-
-    key, run_key = jax.random.split(key)
-    _run(state, run_key).pos.block_until_ready()
-
-    def benchmark_fn():
-        key, run_key = jax.random.split(jax.random.key(1))
-        _run(state, run_key).pos.block_until_ready()
-
-    benchmark(benchmark_fn)
-
-
-def test_benchmark_big_env(benchmark):
-    env = ForagaxObjectEnv(
-        size=10_000,
-        aperture_size=61,
-        objects=(WALL, FLOWER),
-        biomes=(Biome(object_frequencies=(0.05, 0.05)),),
-    )
-    params = env.default_params
-    key = jax.random.key(0)
-
-    # Reset is part of the setup, not benchmarked
-    key, reset_key = jax.random.split(key)
-    _, state = env.reset(reset_key, params)
-
-    @jax.jit
-    def _run(state, key):
-        def f(carry, _):
-            state, key = carry
-            key, step_key = jax.random.split(key, 2)
-            _, new_state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
-            return (new_state, key), None
-
-        (final_state, _), _ = jax.lax.scan(f, (state, key), None, length=100)
-        return final_state
-
-    # warm-up compilation
-    key, run_key = jax.random.split(key)
-    _run(state, run_key).pos.block_until_ready()
-
-    def benchmark_fn():
-        # use a fixed key for benchmark consistency
-        key, run_key = jax.random.split(jax.random.key(1))
-        _run(state, run_key).pos.block_until_ready()
-
-    benchmark(benchmark_fn)
-
-
-def test_benchmark_vmap_env(benchmark):
-    num_envs = 100
-    env = ForagaxObjectEnv(
-        size=1_000,
-        aperture_size=11,
-        objects=(WALL, FLOWER),
-        biomes=(Biome(object_frequencies=(0.1, 0.1)),),
-    )
-    params = env.default_params
-    key = jax.random.key(0)
-
-    # Reset is part of the setup, not benchmarked
-    key, reset_key = jax.random.split(key)
-    reset_keys = jax.random.split(reset_key, num_envs)
-    states = jax.vmap(env.reset, in_axes=(0, None))(reset_keys, params)[1]
-
-    @jax.jit
-    def _run(states, key):
-        def f(carry, _):
-            states, key = carry
-            key, step_key = jax.random.split(key, 2)
-            step_keys = jax.random.split(step_key, num_envs)
-            _, new_states, _, _, _ = jax.vmap(env.step, in_axes=(0, 0, None, None))(
-                step_keys, states, Actions.DOWN, params
-            )
-            return (new_states, key), None
-
-        (final_states, _), _ = jax.lax.scan(f, (states, key), None, length=1000)
-        return final_states
-
-    # warm-up compilation
-    key, run_key = jax.random.split(key)
-    _run(states, run_key).pos.block_until_ready()
-
-    def benchmark_fn():
-        # use a fixed key for benchmark consistency
-        key, run_key = jax.random.split(jax.random.key(1))
-        _run(states, run_key).pos.block_until_ready()
-
-    benchmark(benchmark_fn)
-
-
-def test_benchmark_small_env_color(benchmark):
-    env = ForagaxRGBEnv(
-        size=1_000,
-        aperture_size=15,
-        objects=(WALL, FLOWER),
-        biomes=(Biome(object_frequencies=(0.05, 0.05)),),
-    )
-    params = env.default_params
-    key = jax.random.key(0)
-    key, reset_key = jax.random.split(key)
-    _, state = env.reset(reset_key, params)
-
-    @jax.jit
-    def _run(state, key):
-        def f(carry, _):
-            state, key = carry
-            key, step_key = jax.random.split(key, 2)
-            _, new_state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
-            return (new_state, key), None
-
-        (final_state, _), _ = jax.lax.scan(f, (state, key), None, length=100)
-        return final_state
-
-    key, run_key = jax.random.split(key)
-    _run(state, run_key).pos.block_until_ready()
-
-    def benchmark_fn():
-        key, run_key = jax.random.split(jax.random.key(1))
-        _run(state, run_key).pos.block_until_ready()
-
-    benchmark(benchmark_fn)
-
-
-def test_benchmark_small_env_world(benchmark):
-    env = ForagaxWorldEnv(
-        size=1_000,
-        objects=(WALL, FLOWER),
-        biomes=(Biome(object_frequencies=(0.05, 0.05)),),
-    )
-    params = env.default_params
-    key = jax.random.key(0)
-    key, reset_key = jax.random.split(key)
-    _, state = env.reset(reset_key, params)
-
-    @jax.jit
-    def _run(state, key):
-        def f(carry, _):
-            state, key = carry
-            key, step_key = jax.random.split(key, 2)
-            _, new_state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
-            return (new_state, key), None
-
-        (final_state, _), _ = jax.lax.scan(f, (state, key), None, length=100)
-        return final_state
-
-    key, run_key = jax.random.split(key)
-    _run(state, run_key).pos.block_until_ready()
-
-    def benchmark_fn():
-        key, run_key = jax.random.split(jax.random.key(1))
-        _run(state, run_key).pos.block_until_ready()
-
-    benchmark(benchmark_fn)

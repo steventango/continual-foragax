@@ -10,6 +10,7 @@ from typing import Any, Dict, Tuple, Union
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 from flax import struct
 from gymnax.environments import environment, spaces
 
@@ -66,13 +67,16 @@ class ForagaxEnv(environment.Environment):
 
     def __init__(
         self,
+        name: str = "Foragax-v0",
         size: Union[Tuple[int, int], int] = (10, 10),
         aperture_size: Union[Tuple[int, int], int] = (5, 5),
         objects: Tuple[BaseForagaxObject, ...] = (),
         biomes: Tuple[Biome, ...] = (Biome(object_frequencies=()),),
         nowrap: bool = False,
+        deterministic_spawn: bool = False,
     ):
         super().__init__()
+        self._name = name
         if isinstance(size, int):
             size = (size, size)
         self.size = size
@@ -81,6 +85,7 @@ class ForagaxEnv(environment.Environment):
             aperture_size = (aperture_size, aperture_size)
         self.aperture_size = aperture_size
         self.nowrap = nowrap
+        self.deterministic_spawn = deterministic_spawn
         objects = (EMPTY,) + objects
         if self.nowrap:
             objects = objects + (PADDING,)
@@ -103,12 +108,35 @@ class ForagaxEnv(environment.Environment):
         self.biome_object_frequencies = jnp.array(
             [b.object_frequencies for b in biomes]
         )
-        self.biome_starts = jnp.array(
+        self.biome_starts = np.array(
             [b.start if b.start is not None else (-1, -1) for b in biomes]
         )
-        self.biome_stops = jnp.array(
+        self.biome_stops = np.array(
             [b.stop if b.stop is not None else (-1, -1) for b in biomes]
         )
+        self.biome_sizes = np.prod(self.biome_stops - self.biome_starts, axis=1)
+        self.biome_masks = []
+        for i in range(self.biome_object_frequencies.shape[0]):
+            # Create mask for the biome
+            start = jax.lax.select(
+                self.biome_starts[i, 0] == -1,
+                jnp.array([0, 0]),
+                self.biome_starts[i],
+            )
+            stop = jax.lax.select(
+                self.biome_stops[i, 0] == -1,
+                jnp.array(self.size),
+                self.biome_stops[i],
+            )
+            rows = jnp.arange(self.size[1])[:, None]
+            cols = jnp.arange(self.size[0])
+            mask = (
+                (rows >= start[1])
+                & (rows < stop[1])
+                & (cols >= start[0])
+                & (cols < stop[0])
+            )
+            self.biome_masks.append(mask)
 
     @property
     def default_params(self) -> EnvParams:
@@ -196,57 +224,18 @@ class ForagaxEnv(environment.Environment):
         self, key: jax.Array, params: EnvParams
     ) -> Tuple[jax.Array, EnvState]:
         """Reset environment state."""
-        key, subkey = jax.random.split(key)
-
         object_grid = jnp.zeros((self.size[1], self.size[0]), dtype=int)
-
-        iter_key = subkey
+        key, iter_key = jax.random.split(key)
         for i in range(self.biome_object_frequencies.shape[0]):
             iter_key, biome_key = jax.random.split(iter_key)
-            # Generate random layout
-            grid_rand = jax.random.uniform(biome_key, (self.size[1], self.size[0]))
+            mask = self.biome_masks[i]
 
-            # Create mask for the biome
-            start = jax.lax.select(
-                self.biome_starts[i, 0] == -1,
-                jnp.array([0, 0]),
-                self.biome_starts[i],
-            )
-            stop = jax.lax.select(
-                self.biome_stops[i, 0] == -1,
-                jnp.array(self.size),
-                self.biome_stops[i],
-            )
-
-            rows = jnp.arange(self.size[1])[:, None]
-            cols = jnp.arange(self.size[0])
-
-            mask = (
-                (rows >= start[1])
-                & (rows < stop[1])
-                & (cols >= start[0])
-                & (cols < stop[0])
-            )
-
-            # Generate objects for this biome and update the main grid
-            biome_freqs = self.biome_object_frequencies[i]
-            empty_freq = 1.0 - jnp.sum(biome_freqs)
-            all_freqs = jnp.concatenate([jnp.array([empty_freq]), biome_freqs])
-
-            cumulative_freqs = jnp.cumsum(
-                jnp.concatenate([jnp.array([0.0]), all_freqs])
-            )
-
-            # Determine which object to place in each cell
-            # The last object ID will be used for any value of grid_rand >= cumulative_freqs[-1]
-            # so we don't need to cap grid_rand
-            obj_ids_for_biome = jnp.arange(len(all_freqs))
-            cell_obj_ids = (
-                jnp.searchsorted(cumulative_freqs, grid_rand, side="right") - 1
-            )
-            biome_objects = obj_ids_for_biome[cell_obj_ids]
-
-            object_grid = jnp.where(mask, biome_objects, object_grid)
+            if self.deterministic_spawn:
+                biome_objects = self.generate_biome_new(i, biome_key)
+                object_grid = object_grid.at[mask].set(biome_objects)
+            else:
+                biome_objects = self.generate_biome_old(i, biome_key)
+                object_grid = jnp.where(mask, biome_objects, object_grid)
 
         # Place agent in the center of the world and ensure the cell is empty.
         agent_pos = jnp.array([self.size[0] // 2, self.size[1] // 2])
@@ -260,6 +249,25 @@ class ForagaxEnv(environment.Environment):
 
         return self.get_obs(state, params), state
 
+    def generate_biome_old(self, i: int, biome_key: jax.Array):
+        biome_freqs = self.biome_object_frequencies[i]
+        grid_rand = jax.random.uniform(biome_key, (self.size[1], self.size[0]))
+        empty_freq = 1.0 - jnp.sum(biome_freqs)
+        all_freqs = jnp.concatenate([jnp.array([empty_freq]), biome_freqs])
+        cumulative_freqs = jnp.cumsum(jnp.concatenate([jnp.array([0.0]), all_freqs]))
+        biome_objects = jnp.searchsorted(cumulative_freqs, grid_rand, side="right") - 1
+        return biome_objects
+
+    def generate_biome_new(self, i: int, biome_key: jax.Array):
+        biome_freqs = self.biome_object_frequencies[i]
+        grid = jnp.linspace(0, 1, self.biome_sizes[i], endpoint=False)
+        biome_objects = len(biome_freqs) - jnp.searchsorted(
+            jnp.cumsum(biome_freqs[::-1]), grid, side="right"
+        )
+        flat_biome_objects = biome_objects.flatten()
+        shuffled_objects = jax.random.permutation(biome_key, flat_biome_objects)
+        return shuffled_objects
+
     def is_terminal(self, state: EnvState, params: EnvParams) -> jax.Array:
         """Foragax is a continuing environment."""
         return False
@@ -267,7 +275,7 @@ class ForagaxEnv(environment.Environment):
     @property
     def name(self) -> str:
         """Environment name."""
-        return "Foragax-v0"
+        return self._name
 
     @property
     def num_actions(self) -> int:
@@ -438,13 +446,17 @@ class ForagaxObjectEnv(ForagaxEnv):
 
     def __init__(
         self,
+        name: str = "Foragax-v0",
         size: Union[Tuple[int, int], int] = (10, 10),
         aperture_size: Union[Tuple[int, int], int] = (5, 5),
         objects: Tuple[BaseForagaxObject, ...] = (),
         biomes: Tuple[Biome, ...] = (Biome(object_frequencies=()),),
         nowrap: bool = False,
+        deterministic_spawn: bool = False,
     ):
-        super().__init__(size, aperture_size, objects, biomes, nowrap)
+        super().__init__(
+            name, size, aperture_size, objects, biomes, nowrap, deterministic_spawn
+        )
 
         # Compute unique colors and mapping for partial observability
         # Exclude EMPTY (index 0) from color channels
