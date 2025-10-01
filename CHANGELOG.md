@@ -1,3 +1,19 @@
+## 0.22.0 (2025-10-01)
+
+### Feat
+
+- ForagaxTwoBiome-v9 with deterministic spawning
+- implement deterministic spawning
+
+### Fix
+
+- AttributeError: 'Biome' object has no attribute 'blocking'
+- hardcoded environment name
+
+### Refactor
+
+- move benchmark tests to new file
+
 ## 0.21.0 (2025-09-29)
 
 ### Feat
