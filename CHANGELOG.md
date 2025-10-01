@@ -1,3 +1,17 @@
+## 0.23.0 (2025-10-01)
+
+### Feat
+
+- add ForagaxTwoBiome-v12 with random object spawning and higher mushroom frequencies
+- ForagaxTwoBiome-v11 with higher mushroom freqs
+- add ForgaxTwoBiome-v10, with objects that respawn in random positions
+- random respawn based on objects
+- add random respawning within biomes
+
+### Fix
+
+- flipped coordinates
+
 ## 0.22.0 (2025-10-01)
 
 ### Feat
