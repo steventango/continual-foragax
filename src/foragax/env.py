@@ -75,7 +75,6 @@ class ForagaxEnv(environment.Environment):
         biomes: Tuple[Biome, ...] = (Biome(object_frequencies=()),),
         nowrap: bool = False,
         deterministic_spawn: bool = False,
-        random_respawn: bool = False,
     ):
         super().__init__()
         self._name = name
@@ -88,7 +87,6 @@ class ForagaxEnv(environment.Environment):
         self.aperture_size = aperture_size
         self.nowrap = nowrap
         self.deterministic_spawn = deterministic_spawn
-        self.random_respawn = random_respawn
         objects = (EMPTY,) + objects
         if self.nowrap:
             objects = objects + (PADDING,)
@@ -104,6 +102,7 @@ class ForagaxEnv(environment.Environment):
         self.object_blocking = jnp.array([o.blocking for o in objects])
         self.object_collectable = jnp.array([o.collectable for o in objects])
         self.object_colors = jnp.array([o.color for o in objects])
+        self.object_random_respawn = jnp.array([o.random_respawn for o in objects])
 
         self.reward_fns = [o.reward for o in objects]
         self.regen_delay_fns = [o.regen_delay for o in objects]
@@ -233,7 +232,7 @@ class ForagaxEnv(environment.Environment):
         object_grid = jax.lax.cond(
             should_collect,
             lambda: jax.lax.cond(
-                self.random_respawn,
+                self.object_random_respawn[obj_at_pos],
                 lambda: place_at_random_pos(object_grid, encoded_timer),
                 lambda: place_at_current_pos(object_grid, encoded_timer),
             ),
@@ -505,7 +504,6 @@ class ForagaxObjectEnv(ForagaxEnv):
         biomes: Tuple[Biome, ...] = (Biome(object_frequencies=()),),
         nowrap: bool = False,
         deterministic_spawn: bool = False,
-        random_respawn: bool = False,
     ):
         super().__init__(
             name,
@@ -515,7 +513,6 @@ class ForagaxObjectEnv(ForagaxEnv):
             biomes,
             nowrap,
             deterministic_spawn,
-            random_respawn,
         )
 
         # Compute unique colors and mapping for partial observability

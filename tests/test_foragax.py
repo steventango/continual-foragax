@@ -288,14 +288,22 @@ def test_respawn():
 def test_random_respawn():
     """Test that an object respawns at a random empty location within its biome."""
     key = jax.random.key(0)
-    object_types = (FLOWER, WALL)
+
+    flower_random = DefaultForagaxObject(
+        name="flower",
+        reward=1.0,
+        collectable=True,
+        color=(0, 255, 0),
+        random_respawn=True,
+    )
+
+    object_types = (flower_random, WALL)
     biome = Biome(start=(2, 2), stop=(5, 5), object_frequencies=(0.0, 0.0))
     env = ForagaxObjectEnv(
         size=7,
         aperture_size=3,
         objects=object_types,
         biomes=(biome,),
-        random_respawn=True,
     )
     params = env.default_params
     _, state = env.reset(key, params)
@@ -314,16 +322,15 @@ def test_random_respawn():
     key, step_key = jax.random.split(key)
     _, new_state, reward, _, _ = env.step(step_key, state, Actions.RIGHT, params)
 
-    assert reward == FLOWER.reward_val
+    assert reward == flower_random.reward_val
     # Original position should be empty
     assert new_state.object_grid[original_pos[1], original_pos[0]] == 0
 
     # A timer should be placed somewhere
     assert jnp.sum(new_state.object_grid < 0) == 1
     timer_pos_flat = jnp.argmin(new_state.object_grid)
-    timer_pos = jnp.array(
-        [timer_pos_flat // 7, timer_pos_flat % 7]
-    )  # New position should not be the original position
+    timer_pos = jnp.array(jnp.unravel_index(timer_pos_flat, (7, 7)))
+    # New position should not be the original position
     assert not jnp.array_equal(timer_pos, original_pos)
 
     # New position should be within the biome
@@ -337,17 +344,25 @@ def test_random_respawn():
 def test_random_respawn_no_empty_space():
     """Test that an object respawns at the same spot if no empty space is available."""
     key = jax.random.key(0)
-    object_types = (WALL, FLOWER)
+
+    flower_random = DefaultForagaxObject(
+        name="flower",
+        reward=1.0,
+        collectable=True,
+        color=(0, 255, 0),
+        random_respawn=True,
+    )
+
+    object_types = (WALL, flower_random)
     # A 1x1 biome
     biome = Biome(start=(3, 3), stop=(4, 4), object_frequencies=(0.0, 0.0))
     env = ForagaxObjectEnv(
         size=7,
         objects=object_types,
         biomes=(biome,),
-        random_respawn=True,
     )
     params = env.default_params
-    _, state = env.resest(key, params)
+    _, state = env.reset(key, params)
 
     flower_id = 2  # WALL is 1
     original_pos = jnp.array([3, 3])
@@ -359,9 +374,9 @@ def test_random_respawn_no_empty_space():
 
     # Collect the flower
     key, step_key = jax.random.split(key)
-    _, new_state, reward, _, _ = env.step_env(step_key, state, Actions.RIGHT, params)
+    _, new_state, reward, _, _ = env.step(step_key, state, Actions.RIGHT, params)
 
-    assert reward == FLOWER.reward_val
+    assert reward == flower_random.reward_val
     # The timer should be placed back at the original position
     assert new_state.object_grid[original_pos[1], original_pos[0]] < 0
 
