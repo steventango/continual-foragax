@@ -1,3 +1,9 @@
+## 0.23.1 (2025-10-01)
+
+### Fix
+
+- don't set agent position to be empty
+
 ## 0.23.0 (2025-10-01)
 
 ### Feat
