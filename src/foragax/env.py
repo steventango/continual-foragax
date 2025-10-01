@@ -221,7 +221,7 @@ class ForagaxEnv(environment.Environment):
             new_spawn_pos = valid_spawn_indices[random_idx]
 
             # Place the timer at the new random position
-            return grid.at[new_spawn_pos[1], new_spawn_pos[0]].set(timer_val)
+            return grid.at[new_spawn_pos[0], new_spawn_pos[1]].set(timer_val)
 
         # If collected, replace object with timer; otherwise, keep it
         val_at_pos = object_grid[pos[1], pos[0]]
