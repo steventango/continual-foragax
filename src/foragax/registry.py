@@ -206,6 +206,19 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
         "nowrap": True,
         "deterministic_spawn": True,
     },
+    "ForagaxTwoBiome-v12": {
+        "size": None,
+        "aperture_size": None,
+        "objects": (
+            BROWN_MOREL_UNIFORM_RANDOM,
+            BROWN_OYSTER_UNIFORM_RANDOM,
+            GREEN_DEATHCAP_UNIFORM_RANDOM,
+            GREEN_FAKE_UNIFORM_RANDOM,
+        ),
+        "biomes": None,
+        "nowrap": True,
+        "deterministic_spawn": True,
+    },
     "ForagaxTwoBiomeSmall-v1": {
         "size": (16, 8),
         "aperture_size": None,
@@ -300,7 +313,7 @@ def make(
             ),
         )
 
-    if env_id == "ForagaxTwoBiome-v11":
+    if env_id in ("ForagaxTwoBiome-v11", "ForagaxTwoBiome-v12"):
         margin = aperture_size[1] // 2 + 1
         width = 2 * margin + 9
         config["size"] = (width, 15)
