@@ -446,6 +446,7 @@ class ForagaxObjectEnv(ForagaxEnv):
 
     def __init__(
         self,
+        name: str = "Foragax-v0",
         size: Union[Tuple[int, int], int] = (10, 10),
         aperture_size: Union[Tuple[int, int], int] = (5, 5),
         objects: Tuple[BaseForagaxObject, ...] = (),
@@ -454,7 +455,7 @@ class ForagaxObjectEnv(ForagaxEnv):
         deterministic_spawn: bool = False,
     ):
         super().__init__(
-            size, aperture_size, objects, biomes, nowrap, deterministic_spawn
+            name, size, aperture_size, objects, biomes, nowrap, deterministic_spawn
         )
 
         # Compute unique colors and mapping for partial observability
