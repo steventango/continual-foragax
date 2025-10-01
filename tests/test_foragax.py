@@ -587,7 +587,6 @@ def test_deterministic_object_spawning():
     assert not jnp.array_equal(state.object_grid, state_1.object_grid)
 
 
-
 def test_complex_deterministic_object_spawning():
     """Test a more complex deterministic object spawning case with two biomes."""
     aperture_size = (5, 5)

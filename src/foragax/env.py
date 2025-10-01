@@ -261,7 +261,9 @@ class ForagaxEnv(environment.Environment):
     def generate_biome_new(self, i: int, biome_key: jax.Array):
         biome_freqs = self.biome_object_frequencies[i]
         grid = jnp.linspace(0, 1, self.biome_sizes[i], endpoint=False)
-        biome_objects = len(biome_freqs) - jnp.searchsorted(jnp.cumsum(biome_freqs[::-1]), grid, side="right")
+        biome_objects = len(biome_freqs) - jnp.searchsorted(
+            jnp.cumsum(biome_freqs[::-1]), grid, side="right"
+        )
         flat_biome_objects = biome_objects.flatten()
         shuffled_objects = jax.random.permutation(biome_key, flat_biome_objects)
         return shuffled_objects
