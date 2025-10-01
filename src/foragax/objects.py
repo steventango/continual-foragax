@@ -16,11 +16,13 @@ class BaseForagaxObject:
         blocking: bool = False,
         collectable: bool = False,
         color: Tuple[int, int, int] = (0, 0, 0),
+        random_respawn: bool = False,
     ):
         self.name = name
         self.blocking = blocking
         self.collectable = collectable
         self.color = color
+        self.random_respawn = random_respawn
 
     @abc.abstractmethod
     def reward(self, clock: int, rng: jax.Array) -> float:
@@ -44,8 +46,9 @@ class DefaultForagaxObject(BaseForagaxObject):
         collectable: bool = False,
         regen_delay: Tuple[int, int] = (10, 100),
         color: Tuple[int, int, int] = (255, 255, 255),
+        random_respawn: bool = False,
     ):
-        super().__init__(name, blocking, collectable, color)
+        super().__init__(name, blocking, collectable, color, random_respawn)
         self.reward_val = reward
         self.regen_delay_range = regen_delay
 
@@ -70,6 +73,7 @@ class NormalRegenForagaxObject(DefaultForagaxObject):
         mean_regen_delay: int = 10,
         std_regen_delay: int = 1,
         color: Tuple[int, int, int] = (0, 0, 0),
+        random_respawn: bool = False,
     ):
         super().__init__(
             name=name,
@@ -77,6 +81,7 @@ class NormalRegenForagaxObject(DefaultForagaxObject):
             collectable=collectable,
             regen_delay=(mean_regen_delay, mean_regen_delay),
             color=color,
+            random_respawn=random_respawn,
         )
         self.mean_regen_delay = mean_regen_delay
         self.std_regen_delay = std_regen_delay
@@ -99,6 +104,7 @@ class WeatherObject(NormalRegenForagaxObject):
         mean_regen_delay: int = 10,
         std_regen_delay: int = 1,
         color: Tuple[int, int, int] = (0, 0, 0),
+        random_respawn: bool = False,
     ):
         super().__init__(
             name=name,
@@ -106,6 +112,7 @@ class WeatherObject(NormalRegenForagaxObject):
             mean_regen_delay=mean_regen_delay,
             std_regen_delay=std_regen_delay,
             color=color,
+            random_respawn=random_respawn,
         )
         self.rewards = rewards
         self.repeat = repeat
@@ -269,6 +276,40 @@ GREEN_FAKE_UNIFORM = DefaultForagaxObject(
     collectable=True,
     color=(0, 255, 0),
     regen_delay=(9, 11),
+)
+
+# Random respawn variants
+BROWN_MOREL_UNIFORM_RANDOM = DefaultForagaxObject(
+    name="brown_morel",
+    reward=10.0,
+    collectable=True,
+    color=(63, 30, 25),
+    regen_delay=(90, 110),
+    random_respawn=True,
+)
+BROWN_OYSTER_UNIFORM_RANDOM = DefaultForagaxObject(
+    name="brown_oyster",
+    reward=1.0,
+    collectable=True,
+    color=(63, 30, 25),
+    regen_delay=(9, 11),
+    random_respawn=True,
+)
+GREEN_DEATHCAP_UNIFORM_RANDOM = DefaultForagaxObject(
+    name="green_deathcap",
+    reward=-5.0,
+    collectable=True,
+    color=(0, 255, 0),
+    regen_delay=(9, 11),
+    random_respawn=True,
+)
+GREEN_FAKE_UNIFORM_RANDOM = DefaultForagaxObject(
+    name="green_fake",
+    reward=0.0,
+    collectable=True,
+    color=(0, 255, 0),
+    regen_delay=(9, 11),
+    random_respawn=True,
 )
 
 

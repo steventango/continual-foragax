@@ -13,15 +13,19 @@ from foragax.objects import (
     BROWN_MOREL,
     BROWN_MOREL_2,
     BROWN_MOREL_UNIFORM,
+    BROWN_MOREL_UNIFORM_RANDOM,
     BROWN_OYSTER,
     BROWN_OYSTER_UNIFORM,
+    BROWN_OYSTER_UNIFORM_RANDOM,
     GREEN_DEATHCAP,
     GREEN_DEATHCAP_2,
     GREEN_DEATHCAP_3,
     GREEN_DEATHCAP_UNIFORM,
+    GREEN_DEATHCAP_UNIFORM_RANDOM,
     GREEN_FAKE,
     GREEN_FAKE_2,
     GREEN_FAKE_UNIFORM,
+    GREEN_FAKE_UNIFORM_RANDOM,
     LARGE_MOREL,
     LARGE_OYSTER,
     MEDIUM_MOREL,
@@ -176,6 +180,45 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
         "nowrap": True,
         "deterministic_spawn": True,
     },
+    "ForagaxTwoBiome-v10": {
+        "size": None,
+        "aperture_size": None,
+        "objects": (
+            BROWN_MOREL_UNIFORM_RANDOM,
+            BROWN_OYSTER_UNIFORM_RANDOM,
+            GREEN_DEATHCAP_UNIFORM_RANDOM,
+            GREEN_FAKE_UNIFORM_RANDOM,
+        ),
+        "biomes": None,
+        "nowrap": True,
+        "deterministic_spawn": True,
+    },
+    "ForagaxTwoBiome-v11": {
+        "size": None,
+        "aperture_size": None,
+        "objects": (
+            BROWN_MOREL_UNIFORM,
+            BROWN_OYSTER_UNIFORM,
+            GREEN_DEATHCAP_UNIFORM,
+            GREEN_FAKE_UNIFORM,
+        ),
+        "biomes": None,
+        "nowrap": True,
+        "deterministic_spawn": True,
+    },
+    "ForagaxTwoBiome-v12": {
+        "size": None,
+        "aperture_size": None,
+        "objects": (
+            BROWN_MOREL_UNIFORM_RANDOM,
+            BROWN_OYSTER_UNIFORM_RANDOM,
+            GREEN_DEATHCAP_UNIFORM_RANDOM,
+            GREEN_FAKE_UNIFORM_RANDOM,
+        ),
+        "biomes": None,
+        "nowrap": True,
+        "deterministic_spawn": True,
+    },
     "ForagaxTwoBiomeSmall-v1": {
         "size": (16, 8),
         "aperture_size": None,
@@ -246,7 +289,12 @@ def make(
     if nowrap is not None:
         config["nowrap"] = nowrap
 
-    if env_id in ("ForagaxTwoBiome-v7", "ForagaxTwoBiome-v8", "ForagaxTwoBiome-v9"):
+    if env_id in (
+        "ForagaxTwoBiome-v7",
+        "ForagaxTwoBiome-v8",
+        "ForagaxTwoBiome-v9",
+        "ForagaxTwoBiome-v10",
+    ):
         margin = aperture_size[1] // 2 + 1
         width = 2 * margin + 9
         config["size"] = (width, 15)
@@ -262,6 +310,25 @@ def make(
                 start=(margin + 7, 0),
                 stop=(margin + 9, 15),
                 object_frequencies=(0.0, 0.25, 0.0, 0.5),
+            ),
+        )
+
+    if env_id in ("ForagaxTwoBiome-v11", "ForagaxTwoBiome-v12"):
+        margin = aperture_size[1] // 2 + 1
+        width = 2 * margin + 9
+        config["size"] = (width, 15)
+        config["biomes"] = (
+            # Morel biome
+            Biome(
+                start=(margin, 0),
+                stop=(margin + 2, 15),
+                object_frequencies=(0.5, 0.0, 0.25, 0.0),
+            ),
+            # Oyster biome
+            Biome(
+                start=(margin + 7, 0),
+                stop=(margin + 9, 15),
+                object_frequencies=(0.0, 0.5, 0.0, 0.25),
             ),
         )
 

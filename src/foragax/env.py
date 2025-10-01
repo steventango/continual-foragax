@@ -59,6 +59,7 @@ class EnvParams(environment.EnvParams):
 class EnvState(environment.EnvState):
     pos: jax.Array
     object_grid: jax.Array
+    biome_grid: jax.Array
     time: int
 
 
@@ -101,6 +102,7 @@ class ForagaxEnv(environment.Environment):
         self.object_blocking = jnp.array([o.blocking for o in objects])
         self.object_collectable = jnp.array([o.collectable for o in objects])
         self.object_colors = jnp.array([o.color for o in objects])
+        self.object_random_respawn = jnp.array([o.random_respawn for o in objects])
 
         self.reward_fns = [o.reward for o in objects]
         self.regen_delay_fns = [o.regen_delay for o in objects]
@@ -179,7 +181,7 @@ class ForagaxEnv(environment.Environment):
         is_collectable = self.object_collectable[obj_at_pos]
 
         # 3. HANDLE OBJECT COLLECTION AND RESPAWNING
-        key, subkey = jax.random.split(key)
+        key, subkey, rand_key = jax.random.split(key, 3)
 
         # Decrement timers (stored as negative values)
         is_timer = state.object_grid < 0
@@ -193,10 +195,49 @@ class ForagaxEnv(environment.Environment):
         )
         encoded_timer = obj_at_pos - ((regen_delay + 1) * num_obj_types)
 
+        def place_at_current_pos(current_grid, timer_val):
+            return current_grid.at[pos[1], pos[0]].set(timer_val)
+
+        def place_at_random_pos(current_grid, timer_val):
+            # Set the collected position to empty temporarily
+            grid = current_grid.at[pos[1], pos[0]].set(0)
+
+            # Find all valid spawn locations (empty cells within the same biome)
+            biome_id = state.biome_grid[pos[1], pos[0]]
+            biome_mask = state.biome_grid == biome_id
+            empty_mask = grid == 0
+            valid_spawn_mask = biome_mask & empty_mask
+
+            num_valid_spawns = jnp.sum(valid_spawn_mask)
+
+            # Get indices of valid spawn locations, padded to a static size
+            y_indices, x_indices = jnp.nonzero(
+                valid_spawn_mask, size=self.size[0] * self.size[1], fill_value=-1
+            )
+            valid_spawn_indices = jnp.stack([y_indices, x_indices], axis=1)
+
+            # Select a random valid location
+            random_idx = jax.random.randint(rand_key, (), 0, num_valid_spawns)
+            new_spawn_pos = valid_spawn_indices[random_idx]
+
+            # Place the timer at the new random position
+            return grid.at[new_spawn_pos[0], new_spawn_pos[1]].set(timer_val)
+
         # If collected, replace object with timer; otherwise, keep it
         val_at_pos = object_grid[pos[1], pos[0]]
-        new_val_at_pos = jax.lax.select(is_collectable, encoded_timer, val_at_pos)
-        object_grid = object_grid.at[pos[1], pos[0]].set(new_val_at_pos)
+        should_collect = is_collectable & (val_at_pos > 0)
+
+        # When not collecting, the value at the position remains unchanged.
+        # When collecting, we either place the timer at the current position or a random one.
+        object_grid = jax.lax.cond(
+            should_collect,
+            lambda: jax.lax.cond(
+                self.object_random_respawn[obj_at_pos],
+                lambda: place_at_random_pos(object_grid, encoded_timer),
+                lambda: place_at_current_pos(object_grid, encoded_timer),
+            ),
+            lambda: object_grid,
+        )
 
         info = {"discount": self.discount(state, params)}
         if self.weather_object is not None:
@@ -208,6 +249,7 @@ class ForagaxEnv(environment.Environment):
         state = EnvState(
             pos=pos,
             object_grid=object_grid,
+            biome_grid=state.biome_grid,
             time=state.time + 1,
         )
 
@@ -225,10 +267,12 @@ class ForagaxEnv(environment.Environment):
     ) -> Tuple[jax.Array, EnvState]:
         """Reset environment state."""
         object_grid = jnp.zeros((self.size[1], self.size[0]), dtype=int)
+        biome_grid = jnp.full((self.size[1], self.size[0]), -1, dtype=int)
         key, iter_key = jax.random.split(key)
         for i in range(self.biome_object_frequencies.shape[0]):
             iter_key, biome_key = jax.random.split(iter_key)
             mask = self.biome_masks[i]
+            biome_grid = jnp.where(mask, i, biome_grid)
 
             if self.deterministic_spawn:
                 biome_objects = self.generate_biome_new(i, biome_key)
@@ -244,6 +288,7 @@ class ForagaxEnv(environment.Environment):
         state = EnvState(
             pos=agent_pos,
             object_grid=object_grid,
+            biome_grid=biome_grid,
             time=0,
         )
 
@@ -295,6 +340,12 @@ class ForagaxEnv(environment.Environment):
                 "object_grid": spaces.Box(
                     -1000 * len(self.object_ids),
                     len(self.object_ids),
+                    (self.size[1], self.size[0]),
+                    int,
+                ),
+                "biome_grid": spaces.Box(
+                    0,
+                    self.biome_object_frequencies.shape[0],
                     (self.size[1], self.size[0]),
                     int,
                 ),
@@ -455,7 +506,13 @@ class ForagaxObjectEnv(ForagaxEnv):
         deterministic_spawn: bool = False,
     ):
         super().__init__(
-            name, size, aperture_size, objects, biomes, nowrap, deterministic_spawn
+            name,
+            size,
+            aperture_size,
+            objects,
+            biomes,
+            nowrap,
+            deterministic_spawn,
         )
 
         # Compute unique colors and mapping for partial observability
