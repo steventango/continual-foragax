@@ -281,9 +281,8 @@ class ForagaxEnv(environment.Environment):
                 biome_objects = self.generate_biome_old(i, biome_key)
                 object_grid = jnp.where(mask, biome_objects, object_grid)
 
-        # Place agent in the center of the world and ensure the cell is empty.
+        # Place agent in the center of the world
         agent_pos = jnp.array([self.size[0] // 2, self.size[1] // 2])
-        object_grid = object_grid.at[agent_pos[1], agent_pos[0]].set(0)
 
         state = EnvState(
             pos=agent_pos,
