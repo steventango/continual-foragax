@@ -299,5 +299,6 @@ def make(
         raise ValueError(f"Unknown observation type: {observation_type}")
 
     env_class = env_class_map[observation_type]
+    config["name"] = env_id
 
     return env_class(**config)

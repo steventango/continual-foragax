@@ -67,6 +67,7 @@ class ForagaxEnv(environment.Environment):
 
     def __init__(
         self,
+        name: str = "Foragax-v0",
         size: Union[Tuple[int, int], int] = (10, 10),
         aperture_size: Union[Tuple[int, int], int] = (5, 5),
         objects: Tuple[BaseForagaxObject, ...] = (),
@@ -75,6 +76,7 @@ class ForagaxEnv(environment.Environment):
         deterministic_spawn: bool = False,
     ):
         super().__init__()
+        self._name = name
         if isinstance(size, int):
             size = (size, size)
         self.size = size
@@ -271,7 +273,7 @@ class ForagaxEnv(environment.Environment):
     @property
     def name(self) -> str:
         """Environment name."""
-        return "Foragax-v0"
+        return self._name
 
     @property
     def num_actions(self) -> int:
