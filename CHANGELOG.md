@@ -1,3 +1,9 @@
+## 0.24.0 (2025-10-02)
+
+### Feat
+
+- Add ForagaxTwoBiome-v13 (wrap), ForagaxTwoBiome-v14 (no random respawn, wrap), ForagaxTwoBiome-v15 (no random respawn, no wrap)
+
 ## 0.23.1 (2025-10-01)
 
 ### Fix
