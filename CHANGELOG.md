@@ -1,3 +1,9 @@
+## 0.24.1 (2025-10-02)
+
+### Fix
+
+- don't add margin to ForagaxTwoBiome-v13, ForagaxTwoBiome-v14
+
 ## 0.24.0 (2025-10-02)
 
 ### Feat
