@@ -1,3 +1,17 @@
+## 0.25.0 (2025-10-02)
+
+### Feat
+
+- ForagaxTwoBiome-v15 with teleports every 10k
+- teleport steps
+
+### Fix
+
+- ForagaxTwoBiome-v16 has teleport, ForagaxTwoBiome-v15 does not
+- simplify furthest center logic
+- go left in teleport test
+- teleport to furthest biome center from current pos
+
 ## 0.24.2 (2025-10-02)
 
 ### Fix
