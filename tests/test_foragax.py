@@ -926,12 +926,12 @@ def test_teleporting():
             ),  # Biome 1 center at (7,7)
         ),
         teleport_interval=5,
-        nowrap=True,  # Prevent wrapping to keep agent in biomes
+        nowrap=True,
     )
     params = env.default_params
 
     # Reset and get initial state
-    obs, state = env.reset(key, params)
+    obs, state = env.reset_env(key, params)
 
     # Agent should start at center (5, 5), which is not in either biome initially
     # But let's manually place it in biome 0 for testing
@@ -940,11 +940,11 @@ def test_teleporting():
     # Step 4 times (time will be 0,1,2,3,4 after these steps)
     for i in range(4):
         key, step_key = jax.random.split(key)
-        obs, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+        obs, state, _, _, _ = env.step_env(step_key, state, Actions.LEFT, params)
 
     # After 4 steps, time=4, next step should teleport (4+1) % 5 == 0
     key, step_key = jax.random.split(key)
-    obs, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+    obs, state, _, _, _ = env.step_env(step_key, state, Actions.LEFT, params)
 
     # Should have teleported to the furthest biome center (biome 1 center)
     # From (2,2), (7,7) is further than (2,2)
