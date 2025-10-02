@@ -220,7 +220,7 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
         "deterministic_spawn": True,
     },
     "ForagaxTwoBiome-v13": {
-        "size": None,
+        "size": (15, 15),
         "aperture_size": None,
         "objects": (
             BROWN_MOREL_UNIFORM_RANDOM,
@@ -240,7 +240,7 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
         "deterministic_spawn": True,
     },
     "ForagaxTwoBiome-v14": {
-        "size": None,
+        "size": (15, 15),
         "aperture_size": None,
         "objects": (
             BROWN_MOREL_UNIFORM,
