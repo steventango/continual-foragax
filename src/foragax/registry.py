@@ -228,7 +228,14 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
             GREEN_DEATHCAP_UNIFORM_RANDOM,
             GREEN_FAKE_UNIFORM_RANDOM,
         ),
-        "biomes": None,
+        "biomes": (
+            # Morel biome
+            Biome(start=(3, 0), stop=(5, 15), object_frequencies=(0.25, 0.0, 0.5, 0.0)),
+            # Oyster biome
+            Biome(
+                start=(10, 0), stop=(12, 15), object_frequencies=(0.0, 0.25, 0.0, 0.5)
+            ),
+        ),
         "nowrap": False,
         "deterministic_spawn": True,
     },
@@ -241,7 +248,14 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
             GREEN_DEATHCAP_UNIFORM,
             GREEN_FAKE_UNIFORM,
         ),
-        "biomes": None,
+        "biomes": (
+            # Morel biome
+            Biome(start=(3, 0), stop=(5, 15), object_frequencies=(0.25, 0.0, 0.5, 0.0)),
+            # Oyster biome
+            Biome(
+                start=(10, 0), stop=(12, 15), object_frequencies=(0.0, 0.25, 0.0, 0.5)
+            ),
+        ),
         "nowrap": False,
         "deterministic_spawn": True,
     },
@@ -333,8 +347,6 @@ def make(
         "ForagaxTwoBiome-v8",
         "ForagaxTwoBiome-v9",
         "ForagaxTwoBiome-v10",
-        "ForagaxTwoBiome-v13",
-        "ForagaxTwoBiome-v14",
         "ForagaxTwoBiome-v15",
     ):
         margin = aperture_size[1] // 2 + 1
