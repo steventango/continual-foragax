@@ -263,10 +263,10 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
         "size": None,
         "aperture_size": None,
         "objects": (
-            BROWN_MOREL_UNIFORM,
-            BROWN_OYSTER_UNIFORM,
-            GREEN_DEATHCAP_UNIFORM,
-            GREEN_FAKE_UNIFORM,
+            BROWN_MOREL_UNIFORM_RANDOM,
+            BROWN_OYSTER_UNIFORM_RANDOM,
+            GREEN_DEATHCAP_UNIFORM_RANDOM,
+            GREEN_FAKE_UNIFORM_RANDOM,
         ),
         "biomes": None,
         "nowrap": True,
@@ -409,6 +409,9 @@ def make(
         same_color = env_id in ("ForagaxWeather-v2", "ForagaxWeather-v3")
         hot, cold = create_weather_objects(file_index=file_index, same_color=same_color)
         config["objects"] = (hot, cold)
+
+    if env_id == "ForagaxTwoBiome-v15":
+        config["teleport_interval"] = 10000
 
     env_class_map = {
         "object": ForagaxObjectEnv,
