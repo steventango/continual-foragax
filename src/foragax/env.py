@@ -193,14 +193,12 @@ class ForagaxEnv(environment.Environment):
             should_teleport = False
 
         def teleport_fn():
-            biome_centers = self.biome_centers_jax
             # Calculate squared distances from current position to each biome center
-            diffs = biome_centers - pos
+            diffs = self.biome_centers_jax - pos
             distances = jnp.sum(diffs**2, axis=1)
-            # Find the index of the furthest biome center (last occurrence when tied)
-            n = len(biome_centers)
-            furthest_idx = n - 1 - jnp.argmax(distances[::-1])
-            new_pos = biome_centers[furthest_idx]
+            # Find the index of the furthest biome center
+            furthest_idx = jnp.argmax(distances)
+            new_pos = self.biome_centers_jax[furthest_idx]
             return new_pos
 
         pos = jax.lax.cond(should_teleport, teleport_fn, lambda: pos)
