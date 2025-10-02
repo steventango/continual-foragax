@@ -121,6 +121,14 @@ class ForagaxEnv(environment.Environment):
         self.biome_sizes = np.prod(self.biome_stops - self.biome_starts, axis=1)
         self.biome_starts_jax = jnp.array(self.biome_starts)
         self.biome_stops_jax = jnp.array(self.biome_stops)
+        biome_centers = []
+        for i in range(len(self.biome_starts)):
+            start = self.biome_starts[i]
+            stop = self.biome_stops[i]
+            center_x = (start[0] + stop[0] - 1) // 2
+            center_y = (start[1] + stop[1] - 1) // 2
+            biome_centers.append((center_x, center_y))
+        self.biome_centers_jax = jnp.array(biome_centers)
         self.biome_masks = []
         for i in range(self.biome_object_frequencies.shape[0]):
             # Create mask for the biome
@@ -179,18 +187,20 @@ class ForagaxEnv(environment.Environment):
         pos = jax.lax.select(is_blocking, state.pos, new_pos)
 
         # Check for automatic teleport
-        should_teleport = (self.teleport_interval is not None) & (
-            (state.time + 1) % self.teleport_interval == 0
-        )
+        if self.teleport_interval is not None:
+            should_teleport = jnp.mod(state.time + 1, self.teleport_interval) == 0
+        else:
+            should_teleport = False
 
         def teleport_fn():
-            current_biome = state.biome_grid[pos[1], pos[0]]
-            opposite_biome = 1 - current_biome
-            opposite_start = self.biome_starts_jax[opposite_biome]
-            opposite_stop = self.biome_stops_jax[opposite_biome]
-            center_x = (opposite_start[0] + opposite_stop[0]) // 2
-            center_y = (opposite_start[1] + opposite_stop[1]) // 2
-            new_pos = jnp.array([center_x, center_y])
+            biome_centers = self.biome_centers_jax
+            # Calculate squared distances from current position to each biome center
+            diffs = biome_centers - pos
+            distances = jnp.sum(diffs**2, axis=1)
+            # Find the index of the furthest biome center (last occurrence when tied)
+            n = len(biome_centers)
+            furthest_idx = n - 1 - jnp.argmax(distances[::-1])
+            new_pos = biome_centers[furthest_idx]
             return new_pos
 
         pos = jax.lax.cond(should_teleport, teleport_fn, lambda: pos)
