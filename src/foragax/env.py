@@ -1,6 +1,6 @@
-"""JAX implementation of Foragax environment.
+"""JAX implementation of Forager environment.
 
-Source: https://github.com/andnp/Foragax
+Source: https://github.com/andnp/Forager
 """
 
 from dataclasses import dataclass
