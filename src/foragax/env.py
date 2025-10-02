@@ -1,12 +1,12 @@
-"""JAX implementation of Foragax environment.
+"""JAX implementation of Forager environment.
 
-Source: https://github.com/andnp/Foragax
+Source: https://github.com/andnp/Forager
 """
 
 from dataclasses import dataclass
 from enum import IntEnum
 from functools import partial
-from typing import Any, Dict, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union
 
 import jax
 import jax.numpy as jnp
@@ -75,6 +75,7 @@ class ForagaxEnv(environment.Environment):
         biomes: Tuple[Biome, ...] = (Biome(object_frequencies=()),),
         nowrap: bool = False,
         deterministic_spawn: bool = False,
+        teleport_interval: Optional[int] = None,
     ):
         super().__init__()
         self._name = name
@@ -87,6 +88,7 @@ class ForagaxEnv(environment.Environment):
         self.aperture_size = aperture_size
         self.nowrap = nowrap
         self.deterministic_spawn = deterministic_spawn
+        self.teleport_interval = teleport_interval
         objects = (EMPTY,) + objects
         if self.nowrap:
             objects = objects + (PADDING,)
@@ -117,6 +119,16 @@ class ForagaxEnv(environment.Environment):
             [b.stop if b.stop is not None else (-1, -1) for b in biomes]
         )
         self.biome_sizes = np.prod(self.biome_stops - self.biome_starts, axis=1)
+        self.biome_starts_jax = jnp.array(self.biome_starts)
+        self.biome_stops_jax = jnp.array(self.biome_stops)
+        biome_centers = []
+        for i in range(len(self.biome_starts)):
+            start = self.biome_starts[i]
+            stop = self.biome_stops[i]
+            center_x = (start[0] + stop[0] - 1) // 2
+            center_y = (start[1] + stop[1] - 1) // 2
+            biome_centers.append((center_x, center_y))
+        self.biome_centers_jax = jnp.array(biome_centers)
         self.biome_masks = []
         for i in range(self.biome_object_frequencies.shape[0]):
             # Create mask for the biome
@@ -173,6 +185,23 @@ class ForagaxEnv(environment.Environment):
         obj_at_new_pos = current_objects[new_pos[1], new_pos[0]]
         is_blocking = self.object_blocking[obj_at_new_pos]
         pos = jax.lax.select(is_blocking, state.pos, new_pos)
+
+        # Check for automatic teleport
+        if self.teleport_interval is not None:
+            should_teleport = jnp.mod(state.time + 1, self.teleport_interval) == 0
+        else:
+            should_teleport = False
+
+        def teleport_fn():
+            # Calculate squared distances from current position to each biome center
+            diffs = self.biome_centers_jax - pos
+            distances = jnp.sum(diffs**2, axis=1)
+            # Find the index of the furthest biome center
+            furthest_idx = jnp.argmax(distances)
+            new_pos = self.biome_centers_jax[furthest_idx]
+            return new_pos
+
+        pos = jax.lax.cond(should_teleport, teleport_fn, lambda: pos)
 
         # 2. HANDLE COLLISIONS AND REWARDS
         obj_at_pos = current_objects[pos[1], pos[0]]
@@ -503,6 +532,7 @@ class ForagaxObjectEnv(ForagaxEnv):
         biomes: Tuple[Biome, ...] = (Biome(object_frequencies=()),),
         nowrap: bool = False,
         deterministic_spawn: bool = False,
+        teleport_interval: Optional[int] = None,
     ):
         super().__init__(
             name,
@@ -512,6 +542,7 @@ class ForagaxObjectEnv(ForagaxEnv):
             biomes,
             nowrap,
             deterministic_spawn,
+            teleport_interval,
         )
 
         # Compute unique colors and mapping for partial observability

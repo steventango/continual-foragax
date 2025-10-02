@@ -272,6 +272,19 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
         "nowrap": True,
         "deterministic_spawn": True,
     },
+    "ForagaxTwoBiome-v16": {
+        "size": None,
+        "aperture_size": None,
+        "objects": (
+            BROWN_MOREL_UNIFORM_RANDOM,
+            BROWN_OYSTER_UNIFORM_RANDOM,
+            GREEN_DEATHCAP_UNIFORM_RANDOM,
+            GREEN_FAKE_UNIFORM_RANDOM,
+        ),
+        "biomes": None,
+        "nowrap": True,
+        "deterministic_spawn": True,
+    },
     "ForagaxTwoBiomeSmall-v1": {
         "size": (16, 8),
         "aperture_size": None,
@@ -348,6 +361,7 @@ def make(
         "ForagaxTwoBiome-v9",
         "ForagaxTwoBiome-v10",
         "ForagaxTwoBiome-v15",
+        "ForagaxTwoBiome-v16",
     ):
         margin = aperture_size[1] // 2 + 1
         width = 2 * margin + 9
@@ -409,6 +423,9 @@ def make(
         same_color = env_id in ("ForagaxWeather-v2", "ForagaxWeather-v3")
         hot, cold = create_weather_objects(file_index=file_index, same_color=same_color)
         config["objects"] = (hot, cold)
+
+    if env_id == "ForagaxTwoBiome-v16":
+        config["teleport_interval"] = 10000
 
     env_class_map = {
         "object": ForagaxObjectEnv,
