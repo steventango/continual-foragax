@@ -219,6 +219,45 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
         "nowrap": True,
         "deterministic_spawn": True,
     },
+    "ForagaxTwoBiome-v13": {
+        "size": None,
+        "aperture_size": None,
+        "objects": (
+            BROWN_MOREL_UNIFORM_RANDOM,
+            BROWN_OYSTER_UNIFORM_RANDOM,
+            GREEN_DEATHCAP_UNIFORM_RANDOM,
+            GREEN_FAKE_UNIFORM_RANDOM,
+        ),
+        "biomes": None,
+        "nowrap": False,
+        "deterministic_spawn": True,
+    },
+    "ForagaxTwoBiome-v14": {
+        "size": None,
+        "aperture_size": None,
+        "objects": (
+            BROWN_MOREL_UNIFORM,
+            BROWN_OYSTER_UNIFORM,
+            GREEN_DEATHCAP_UNIFORM,
+            GREEN_FAKE_UNIFORM,
+        ),
+        "biomes": None,
+        "nowrap": False,
+        "deterministic_spawn": True,
+    },
+    "ForagaxTwoBiome-v15": {
+        "size": None,
+        "aperture_size": None,
+        "objects": (
+            BROWN_MOREL_UNIFORM,
+            BROWN_OYSTER_UNIFORM,
+            GREEN_DEATHCAP_UNIFORM,
+            GREEN_FAKE_UNIFORM,
+        ),
+        "biomes": None,
+        "nowrap": True,
+        "deterministic_spawn": True,
+    },
     "ForagaxTwoBiomeSmall-v1": {
         "size": (16, 8),
         "aperture_size": None,
@@ -294,6 +333,9 @@ def make(
         "ForagaxTwoBiome-v8",
         "ForagaxTwoBiome-v9",
         "ForagaxTwoBiome-v10",
+        "ForagaxTwoBiome-v13",
+        "ForagaxTwoBiome-v14",
+        "ForagaxTwoBiome-v15",
     ):
         margin = aperture_size[1] // 2 + 1
         width = 2 * margin + 9
