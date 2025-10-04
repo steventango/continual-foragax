@@ -64,6 +64,27 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
         "biomes": None,
         "nowrap": True,
     },
+    "ForagaxWeather-v4": {
+        "size": None,
+        "aperture_size": None,
+        "objects": None,
+        "biomes": None,
+        "nowrap": True,
+        "deterministic_spawn": True,
+    },
+    "ForagaxWeather-v5": {
+        "size": (15, 15),
+        "aperture_size": None,
+        "objects": None,
+        "biomes": (
+            # Hot biome
+            Biome(start=(0, 3), stop=(15, 5), object_frequencies=(0.5, 0.0)),
+            # Cold biome
+            Biome(start=(0, 10), stop=(15, 12), object_frequencies=(0.0, 0.5)),
+        ),
+        "nowrap": False,
+        "deterministic_spawn": True,
+    },
     "ForagaxTwoBiome-v1": {
         "size": (15, 15),
         "aperture_size": None,
@@ -400,7 +421,7 @@ def make(
             ),
         )
 
-    if env_id == "ForagaxWeather-v3":
+    if env_id in ("ForagaxWeather-v3", "ForagaxWeather-v4"):
         margin = aperture_size[1] // 2 + 1
         width = 2 * margin + 9
         config["size"] = (15, width)
@@ -420,8 +441,16 @@ def make(
         )
 
     if env_id.startswith("ForagaxWeather"):
-        same_color = env_id in ("ForagaxWeather-v2", "ForagaxWeather-v3")
-        hot, cold = create_weather_objects(file_index=file_index, same_color=same_color)
+        same_color = env_id in (
+            "ForagaxWeather-v2",
+            "ForagaxWeather-v3",
+            "ForagaxWeather-v4",
+            "ForagaxWeather-v5",
+        )
+        random_respawn = env_id in ("ForagaxWeather-v4", "ForagaxWeather-v5")
+        hot, cold = create_weather_objects(
+            file_index=file_index, same_color=same_color, random_respawn=random_respawn
+        )
         config["objects"] = (hot, cold)
 
     if env_id == "ForagaxTwoBiome-v16":
