@@ -96,3 +96,86 @@ def test_foragax_weather_v4_color_configuration():
 
     # Same color configuration: v4 uses same color
     assert hot_v4.color == cold_v4.color, "v4 should use same color for hot and cold"
+
+
+def test_foragax_weather_v5_registry():
+    """Test that ForagaxWeather-v5 can be created via registry and has correct config."""
+    env = make("ForagaxWeather-v5", aperture_size=(5, 5))
+
+    # Check basic configuration
+    assert env.name == "ForagaxWeather-v5"
+    assert env.deterministic_spawn is True
+    assert env.nowrap is False  # v5 enables wrapping
+
+    # Check that weather objects have random_respawn=True
+    hot, cold = env.objects[1], env.objects[2]  # Skip EMPTY (index 0)
+    assert hot.name == "hot"
+    assert cold.name == "cold"
+    assert hot.random_respawn is True
+    assert cold.random_respawn is True
+
+    # Test basic functionality
+    key = jax.random.key(0)
+    obs, state = env.reset(key, env.default_params)
+    assert obs.shape == (5, 5, 1)  # 1 color channel (hot/cold same color, no padding)
+
+    # Test stepping
+    key, step_key = jax.random.split(key)
+    action = env.action_space(env.default_params).sample(step_key)
+    obs2, state2, reward, done, info = env.step(
+        step_key, state, action, env.default_params
+    )
+    assert obs2.shape == (5, 5, 1)
+    assert not done
+
+
+def test_foragax_weather_v5_deterministic_spawn():
+    """Test that ForagaxWeather-v5 uses deterministic spawning."""
+    env = make("ForagaxWeather-v5", aperture_size=(5, 5))
+    params = env.default_params
+
+    # Test that multiple resets with same key produce same object placement
+    key = jax.random.key(42)
+    _, state1 = env.reset(key, params)
+
+    key = jax.random.key(42)  # Same key
+    _, state2 = env.reset(key, params)
+
+    # Object grids should be identical (deterministic spawn)
+    chex.assert_trees_all_equal(state1.object_grid, state2.object_grid)
+
+    # But different keys should produce different placements
+    key1 = jax.random.key(42)
+    key2 = jax.random.key(43)
+    _, state1 = env.reset(key1, params)
+    _, state2 = env.reset(key2, params)
+
+    # Should be different (shuffled deterministically)
+    assert not jnp.array_equal(state1.object_grid, state2.object_grid)
+
+    # Test that number of objects is the same
+    num_hot_1 = jnp.sum(state1.object_grid == 1)
+    num_cold_1 = jnp.sum(state1.object_grid == 2)
+    num_hot_2 = jnp.sum(state2.object_grid == 1)
+    num_cold_2 = jnp.sum(state2.object_grid == 2)
+    assert num_hot_1 == num_hot_2
+    assert num_cold_1 == num_cold_2
+
+
+def test_foragax_weather_v5_random_respawn():
+    """Test that ForagaxWeather-v5 weather objects have random_respawn=True."""
+    env = make("ForagaxWeather-v5", aperture_size=(5, 5))
+
+    # Check that weather objects have random_respawn=True
+    hot, cold = env.objects[1], env.objects[2]  # Skip EMPTY
+    assert hot.random_respawn is True, "Hot objects should have random_respawn=True"
+    assert cold.random_respawn is True, "Cold objects should have random_respawn=True"
+
+
+def test_foragax_weather_v5_color_configuration():
+    """Test that ForagaxWeather-v5 weather objects use the same color."""
+    env = make("ForagaxWeather-v5", aperture_size=(5, 5))
+    hot_v5, cold_v5 = env.objects[1], env.objects[2]
+
+    # Same color configuration: v5 uses same color
+    assert hot_v5.color == cold_v5.color, "v5 should use same color for hot and cold"
