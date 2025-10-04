@@ -179,3 +179,105 @@ def test_foragax_weather_v5_color_configuration():
 
     # Same color configuration: v5 uses same color
     assert hot_v5.color == cold_v5.color, "v5 should use same color for hot and cold"
+
+
+def test_foragax_twobiome_v10_registry():
+    """Test that ForagaxTwoBiome-v10 can be created via registry and has correct config."""
+    env = make("ForagaxTwoBiome-v10", aperture_size=(5, 5))
+
+    # Check basic configuration
+    assert env.name == "ForagaxTwoBiome-v10"
+    assert env.deterministic_spawn is True
+    assert env.nowrap is True
+
+    # Check that objects have random_respawn=True
+    morel, oyster, deathcap, fake = (
+        env.objects[1],
+        env.objects[2],
+        env.objects[3],
+        env.objects[4],
+    )  # Skip EMPTY
+    assert morel.name == "brown_morel"
+    assert oyster.name == "brown_oyster"
+    assert deathcap.name == "green_deathcap"
+    assert fake.name == "green_fake"
+    assert morel.random_respawn is True
+    assert oyster.random_respawn is True
+    assert deathcap.random_respawn is True
+    assert fake.random_respawn is True
+
+    # Test basic functionality
+    key = jax.random.key(0)
+    obs, state = env.reset(key, env.default_params)
+    assert obs.shape == (5, 5, 3)  # 3 color channels (brown, green, black padding)
+
+    # Test stepping
+    key, step_key = jax.random.split(key)
+    action = env.action_space(env.default_params).sample(step_key)
+    obs2, state2, reward, done, info = env.step(
+        step_key, state, action, env.default_params
+    )
+    assert obs2.shape == (5, 5, 3)
+    assert not done
+
+
+def test_foragax_twobiome_v10_deterministic_spawn():
+    """Test that ForagaxTwoBiome-v10 uses deterministic spawning."""
+    env = make("ForagaxTwoBiome-v10", aperture_size=(5, 5))
+    params = env.default_params
+
+    # Test that multiple resets with same key produce same object placement
+    key = jax.random.key(42)
+    _, state1 = env.reset(key, params)
+
+    key = jax.random.key(42)  # Same key
+    _, state2 = env.reset(key, params)
+
+    # Object grids should be identical (deterministic spawn)
+    chex.assert_trees_all_equal(state1.object_grid, state2.object_grid)
+
+    # But different keys should produce different placements
+    key1 = jax.random.key(42)
+    key2 = jax.random.key(43)
+    _, state1 = env.reset(key1, params)
+    _, state2 = env.reset(key2, params)
+
+    # Should be different (shuffled deterministically)
+    assert not jnp.array_equal(state1.object_grid, state2.object_grid)
+
+    # Test that number of objects is the same
+    num_morel_1 = jnp.sum(state1.object_grid == 1)
+    num_oyster_1 = jnp.sum(state1.object_grid == 2)
+    num_deathcap_1 = jnp.sum(state1.object_grid == 3)
+    num_fake_1 = jnp.sum(state1.object_grid == 4)
+    num_morel_2 = jnp.sum(state2.object_grid == 1)
+    num_oyster_2 = jnp.sum(state2.object_grid == 2)
+    num_deathcap_2 = jnp.sum(state2.object_grid == 3)
+    num_fake_2 = jnp.sum(state2.object_grid == 4)
+    assert num_morel_1 == num_morel_2
+    assert num_oyster_1 == num_oyster_2
+    assert num_deathcap_1 == num_deathcap_2
+    assert num_fake_1 == num_fake_2
+
+
+def test_foragax_twobiome_v10_random_respawn():
+    """Test that ForagaxTwoBiome-v10 objects have random_respawn=True."""
+    env = make("ForagaxTwoBiome-v10", aperture_size=(5, 5))
+
+    # Check that all objects have random_respawn=True
+    morel, oyster, deathcap, fake = (
+        env.objects[1],
+        env.objects[2],
+        env.objects[3],
+        env.objects[4],
+    )
+    assert morel.random_respawn is True, "Morel objects should have random_respawn=True"
+    assert oyster.random_respawn is True, (
+        "Oyster objects should have random_respawn=True"
+    )
+    assert deathcap.random_respawn is True, (
+        "Deathcap objects should have random_respawn=True"
+    )
+    assert fake.random_respawn is True, "Fake objects should have random_respawn=True"
+
+
