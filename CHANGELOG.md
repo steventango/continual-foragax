@@ -1,3 +1,15 @@
+## 0.26.0 (2025-10-04)
+
+### Feat
+
+- ForagaxWeather-v5 with wrapping #26
+- ForagaxWeather-v4 with random respawn #25
+- create_weather_objects with random_respawn
+
+### Fix
+
+- ForagaxWeather-v4 same_color=True
+
 ## 0.25.0 (2025-10-02)
 
 ### Feat
