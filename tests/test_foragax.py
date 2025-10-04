@@ -22,6 +22,7 @@ from foragax.objects import (
     THORNS,
     WALL,
     DefaultForagaxObject,
+    WeatherObject,
 )
 
 
@@ -965,3 +966,112 @@ def test_teleporting():
     # From (7,7), (2,2) is further than (7,7)
     expected_pos = jnp.array([2, 2])
     chex.assert_trees_all_equal(state.pos, expected_pos)
+
+
+def test_info_discount():
+    """Test that info contains discount."""
+    key = jax.random.key(0)
+    env = ForagaxObjectEnv(size=(5, 5), objects=())
+    params = env.default_params
+    obs, state = env.reset(key, params)
+
+    key, step_key = jax.random.split(key)
+    _, _, _, _, info = env.step(step_key, state, Actions.UP, params)
+
+    assert "discount" in info
+    assert info["discount"] == 1.0
+
+
+def test_info_temperature():
+    """Test that info contains temperature when weather object is present."""
+    key = jax.random.key(0)
+    # Create a simple weather object
+    weather_obj = WeatherObject(
+        name="hot",
+        rewards=jnp.array([10.0, 20.0]),
+        repeat=1,
+        multiplier=1.0,
+    )
+
+    env = ForagaxObjectEnv(
+        size=(5, 5), objects=(weather_obj,), biomes=(Biome(object_frequencies=(0.1,)),)
+    )
+    params = env.default_params
+    obs, state = env.reset(key, params)
+
+    key, step_key = jax.random.split(key)
+    _, state, _, _, info = env.step(step_key, state, Actions.UP, params)
+
+    assert "temperature" in info
+    # Temperature should be based on time=0, so first temperature value
+    assert info["temperature"] == 10.0
+
+    key, step_key = jax.random.split(key)
+    _, state, _, _, info = env.step(step_key, state, Actions.UP, params)
+    assert info["temperature"] == 20.0  # Next temperature value
+
+
+def test_info_biome_id():
+    """Test that info contains biome_id at agent's position."""
+    key = jax.random.key(0)
+
+    # Create environment with two biomes: one at (3,y) and one at (4,y)
+    biomes = (
+        Biome(start=(3, 0), stop=(4, 5), object_frequencies=(0.0,)),
+        Biome(start=(4, 0), stop=(5, 5), object_frequencies=(0.0,)),
+    )
+
+    env = ForagaxObjectEnv(size=(5, 5), objects=(), biomes=biomes)
+    params = env.default_params
+    obs, state = env.reset(key, params)
+
+    # Agent starts at center (2, 2), which should be in neither biome (biome_id = -1)
+    assert state.biome_grid[2, 2] == -1
+
+    # Move right to biome 0: from (2,2) to (3,2)
+    key, step_key = jax.random.split(key)
+    _, state, _, _, info = env.step(step_key, state, Actions.RIGHT, params)
+
+    assert "biome_id" in info
+    assert state.biome_grid[2, 3] == 0  # Position (3,2) is in biome 0
+    assert info["biome_id"] == 0
+
+    # Move right again to biome 1: from (3,2) to (4,2)
+    key, step_key = jax.random.split(key)
+    _, state, _, _, info = env.step(step_key, state, Actions.RIGHT, params)
+
+    assert state.biome_grid[2, 4] == 1  # Position (4,2) is in biome 1
+    assert info["biome_id"] == 1
+
+
+def test_info_object_collected_id():
+    """Test that info contains object_eaten_id when collecting objects."""
+    key = jax.random.key(0)
+    env = ForagaxObjectEnv(
+        size=(7, 7),
+        objects=(FLOWER,),
+    )
+    params = env.default_params
+    _, state = env.reset(key, params)
+
+    flower_id = 1  # 0 is EMPTY
+
+    # Place a flower and move the agent to it
+    grid = jnp.zeros((7, 7), dtype=int)
+    grid = grid.at[4, 3].set(flower_id)
+    state = state.replace(object_grid=grid, pos=jnp.array([3, 3]))
+
+    # Collect the flower by moving down
+    key, step_key = jax.random.split(key)
+    _, _, reward, _, info = env.step(step_key, state, Actions.DOWN, params)
+
+    assert "object_collected_id" in info
+    assert info["object_collected_id"] == 1  # FLOWER id
+    assert reward == FLOWER.reward_val
+
+    # Next step should not collect anything
+    key, step_key = jax.random.split(key)
+    _, _, reward, _, info = env.step(step_key, state, Actions.UP, params)
+
+    assert info["object_collected_id"] == -1  # No object collected
+    assert reward == 0.0
