@@ -428,7 +428,7 @@ def make(
         )
 
     if env_id.startswith("ForagaxWeather"):
-        same_color = env_id in ("ForagaxWeather-v2", "ForagaxWeather-v3")
+        same_color = env_id in ("ForagaxWeather-v2", "ForagaxWeather-v3", "ForagaxWeather-v4")
         random_respawn = env_id == "ForagaxWeather-v4"
         hot, cold = create_weather_objects(
             file_index=file_index, same_color=same_color, random_respawn=random_respawn
