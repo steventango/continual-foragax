@@ -273,6 +273,8 @@ class ForagaxEnv(environment.Environment):
             info["temperature"] = get_temperature(
                 self.weather_object.rewards, state.time, self.weather_object.repeat
             )
+        info["biome_id"] = state.biome_grid[pos[1], pos[0]]
+        info["object_collected_id"] = jax.lax.select(should_collect, obj_at_pos, -1)
 
         # 4. UPDATE STATE
         state = EnvState(
