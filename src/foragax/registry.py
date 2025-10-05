@@ -1,13 +1,11 @@
 """Factory functions for creating Foragax environment variants."""
 
+import warnings
 from typing import Any, Dict, Optional, Tuple
 
 from foragax.env import (
     Biome,
     ForagaxEnv,
-    ForagaxObjectEnv,
-    ForagaxRGBEnv,
-    ForagaxWorldEnv,
 )
 from foragax.objects import (
     BROWN_MOREL,
@@ -347,21 +345,23 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
 
 def make(
     env_id: str,
-    observation_type: str = "object",
+    observation_type: str = "color",
     aperture_size: Optional[Tuple[int, int]] = (5, 5),
     file_index: int = 0,
     nowrap: Optional[bool] = None,
+    **kwargs: Any,
 ) -> ForagaxEnv:
     """Create a Foragax environment.
 
     Args:
         env_id: The ID of the environment to create.
-        observation_type: The type of observation to use. One of "object", "rgb", or "world".
-        aperture_size: The size of the agent's observation aperture. If None, the default
-            for the environment is used.
+        observation_type: The type of observation to use. One of "object", "rgb", or "color".
+        aperture_size: The size of the agent's observation aperture. If -1, full world observation.
+            If None, the default for the environment is used.
         file_index: File index for weather objects. nowrap: If True, disables
         wrapping around environment boundaries. If None, uses defaults per
         environment.
+        **kwargs: Additional keyword arguments to pass to the ForagaxEnv constructor.
 
     Returns:
         A Foragax environment instance.
@@ -371,11 +371,15 @@ def make(
 
     config = ENV_CONFIGS[env_id].copy()
     if isinstance(aperture_size, int):
-        aperture_size = (aperture_size, aperture_size)
+        if aperture_size == -1:
+            aperture_size = -1  # keep as -1
+        else:
+            aperture_size = (aperture_size, aperture_size)
     config["aperture_size"] = aperture_size
     if nowrap is not None:
         config["nowrap"] = nowrap
 
+    # Handle special size and biome configurations
     if env_id in (
         "ForagaxTwoBiome-v7",
         "ForagaxTwoBiome-v8",
@@ -384,7 +388,10 @@ def make(
         "ForagaxTwoBiome-v15",
         "ForagaxTwoBiome-v16",
     ):
-        margin = aperture_size[1] // 2 + 1
+        if aperture_size == -1:
+            margin = 0  # for world view, no margin needed
+        else:
+            margin = aperture_size[1] // 2 + 1
         width = 2 * margin + 9
         config["size"] = (width, 15)
         config["biomes"] = (
@@ -403,7 +410,10 @@ def make(
         )
 
     if env_id in ("ForagaxTwoBiome-v11", "ForagaxTwoBiome-v12"):
-        margin = aperture_size[1] // 2 + 1
+        if aperture_size == -1:
+            margin = 0
+        else:
+            margin = aperture_size[1] // 2 + 1
         width = 2 * margin + 9
         config["size"] = (width, 15)
         config["biomes"] = (
@@ -422,7 +432,10 @@ def make(
         )
 
     if env_id in ("ForagaxWeather-v3", "ForagaxWeather-v4"):
-        margin = aperture_size[1] // 2 + 1
+        if aperture_size == -1:
+            margin = 0
+        else:
+            margin = aperture_size[1] // 2 + 1
         width = 2 * margin + 9
         config["size"] = (15, width)
         config["biomes"] = (
@@ -456,16 +469,20 @@ def make(
     if env_id == "ForagaxTwoBiome-v16":
         config["teleport_interval"] = 10000
 
-    env_class_map = {
-        "object": ForagaxObjectEnv,
-        "rgb": ForagaxRGBEnv,
-        "world": ForagaxWorldEnv,
-    }
+    # Backward compatibility: map "world" to "object" with full world
+    if observation_type == "world":
+        # add deprecation warning
+        warnings.warn(
+            "'world' observation_type is deprecated. Use 'object' with aperture_size=-1 instead.",
+            DeprecationWarning,
+        )
+        observation_type = "object"
+        config["aperture_size"] = -1
 
-    if observation_type not in env_class_map:
-        raise ValueError(f"Unknown observation type: {observation_type}")
+    if observation_type not in ("object", "rgb", "color"):
+        raise ValueError(f"Unknown observation_type: {observation_type}")
 
-    env_class = env_class_map[observation_type]
     config["name"] = env_id
+    config["observation_type"] = observation_type
 
-    return env_class(**config)
+    return ForagaxEnv(**config, **kwargs)

@@ -2,12 +2,12 @@ import chex
 import jax
 import jax.numpy as jnp
 
-from foragax.env import Actions, Biome, ForagaxObjectEnv, ForagaxRGBEnv, ForagaxWorldEnv
+from foragax.env import Actions, Biome, ForagaxEnv
 from foragax.objects import FLOWER, WALL
 
 
 def test_benchmark_vision(benchmark):
-    env = ForagaxObjectEnv(size=7, aperture_size=3, objects=(WALL,))
+    env = ForagaxEnv(size=7, aperture_size=3, objects=(WALL,), observation_type="color")
     params = env.default_params
     key = jax.random.key(0)
     _, state = env.reset(key, params)
@@ -41,11 +41,12 @@ def test_benchmark_vision(benchmark):
 
 
 def test_benchmark_creation(benchmark):
-    env = ForagaxObjectEnv(
+    env = ForagaxEnv(
         size=1_000,
         aperture_size=31,
         objects=(WALL, FLOWER),
         biomes=(Biome(object_frequencies=(0.05, 0.05)),),
+        observation_type="color",
     )
     params = env.default_params
 
@@ -63,11 +64,12 @@ def test_benchmark_creation(benchmark):
 
 
 def test_benchmark_small_env(benchmark):
-    env = ForagaxObjectEnv(
+    env = ForagaxEnv(
         size=1_000,
         aperture_size=11,
         objects=(WALL, FLOWER),
         biomes=(Biome(object_frequencies=(0.1, 0.1)),),
+        observation_type="color",
     )
     params = env.default_params
     key = jax.random.key(0)
@@ -96,11 +98,12 @@ def test_benchmark_small_env(benchmark):
 
 
 def test_benchmark_big_env(benchmark):
-    env = ForagaxObjectEnv(
+    env = ForagaxEnv(
         size=10_000,
         aperture_size=61,
         objects=(WALL, FLOWER),
         biomes=(Biome(object_frequencies=(0.05, 0.05)),),
+        observation_type="color",
     )
     params = env.default_params
     key = jax.random.key(0)
@@ -134,11 +137,12 @@ def test_benchmark_big_env(benchmark):
 
 def test_benchmark_vmap_env(benchmark):
     num_envs = 100
-    env = ForagaxObjectEnv(
+    env = ForagaxEnv(
         size=1_000,
         aperture_size=11,
         objects=(WALL, FLOWER),
         biomes=(Biome(object_frequencies=(0.1, 0.1)),),
+        observation_type="color",
     )
     params = env.default_params
     key = jax.random.key(0)
@@ -175,11 +179,12 @@ def test_benchmark_vmap_env(benchmark):
 
 
 def test_benchmark_small_env_color(benchmark):
-    env = ForagaxRGBEnv(
+    env = ForagaxEnv(
         size=1_000,
         aperture_size=15,
         objects=(WALL, FLOWER),
         biomes=(Biome(object_frequencies=(0.05, 0.05)),),
+        observation_type="rgb",
     )
     params = env.default_params
     key = jax.random.key(0)
@@ -208,10 +213,12 @@ def test_benchmark_small_env_color(benchmark):
 
 
 def test_benchmark_small_env_world(benchmark):
-    env = ForagaxWorldEnv(
+    env = ForagaxEnv(
         size=1_000,
         objects=(WALL, FLOWER),
         biomes=(Biome(object_frequencies=(0.05, 0.05)),),
+        observation_type="object",
+        aperture_size=-1,
     )
     params = env.default_params
     key = jax.random.key(0)

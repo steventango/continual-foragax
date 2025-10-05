@@ -5,9 +5,7 @@ import jax.numpy as jnp
 from foragax.env import (
     Actions,
     Biome,
-    ForagaxObjectEnv,
-    ForagaxRGBEnv,
-    ForagaxWorldEnv,
+    ForagaxEnv,
 )
 from foragax.objects import (
     BROWN_MOREL_UNIFORM,
@@ -28,10 +26,11 @@ from foragax.objects import (
 
 def test_observation_shape():
     """Test that the observation shape is correct."""
-    env = ForagaxObjectEnv(
+    env = ForagaxEnv(
         size=(500, 500),
         aperture_size=(9, 9),
         objects=(WALL, FLOWER, THORNS),
+        observation_type="color",
     )
     params = env.default_params
     assert env.observation_space(params).shape == (9, 9, 3)
@@ -41,7 +40,7 @@ def test_gymnax_api():
     key = jax.random.key(0)
     key, key_reset, key_act, key_step = jax.random.split(key, 4)
 
-    env = ForagaxObjectEnv(size=(5, 5))
+    env = ForagaxEnv(size=(5, 5), observation_type="color")
     env_params = env.default_params
 
     obs, state = env.reset(key_reset, env_params)
@@ -54,7 +53,7 @@ def test_gymnax_api():
 
 def test_sizes():
     # can specify sizes with integers
-    env = ForagaxObjectEnv(size=8, aperture_size=3)
+    env = ForagaxEnv(size=8, aperture_size=3, observation_type="color")
     params = env.default_params
     key = jax.random.key(0)
     obs, state = env.reset(key, params)
@@ -66,7 +65,7 @@ def test_sizes():
 
 def test_uneven_sizes():
     # can specify sizes as uneven tuples
-    env = ForagaxObjectEnv(size=(10, 5), aperture_size=(5, 1))
+    env = ForagaxEnv(size=(10, 5), aperture_size=(5, 1), observation_type="color")
     params = env.default_params
     key = jax.random.key(0)
     obs, state = env.reset(key, params)
@@ -80,10 +79,11 @@ def test_add_objects():
     # can add objects
     size = 100
     freq = 0.1
-    env = ForagaxObjectEnv(
+    env = ForagaxEnv(
         size=size,
         objects=(FLOWER,),
         biomes=(Biome(object_frequencies=(freq,)),),
+        observation_type="color",
     )
     params = env.default_params
     key = jax.random.key(0)
@@ -95,10 +95,11 @@ def test_add_objects():
 
 
 def test_object_observation_mode():
-    env = ForagaxObjectEnv(
+    env = ForagaxEnv(
         size=(10, 10),
         aperture_size=(5, 5),
         objects=(WALL, FLOWER),
+        observation_type="color",
     )
     params = env.default_params
     key = jax.random.key(0)
@@ -108,10 +109,11 @@ def test_object_observation_mode():
 
 
 def test_rgb_observation_mode():
-    env = ForagaxRGBEnv(
+    env = ForagaxEnv(
         size=(10, 10),
         aperture_size=(5, 5),
         objects=(WALL, FLOWER),
+        observation_type="rgb",
     )
     params = env.default_params
     key = jax.random.key(0)
@@ -121,10 +123,11 @@ def test_rgb_observation_mode():
 
 
 def test_object_observation_mode_large_aperture():
-    env = ForagaxObjectEnv(
+    env = ForagaxEnv(
         size=(10, 10),
         aperture_size=(20, 20),
         objects=(WALL, FLOWER),
+        observation_type="color",
     )
     params = env.default_params
     key = jax.random.key(0)
@@ -134,10 +137,11 @@ def test_object_observation_mode_large_aperture():
 
 
 def test_rgb_observation_mode_large_aperture():
-    env = ForagaxRGBEnv(
+    env = ForagaxEnv(
         size=(10, 10),
         aperture_size=(20, 20),
         objects=(WALL, FLOWER),
+        observation_type="rgb",
     )
     params = env.default_params
     key = jax.random.key(0)
@@ -148,11 +152,12 @@ def test_rgb_observation_mode_large_aperture():
 
 def test_world_observation_mode():
     # can use world observation mode
-    env = ForagaxWorldEnv(
+    env = ForagaxEnv(
         size=(10, 10),
-        aperture_size=5,
+        aperture_size=-1,
         objects=(WALL, FLOWER),
         biomes=(Biome(object_frequencies=(0.1, 0.1)),),
+        observation_type="object",
     )
     params = env.default_params
     key = jax.random.key(0)
@@ -178,10 +183,11 @@ def test_basic_movement():
         start=(3, 4),
         stop=(4, 6),
     )
-    env = ForagaxObjectEnv(
+    env = ForagaxEnv(
         size=7,
         objects=(WALL,),
         biomes=(biome,),
+        observation_type="color",
     )
     params = env.default_params
     _, state = env.reset(key, params)
@@ -210,7 +216,12 @@ def test_vision():
     """Test the agent's observation."""
     key = jax.random.key(0)
     object_types = (WALL,)
-    env = ForagaxObjectEnv(size=(7, 7), aperture_size=(3, 3), objects=object_types)
+    env = ForagaxEnv(
+        size=(7, 7),
+        aperture_size=(3, 3),
+        objects=object_types,
+        observation_type="color",
+    )
     params = env.default_params
     obs, state = env.reset(key, params)
 
@@ -252,10 +263,11 @@ def test_respawn():
     """Test object respawning."""
     key = jax.random.key(0)
     object_types = (FLOWER,)
-    env = ForagaxObjectEnv(
+    env = ForagaxEnv(
         size=7,
         aperture_size=3,
         objects=object_types,
+        observation_type="color",
     )
     params = env.default_params
     _, state = env.reset(key, params)
@@ -300,11 +312,12 @@ def test_random_respawn():
 
     object_types = (flower_random, WALL)
     biome = Biome(start=(2, 2), stop=(5, 5), object_frequencies=(0.0, 0.0))
-    env = ForagaxObjectEnv(
+    env = ForagaxEnv(
         size=7,
         aperture_size=3,
         objects=object_types,
         biomes=(biome,),
+        observation_type="color",
     )
     params = env.default_params
     _, state = env.reset(key, params)
@@ -357,10 +370,11 @@ def test_random_respawn_no_empty_space():
     object_types = (WALL, flower_random)
     # A 1x1 biome
     biome = Biome(start=(3, 3), stop=(4, 4), object_frequencies=(0.0, 0.0))
-    env = ForagaxObjectEnv(
+    env = ForagaxEnv(
         size=7,
         objects=object_types,
         biomes=(biome,),
+        observation_type="color",
     )
     params = env.default_params
     _, state = env.reset(key, params)
@@ -385,7 +399,7 @@ def test_random_respawn_no_empty_space():
 def test_wrapping_dynamics():
     """Test that the agent wraps around the environment boundaries."""
     key = jax.random.key(0)
-    env = ForagaxObjectEnv(size=(5, 5), objects=())
+    env = ForagaxEnv(size=(5, 5), objects=(), observation_type="color")
     params = env.default_params
     _, state = env.reset(key, params)
 
@@ -468,7 +482,7 @@ def test_wrapping_dynamics():
 def test_no_wrapping_dynamics():
     """Test that the agent does not wrap around the environment boundaries when nowrap=True."""
     key = jax.random.key(0)
-    env = ForagaxObjectEnv(size=(5, 5), objects=(), nowrap=True)
+    env = ForagaxEnv(size=(5, 5), objects=(), nowrap=True, observation_type="color")
     params = env.default_params
     _, state = env.reset(key, params)
 
@@ -525,7 +539,9 @@ def test_no_wrapping_dynamics():
 def test_wrapping_vision():
     """Test that the agent's vision wraps around the environment boundaries."""
     key = jax.random.key(0)
-    env = ForagaxObjectEnv(size=(5, 5), aperture_size=(3, 3), objects=(FLOWER,))
+    env = ForagaxEnv(
+        size=(5, 5), aperture_size=(3, 3), objects=(FLOWER,), observation_type="color"
+    )
     params = env.default_params
     obs, state = env.reset(key, params)
 
@@ -570,8 +586,12 @@ def test_no_wrapping_vision():
     """Test that the agent's vision does not wrap around boundaries when nowrap=True."""
     key = jax.random.key(0)
     object_types = (FLOWER,)
-    env_no_wrap = ForagaxObjectEnv(
-        size=(7, 7), aperture_size=(3, 3), objects=object_types, nowrap=True
+    env_no_wrap = ForagaxEnv(
+        size=(7, 7),
+        aperture_size=(3, 3),
+        objects=object_types,
+        nowrap=True,
+        observation_type="color",
     )
     params = env_no_wrap.default_params
 
@@ -603,7 +623,7 @@ def test_no_wrapping_vision():
 def test_generate_objects_in_biome():
     """Test generating objects within a specific biome area."""
     object_types = (WALL, FLOWER, THORNS, MOREL, OYSTER)
-    env = ForagaxObjectEnv(
+    env = ForagaxEnv(
         size=(10, 10),
         objects=object_types,
         biomes=(
@@ -613,6 +633,7 @@ def test_generate_objects_in_biome():
                 stop=(6, 6),
             ),
         ),
+        observation_type="color",
     )
     key = jax.random.key(0)
     params = env.default_params
@@ -640,7 +661,7 @@ def test_generate_objects_in_biome():
 def test_deterministic_object_spawning():
     """Test deterministic object spawning with fixed counts and shuffled positions."""
     object_types = (WALL, FLOWER)
-    env = ForagaxObjectEnv(
+    env = ForagaxEnv(
         size=(10, 10),
         objects=object_types,
         biomes=(
@@ -651,6 +672,7 @@ def test_deterministic_object_spawning():
             ),
         ),
         deterministic_spawn=True,
+        observation_type="color",
     )
     key = jax.random.key(0)
     params = env.default_params
@@ -714,9 +736,10 @@ def test_complex_deterministic_object_spawning():
         ),
         "deterministic_spawn": True,
         "aperture_size": aperture_size,
+        "observation_type": "color",
     }
 
-    env = ForagaxObjectEnv(**config)
+    env = ForagaxEnv(**config)
     params = env.default_params
     key = jax.random.key(0)
 
@@ -755,10 +778,11 @@ def test_complex_deterministic_object_spawning():
 
 def test_color_based_partial_observability():
     """Test that objects with the same color are grouped into the same observation channel."""
-    env = ForagaxObjectEnv(
+    env = ForagaxEnv(
         size=(10, 10),
         aperture_size=(5, 5),
         objects=(MOREL, LARGE_MOREL, MEDIUM_MOREL, FLOWER),
+        observation_type="color",
     )
     params = env.default_params
     key = jax.random.key(0)
@@ -797,10 +821,11 @@ def test_color_based_partial_observability():
 
 def test_color_channel_mapping():
     """Test that the color channel mapping is correct."""
-    env = ForagaxObjectEnv(
+    env = ForagaxEnv(
         size=(10, 10),
         aperture_size=(3, 3),
         objects=(WALL, FLOWER, THORNS),
+        observation_type="color",
     )
 
     # WALL (gray), FLOWER (green), THORNS (red) - all different colors
@@ -823,10 +848,11 @@ def test_same_color_objects_same_channel():
     obj2 = DefaultForagaxObject(name="obj2", color=(100, 50, 25))  # Same color
     obj3 = DefaultForagaxObject(name="obj3", color=(200, 100, 50))  # Different color
 
-    env = ForagaxObjectEnv(
+    env = ForagaxEnv(
         size=(7, 7),
         aperture_size=(3, 3),
         objects=(obj1, obj2, obj3),
+        observation_type="color",
     )
     params = env.default_params
 
@@ -857,10 +883,11 @@ def test_same_color_objects_same_channel():
 
 def test_empty_environment_observation():
     """Test observation shape when no objects are present."""
-    env = ForagaxObjectEnv(
+    env = ForagaxEnv(
         size=(5, 5),
         aperture_size=(3, 3),
         objects=(),  # No objects
+        observation_type="color",
     )
     params = env.default_params
     key = jax.random.key(0)
@@ -880,10 +907,11 @@ def test_single_color_all_objects():
     obj2 = DefaultForagaxObject(name="obj2", color=(50, 100, 150))
     obj3 = DefaultForagaxObject(name="obj3", color=(50, 100, 150))
 
-    env = ForagaxObjectEnv(
+    env = ForagaxEnv(
         size=(7, 7),
         aperture_size=(3, 3),
         objects=(obj1, obj2, obj3),
+        observation_type="color",
     )
     params = env.default_params
 
@@ -914,7 +942,7 @@ def test_teleporting():
     key = jax.random.key(0)
 
     # Create environment with two biomes and teleport every 5 steps
-    env = ForagaxObjectEnv(
+    env = ForagaxEnv(
         size=(10, 10),
         aperture_size=(3, 3),
         objects=(WALL,),
@@ -928,6 +956,7 @@ def test_teleporting():
         ),
         teleport_interval=5,
         nowrap=True,
+        observation_type="color",
     )
     params = env.default_params
 
@@ -971,7 +1000,7 @@ def test_teleporting():
 def test_info_discount():
     """Test that info contains discount."""
     key = jax.random.key(0)
-    env = ForagaxObjectEnv(size=(5, 5), objects=())
+    env = ForagaxEnv(size=(5, 5), objects=(), observation_type="color")
     params = env.default_params
     obs, state = env.reset(key, params)
 
@@ -993,8 +1022,11 @@ def test_info_temperature():
         multiplier=1.0,
     )
 
-    env = ForagaxObjectEnv(
-        size=(5, 5), objects=(weather_obj,), biomes=(Biome(object_frequencies=(0.1,)),)
+    env = ForagaxEnv(
+        size=(5, 5),
+        objects=(weather_obj,),
+        biomes=(Biome(object_frequencies=(0.1,)),),
+        observation_type="color",
     )
     params = env.default_params
     obs, state = env.reset(key, params)
@@ -1021,7 +1053,7 @@ def test_info_biome_id():
         Biome(start=(4, 0), stop=(5, 5), object_frequencies=(0.0,)),
     )
 
-    env = ForagaxObjectEnv(size=(5, 5), objects=(), biomes=biomes)
+    env = ForagaxEnv(size=(5, 5), objects=(), biomes=biomes, observation_type="color")
     params = env.default_params
     obs, state = env.reset(key, params)
 
@@ -1047,9 +1079,10 @@ def test_info_biome_id():
 def test_info_object_collected_id():
     """Test that info contains object_eaten_id when collecting objects."""
     key = jax.random.key(0)
-    env = ForagaxObjectEnv(
+    env = ForagaxEnv(
         size=(7, 7),
         objects=(FLOWER,),
+        observation_type="color",
     )
     params = env.default_params
     _, state = env.reset(key, params)
