@@ -1,3 +1,9 @@
+## 0.28.1 (2025-10-05)
+
+### Fix
+
+- don't add padding channel for world view
+
 ## 0.28.0 (2025-10-05)
 
 ### Feat
