@@ -522,7 +522,7 @@ class ForagaxEnv(environment.Environment):
     def observation_space(self, params: EnvParams) -> spaces.Box:
         """Observation space based on observation_type and full_world."""
         if self.full_world:
-            size = reversed(self.size)
+            size = tuple(reversed(self.size))
         else:
             size = self.aperture_size
 
