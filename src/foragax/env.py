@@ -76,6 +76,7 @@ class ForagaxEnv(environment.Environment):
         nowrap: bool = False,
         deterministic_spawn: bool = False,
         teleport_interval: Optional[int] = None,
+        observation_type: str = "object",
     ):
         super().__init__()
         self._name = name
@@ -83,9 +84,17 @@ class ForagaxEnv(environment.Environment):
             size = (size, size)
         self.size = size
 
-        if isinstance(aperture_size, int):
-            aperture_size = (aperture_size, aperture_size)
-        self.aperture_size = aperture_size
+        # Handle aperture_size = -1 for world view
+        if isinstance(aperture_size, int) and aperture_size == -1:
+            self.full_world = True
+            self.aperture_size = self.size  # Use full size for consistency
+        else:
+            self.full_world = False
+            if isinstance(aperture_size, int):
+                aperture_size = (aperture_size, aperture_size)
+            self.aperture_size = aperture_size
+
+        self.observation_type = observation_type
         self.nowrap = nowrap
         self.deterministic_spawn = deterministic_spawn
         self.teleport_interval = teleport_interval
@@ -151,6 +160,29 @@ class ForagaxEnv(environment.Environment):
                 & (cols < stop[0])
             )
             self.biome_masks.append(mask)
+
+        # Compute unique colors and mapping for partial observability (for 'color' observation_type)
+        # Exclude EMPTY (index 0) from color channels
+        object_colors_no_empty = self.object_colors[1:]
+
+        # Find unique colors in order of first appearance
+        unique_colors = []
+        color_indices = jnp.zeros(len(object_colors_no_empty), dtype=int)
+        color_map = {}
+        next_channel = 0
+
+        for i, color in enumerate(object_colors_no_empty):
+            color_tuple = tuple(color.tolist())
+            if color_tuple not in color_map:
+                color_map[color_tuple] = next_channel
+                unique_colors.append(color)
+                next_channel += 1
+            color_indices = color_indices.at[i].set(color_map[color_tuple])
+
+        self.unique_colors = jnp.array(unique_colors)
+        self.num_color_channels = len(unique_colors)
+        # color_indices maps from object_id-1 to color_channel_index
+        self.object_to_color_map = color_indices
 
     @property
     def default_params(self) -> EnvParams:
@@ -412,6 +444,102 @@ class ForagaxEnv(environment.Environment):
 
         return aperture
 
+    def get_obs(self, state: EnvState, params: EnvParams, key=None) -> jax.Array:
+        """Get observation based on observation_type and full_world."""
+        # Decode grid for observation
+        obs_grid = jnp.maximum(0, state.object_grid)
+
+        if self.full_world:
+            return self._get_world_obs(obs_grid, state)
+        else:
+            grid = self._get_aperture(obs_grid, state.pos)
+            return self._get_aperture_obs(grid, state)
+
+    def _get_world_obs(self, obs_grid: jax.Array, state: EnvState) -> jax.Array:
+        """Get world observation."""
+        num_obj_types = len(self.object_ids)
+        if self.observation_type == "object":
+            obs = jnp.zeros(
+                (self.size[1], self.size[0], num_obj_types), dtype=jnp.float32
+            )
+            num_object_channels = num_obj_types - 1
+            # create masks for all objects at once
+            object_ids = jnp.arange(1, num_obj_types)
+            object_masks = obs_grid[..., None] == object_ids[None, None, :]
+            obs = obs.at[:, :, :num_object_channels].set(object_masks.astype(float))
+            obs = obs.at[state.pos[1], state.pos[0], -1].set(1)
+            return obs
+        elif self.observation_type == "rgb":
+            obs = jax.nn.one_hot(obs_grid, num_obj_types)
+            # Agent position
+            obs = obs.at[state.pos[1], state.pos[0], :].set(0)
+            obs = obs.at[state.pos[1], state.pos[0], -1].set(1)
+            colors = self.object_colors / 255.0
+            obs = jnp.tensordot(obs, colors, axes=1)
+            return obs
+        elif self.observation_type == "color":
+            # Handle case with no objects (only EMPTY)
+            if self.num_color_channels == 0:
+                return jnp.zeros(obs_grid.shape + (0,), dtype=jnp.float32)
+            # Map object IDs to color channel indices
+            color_channels = jnp.where(
+                obs_grid == 0,
+                -1,
+                jnp.take(self.object_to_color_map, obs_grid - 1, axis=0),
+            )
+            obs = jax.nn.one_hot(color_channels, self.num_color_channels, axis=-1)
+            return obs
+        else:
+            raise ValueError(f"Unknown observation_type: {self.observation_type}")
+
+    def _get_aperture_obs(self, aperture: jax.Array, state: EnvState) -> jax.Array:
+        """Get aperture observation."""
+        if self.observation_type == "object":
+            num_obj_types = len(self.object_ids)
+            obs = jax.nn.one_hot(aperture, num_obj_types, axis=-1)
+            return obs
+        elif self.observation_type == "rgb":
+            num_obj_types = len(self.object_ids)
+            aperture_one_hot = jax.nn.one_hot(aperture, num_obj_types)
+            colors = self.object_colors / 255.0
+            obs = jnp.tensordot(aperture_one_hot, colors, axes=1)
+            return obs
+        elif self.observation_type == "color":
+            # Handle case with no objects (only EMPTY)
+            if self.num_color_channels == 0:
+                return jnp.zeros(aperture.shape + (0,), dtype=jnp.float32)
+            # Map object IDs to color channel indices
+            color_channels = jnp.where(
+                aperture == 0,
+                -1,  # Special value for EMPTY
+                jnp.take(self.object_to_color_map, aperture - 1, axis=0),
+            )
+            obs = jax.nn.one_hot(color_channels, self.num_color_channels, axis=-1)
+            return obs
+        else:
+            raise ValueError(f"Unknown observation_type: {self.observation_type}")
+
+    def observation_space(self, params: EnvParams) -> spaces.Box:
+        """Observation space based on observation_type and full_world."""
+        if self.full_world:
+            size = reversed(self.size)
+        else:
+            size = self.aperture_size
+
+        if self.observation_type == "rgb":
+            channels = 3
+        elif self.observation_type == "object":
+            num_obj_types = len(self.objects)
+            channels = num_obj_types
+        elif self.observation_type == "color":
+            channels = self.num_color_channels
+        else:
+            raise ValueError(f"Unknown observation_type: {self.observation_type}")
+
+        obs_shape = (*size, channels)
+
+        return spaces.Box(0, 1, obs_shape, float)
+
     @partial(jax.jit, static_argnames=("self", "render_mode"))
     def render(self, state: EnvState, params: EnvParams, render_mode: str = "world"):
         """Render the environment state."""
@@ -520,133 +648,3 @@ class ForagaxEnv(environment.Environment):
             raise ValueError(f"Unknown render_mode: {render_mode}")
 
         return img
-
-
-class ForagaxObjectEnv(ForagaxEnv):
-    """Foragax environment with object-based aperture observation."""
-
-    def __init__(
-        self,
-        name: str = "Foragax-v0",
-        size: Union[Tuple[int, int], int] = (10, 10),
-        aperture_size: Union[Tuple[int, int], int] = (5, 5),
-        objects: Tuple[BaseForagaxObject, ...] = (),
-        biomes: Tuple[Biome, ...] = (Biome(object_frequencies=()),),
-        nowrap: bool = False,
-        deterministic_spawn: bool = False,
-        teleport_interval: Optional[int] = None,
-    ):
-        super().__init__(
-            name,
-            size,
-            aperture_size,
-            objects,
-            biomes,
-            nowrap,
-            deterministic_spawn,
-            teleport_interval,
-        )
-
-        # Compute unique colors and mapping for partial observability
-        # Exclude EMPTY (index 0) from color channels
-        object_colors_no_empty = self.object_colors[1:]
-
-        # Find unique colors in order of first appearance
-        unique_colors = []
-        color_indices = jnp.zeros(len(object_colors_no_empty), dtype=int)
-        color_map = {}
-        next_channel = 0
-
-        for i, color in enumerate(object_colors_no_empty):
-            color_tuple = tuple(color.tolist())
-            if color_tuple not in color_map:
-                color_map[color_tuple] = next_channel
-                unique_colors.append(color)
-                next_channel += 1
-            color_indices = color_indices.at[i].set(color_map[color_tuple])
-
-        self.unique_colors = jnp.array(unique_colors)
-        self.num_color_channels = len(unique_colors)
-        # color_indices maps from object_id-1 to color_channel_index
-        self.object_to_color_map = color_indices
-
-    def get_obs(self, state: EnvState, params: EnvParams, key=None) -> jax.Array:
-        # Decode grid for observation
-        obs_grid = jnp.maximum(0, state.object_grid)
-        aperture = self._get_aperture(obs_grid, state.pos)
-
-        # Handle case with no objects (only EMPTY)
-        if self.num_color_channels == 0:
-            return jnp.zeros(aperture.shape + (0,), dtype=jnp.float32)
-
-        # Map object IDs to color channel indices
-        # aperture contains object IDs (0 = EMPTY, 1+ = objects)
-        # For EMPTY (0), we want no color channel activated
-        # For objects (1+), map to color channel using object_to_color_map
-        color_channels = jnp.where(
-            aperture == 0,
-            -1,  # Special value for EMPTY
-            jnp.take(self.object_to_color_map, aperture - 1, axis=0),
-        )
-
-        # Create one-hot encoding for color channels
-        # jax.nn.one_hot produces all zeros for -1 (EMPTY positions)
-        obs = jax.nn.one_hot(color_channels, self.num_color_channels, axis=-1)
-
-        return obs
-
-    def observation_space(self, params: EnvParams) -> spaces.Box:
-        obs_shape = (
-            self.aperture_size[0],
-            self.aperture_size[1],
-            self.num_color_channels,
-        )
-        return spaces.Box(0, 1, obs_shape, float)
-
-
-class ForagaxRGBEnv(ForagaxEnv):
-    """Foragax environment with color-based aperture observation."""
-
-    def get_obs(self, state: EnvState, params: EnvParams, key=None) -> jax.Array:
-        num_obj_types = len(self.object_ids)
-        # Decode grid for observation
-        obs_grid = jnp.maximum(0, state.object_grid)
-        aperture = self._get_aperture(obs_grid, state.pos)
-        aperture_one_hot = jax.nn.one_hot(aperture, num_obj_types)
-
-        # Agent position is always at the center of the aperture
-        center = (self.aperture_size[1] // 2, self.aperture_size[0] // 2)
-        aperture_one_hot = aperture_one_hot.at[center[0], center[1], :].set(0)
-        aperture_one_hot = aperture_one_hot.at[center[0], center[1], -1].set(1)
-
-        colors = self.object_colors / 255.0
-        obs = jnp.tensordot(aperture_one_hot, colors, axes=1)
-        return obs
-
-    def observation_space(self, params: EnvParams) -> spaces.Box:
-        obs_shape = (self.aperture_size[0], self.aperture_size[1], 3)
-        return spaces.Box(0, 1, obs_shape, float)
-
-
-class ForagaxWorldEnv(ForagaxEnv):
-    """Foragax environment with world observation."""
-
-    def get_obs(self, state: EnvState, params: EnvParams, key=None) -> jax.Array:
-        num_obj_types = len(self.object_ids)
-        # Decode grid for observation
-        obs_grid = jnp.maximum(0, state.object_grid)
-        obs = jnp.zeros((self.size[1], self.size[0], num_obj_types), dtype=jnp.float32)
-
-        num_object_channels = num_obj_types - 1
-        # create masks for all objects at once
-        object_ids = jnp.arange(1, num_obj_types)
-        object_masks = obs_grid[..., None] == object_ids[None, None, :]
-        obs = obs.at[:, :, :num_object_channels].set(object_masks.astype(float))
-
-        obs = obs.at[state.pos[1], state.pos[0], -1].set(1)
-        return obs
-
-    def observation_space(self, params: EnvParams) -> spaces.Box:
-        num_obj_types = len(self.object_ids)
-        obs_shape = (self.size[1], self.size[0], num_obj_types)
-        return spaces.Box(0, 1, obs_shape, float)
