@@ -99,7 +99,7 @@ class ForagaxEnv(environment.Environment):
         self.deterministic_spawn = deterministic_spawn
         self.teleport_interval = teleport_interval
         objects = (EMPTY,) + objects
-        if self.nowrap:
+        if self.nowrap and not self.full_world:
             objects = objects + (PADDING,)
         self.objects = objects
         self.weather_object = None
