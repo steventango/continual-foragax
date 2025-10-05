@@ -1,3 +1,9 @@
+## 0.28.0 (2025-10-05)
+
+### Feat
+
+- observation config split into type and view #22
+
 ## 0.27.0 (2025-10-04)
 
 ### Feat
