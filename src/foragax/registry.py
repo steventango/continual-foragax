@@ -361,6 +361,8 @@ def make(
     observation_type: str = "color",
     aperture_size: Optional[Tuple[int, int]] = (5, 5),
     file_index: int = 0,
+    repeat: int = 500,
+    digestion_steps: int = 0,
     **kwargs: Any,
 ) -> ForagaxEnv:
     """Create a Foragax environment.
@@ -371,6 +373,8 @@ def make(
         aperture_size: The size of the agent's observation aperture. If -1, full world observation.
             If None, the default for the environment is used.
         file_index: File index for weather objects.
+        repeat: How many steps each temperature value repeats for (weather environments).
+        digestion_steps: Number of steps required to digest food items (weather environments).
         **kwargs: Additional keyword arguments to pass to the ForagaxEnv constructor.
 
     Returns:
@@ -474,9 +478,9 @@ def make(
             "ForagaxWeather-v5",
             "ForagaxWeather-v6",
         )
-        digestion_steps = 10 if env_id in ("ForagaxWeather-v6") else 0
         hot, cold = create_weather_objects(
             file_index=file_index,
+            repeat=repeat,
             same_color=same_color,
             random_respawn=random_respawn,
             digestion_steps=digestion_steps,
