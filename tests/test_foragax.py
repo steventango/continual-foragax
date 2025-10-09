@@ -1034,13 +1034,57 @@ def test_info_temperature():
     key, step_key = jax.random.split(key)
     _, state, _, _, info = env.step(step_key, state, Actions.UP, params)
 
-    assert "temperature" in info
-    # Temperature should be based on time=0, so first temperature value
-    assert info["temperature"] == 10.0
+    assert "temperatures" in info
+    # Temperatures should be an array with temperature at index 1 (object ID 1 for the weather object)
+    assert len(info["temperatures"]) == 2  # EMPTY + 1 weather object
+    assert info["temperatures"][0] == 0.0  # EMPTY
+    assert info["temperatures"][1] == 10.0  # weather object at index 1
 
     key, step_key = jax.random.split(key)
     _, state, _, _, info = env.step(step_key, state, Actions.UP, params)
-    assert info["temperature"] == 20.0  # Next temperature value
+    assert info["temperatures"][1] == 20.0  # Next temperature value
+
+
+def test_info_multiple_weather_objects():
+    """Test that info contains temperatures for multiple weather objects."""
+    key = jax.random.key(0)
+    # Create two weather objects
+    hot_obj = WeatherObject(
+        name="hot",
+        rewards=jnp.array([10.0, 20.0]),
+        repeat=1,
+        multiplier=1.0,
+    )
+    cold_obj = WeatherObject(
+        name="cold",
+        rewards=jnp.array([5.0, 15.0]),
+        repeat=1,
+        multiplier=-1.0,
+    )
+
+    env = ForagaxEnv(
+        size=(5, 5),
+        objects=(hot_obj, cold_obj),
+        biomes=(Biome(object_frequencies=(0.1, 0.1)),),
+        observation_type="color",
+    )
+    params = env.default_params
+    obs, state = env.reset(key, params)
+
+    key, step_key = jax.random.split(key)
+    _, state, _, _, info = env.step(step_key, state, Actions.UP, params)
+
+    # Should have temperatures array
+    assert "temperatures" in info
+    assert len(info["temperatures"]) == 3  # EMPTY + 2 objects
+    assert info["temperatures"][0] == 0.0  # EMPTY
+    assert info["temperatures"][1] == 10.0  # hot object at index 1
+    assert info["temperatures"][2] == 5.0  # cold object at index 2 (raw temperature)
+
+    key, step_key = jax.random.split(key)
+    _, state, _, _, info = env.step(step_key, state, Actions.UP, params)
+    assert info["temperatures"][1] == 20.0  # hot next
+    assert info["temperatures"][2] == 15.0  # cold next
 
 
 def test_info_biome_id():

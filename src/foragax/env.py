@@ -103,11 +103,6 @@ class ForagaxEnv(environment.Environment):
         if self.nowrap and not self.full_world:
             objects = objects + (PADDING,)
         self.objects = objects
-        self.weather_object = None
-        for o in objects:
-            if isinstance(o, WeatherObject):
-                self.weather_object = o
-                break
 
         # JIT-compatible versions of object and biome properties
         self.object_ids = jnp.arange(len(objects))
@@ -333,10 +328,13 @@ class ForagaxEnv(environment.Environment):
         )
 
         info = {"discount": self.discount(state, params)}
-        if self.weather_object is not None:
-            info["temperature"] = get_temperature(
-                self.weather_object.rewards, state.time, self.weather_object.repeat
-            )
+        temperatures = jnp.zeros(len(self.objects))
+        for obj_index, obj in enumerate(self.objects):
+            if isinstance(obj, WeatherObject):
+                temperatures = temperatures.at[obj_index].set(
+                    get_temperature(obj.rewards, state.time, obj.repeat)
+                )
+        info["temperatures"] = temperatures
         info["biome_id"] = state.biome_grid[pos[1], pos[0]]
         info["object_collected_id"] = jax.lax.select(should_collect, obj_at_pos, -1)
 
