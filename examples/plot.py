@@ -17,10 +17,11 @@ def main():
     os.makedirs(out_dir, exist_ok=True)
 
     key = jax.random.key(0)
-
+    file_index = 0
     env = make(
-        "ForagaxWeather-v1",
+        "ForagaxWeather-v5",
         aperture_size=5,
+        file_index=file_index,
         observation_type="object",
     )
     env_params = env.default_params
@@ -38,7 +39,7 @@ def main():
         _, next_env_state, reward, done, info = env.step(
             key_step, env_state, action, env_params
         )
-        temp = info["temperature"]
+        temp = info["temperatures"][1]
         assert -abs(temp) <= reward <= abs(temp), (
             f"Reward {reward} out of bounds for temperature {temp}"
         )
@@ -46,7 +47,7 @@ def main():
         rewards[step] = reward
         env_state = next_env_state
 
-    sample_path = os.path.abspath(os.path.join(out_dir, "sample_plot.png"))
+    sample_path = os.path.abspath(os.path.join(out_dir, f"plot_{file_index}.png"))
     fig, ax = plt.subplots(figsize=(8, 3))
     ax.set_xlabel("Step")
     ax.set_ylabel("Value")

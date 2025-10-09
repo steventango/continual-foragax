@@ -83,6 +83,19 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
         "nowrap": False,
         "deterministic_spawn": True,
     },
+    "ForagaxWeather-v6": {
+        "size": (15, 15),
+        "aperture_size": None,
+        "objects": None,
+        "biomes": (
+            # Hot biome
+            Biome(start=(0, 3), stop=(15, 5), object_frequencies=(0.5, 0.0)),
+            # Cold biome
+            Biome(start=(0, 10), stop=(15, 12), object_frequencies=(0.0, 0.5)),
+        ),
+        "nowrap": False,
+        "deterministic_spawn": True,
+    },
     "ForagaxTwoBiome-v1": {
         "size": (15, 15),
         "aperture_size": None,
@@ -348,7 +361,6 @@ def make(
     observation_type: str = "color",
     aperture_size: Optional[Tuple[int, int]] = (5, 5),
     file_index: int = 0,
-    nowrap: Optional[bool] = None,
     **kwargs: Any,
 ) -> ForagaxEnv:
     """Create a Foragax environment.
@@ -358,9 +370,7 @@ def make(
         observation_type: The type of observation to use. One of "object", "rgb", or "color".
         aperture_size: The size of the agent's observation aperture. If -1, full world observation.
             If None, the default for the environment is used.
-        file_index: File index for weather objects. nowrap: If True, disables
-        wrapping around environment boundaries. If None, uses defaults per
-        environment.
+        file_index: File index for weather objects.
         **kwargs: Additional keyword arguments to pass to the ForagaxEnv constructor.
 
     Returns:
@@ -376,8 +386,6 @@ def make(
         else:
             aperture_size = (aperture_size, aperture_size)
     config["aperture_size"] = aperture_size
-    if nowrap is not None:
-        config["nowrap"] = nowrap
 
     # Handle special size and biome configurations
     if env_id in (
@@ -459,10 +467,19 @@ def make(
             "ForagaxWeather-v3",
             "ForagaxWeather-v4",
             "ForagaxWeather-v5",
+            "ForagaxWeather-v6",
         )
-        random_respawn = env_id in ("ForagaxWeather-v4", "ForagaxWeather-v5")
+        random_respawn = env_id in (
+            "ForagaxWeather-v4",
+            "ForagaxWeather-v5",
+            "ForagaxWeather-v6",
+        )
+        digestion_steps = 10 if env_id in ("ForagaxWeather-v6") else 0
         hot, cold = create_weather_objects(
-            file_index=file_index, same_color=same_color, random_respawn=random_respawn
+            file_index=file_index,
+            same_color=same_color,
+            random_respawn=random_respawn,
+            digestion_steps=digestion_steps,
         )
         config["objects"] = (hot, cold)
 

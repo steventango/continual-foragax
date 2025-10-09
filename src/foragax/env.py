@@ -61,6 +61,7 @@ class EnvState(environment.EnvState):
     object_grid: jax.Array
     biome_grid: jax.Array
     time: int
+    digestion_buffer: jax.Array
 
 
 class ForagaxEnv(environment.Environment):
@@ -102,11 +103,6 @@ class ForagaxEnv(environment.Environment):
         if self.nowrap and not self.full_world:
             objects = objects + (PADDING,)
         self.objects = objects
-        self.weather_object = None
-        for o in objects:
-            if isinstance(o, WeatherObject):
-                self.weather_object = o
-                break
 
         # JIT-compatible versions of object and biome properties
         self.object_ids = jnp.arange(len(objects))
@@ -117,6 +113,13 @@ class ForagaxEnv(environment.Environment):
 
         self.reward_fns = [o.reward for o in objects]
         self.regen_delay_fns = [o.regen_delay for o in objects]
+        self.digestion_steps_fns = [o.digestion_steps for o in objects]
+
+        # Compute digestion steps per object (using max_digestion_steps attribute)
+        object_max_digestion_steps = jnp.array([o.max_digestion_steps for o in objects])
+        self.max_digestion_steps = (
+            int(jnp.max(object_max_digestion_steps)) + 1 if len(objects) > 0 else 0
+        )
 
         self.biome_object_frequencies = jnp.array(
             [b.object_frequencies for b in biomes]
@@ -237,12 +240,36 @@ class ForagaxEnv(environment.Environment):
 
         # 2. HANDLE COLLISIONS AND REWARDS
         obj_at_pos = current_objects[pos[1], pos[0]]
-        key, subkey = jax.random.split(key)
-        reward = jax.lax.switch(obj_at_pos, self.reward_fns, state.time, subkey)
         is_collectable = self.object_collectable[obj_at_pos]
+        should_collect = is_collectable & (obj_at_pos > 0)
+
+        # Handle digestion: add reward to buffer if collected
+        digestion_buffer = state.digestion_buffer
+        key, reward_subkey = jax.random.split(key)
+        object_reward = jax.lax.switch(
+            obj_at_pos, self.reward_fns, state.time, reward_subkey
+        )
+        key, digestion_subkey = jax.random.split(key)
+        digestion_steps = jax.lax.switch(
+            obj_at_pos, self.digestion_steps_fns, state.time, digestion_subkey
+        )
+        reward = jnp.where(should_collect & (digestion_steps == 0), object_reward, 0.0)
+        if self.max_digestion_steps > 0:
+            # Add delayed rewards to buffer
+            digestion_buffer = jax.lax.cond(
+                should_collect & (digestion_steps > 0),
+                lambda: digestion_buffer.at[
+                    (state.time + digestion_steps) % self.max_digestion_steps
+                ].add(object_reward),
+                lambda: digestion_buffer,
+            )
+            # Deliver current rewards
+            current_index = state.time % self.max_digestion_steps
+            reward += digestion_buffer[current_index]
+            digestion_buffer = digestion_buffer.at[current_index].set(0.0)
 
         # 3. HANDLE OBJECT COLLECTION AND RESPAWNING
-        key, subkey, rand_key = jax.random.split(key, 3)
+        key, regen_subkey, rand_key = jax.random.split(key, 3)
 
         # Decrement timers (stored as negative values)
         is_timer = state.object_grid < 0
@@ -252,7 +279,7 @@ class ForagaxEnv(environment.Environment):
 
         # Collect object: set a timer
         regen_delay = jax.lax.switch(
-            obj_at_pos, self.regen_delay_fns, state.time, subkey
+            obj_at_pos, self.regen_delay_fns, state.time, regen_subkey
         )
         encoded_timer = obj_at_pos - ((regen_delay + 1) * num_obj_types)
 
@@ -301,10 +328,13 @@ class ForagaxEnv(environment.Environment):
         )
 
         info = {"discount": self.discount(state, params)}
-        if self.weather_object is not None:
-            info["temperature"] = get_temperature(
-                self.weather_object.rewards, state.time, self.weather_object.repeat
-            )
+        temperatures = jnp.zeros(len(self.objects))
+        for obj_index, obj in enumerate(self.objects):
+            if isinstance(obj, WeatherObject):
+                temperatures = temperatures.at[obj_index].set(
+                    get_temperature(obj.rewards, state.time, obj.repeat)
+                )
+        info["temperatures"] = temperatures
         info["biome_id"] = state.biome_grid[pos[1], pos[0]]
         info["object_collected_id"] = jax.lax.select(should_collect, obj_at_pos, -1)
 
@@ -314,6 +344,7 @@ class ForagaxEnv(environment.Environment):
             object_grid=object_grid,
             biome_grid=state.biome_grid,
             time=state.time + 1,
+            digestion_buffer=digestion_buffer,
         )
 
         done = self.is_terminal(state, params)
@@ -352,6 +383,7 @@ class ForagaxEnv(environment.Environment):
             object_grid=object_grid,
             biome_grid=biome_grid,
             time=0,
+            digestion_buffer=jnp.zeros((self.max_digestion_steps,)),
         )
 
         return self.get_obs(state, params), state
@@ -412,6 +444,12 @@ class ForagaxEnv(environment.Environment):
                     int,
                 ),
                 "time": spaces.Discrete(params.max_steps_in_episode),
+                "digestion_buffer": spaces.Box(
+                    -jnp.inf,
+                    jnp.inf,
+                    (self.max_digestion_steps,),
+                    float,
+                ),
             }
         )
 
