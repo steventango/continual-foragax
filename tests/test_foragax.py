@@ -1108,3 +1108,54 @@ def test_info_object_collected_id():
 
     assert info["object_collected_id"] == -1  # No object collected
     assert reward == 0.0
+
+
+def test_digestion_delay():
+    """Test that rewards are delayed by digestion_steps for objects with k > 0."""
+    key = jax.random.key(0)
+
+    # Create an object with digestion delay of 2 steps
+    delayed_flower = DefaultForagaxObject(
+        name="delayed_flower",
+        reward=5.0,
+        collectable=True,
+        color=(0, 255, 0),
+        digestion_steps=2,
+    )
+
+    env = ForagaxEnv(
+        size=(7, 7),
+        objects=(delayed_flower,),
+        observation_type="color",
+    )
+    params = env.default_params
+    _, state = env.reset(key, params)
+
+    delayed_flower_id = 1  # 0 is EMPTY
+
+    # Place the delayed flower and move the agent to it
+    grid = jnp.zeros((7, 7), dtype=int)
+    grid = grid.at[4, 3].set(delayed_flower_id)
+    state = state.replace(object_grid=grid, pos=jnp.array([3, 3]))
+
+    # Collect the flower by moving down - should get no immediate reward
+    key, step_key = jax.random.split(key)
+    _, state, reward, _, info = env.step(step_key, state, Actions.DOWN, params)
+
+    assert info["object_collected_id"] == delayed_flower_id
+    assert reward == 0.0  # No immediate reward due to digestion delay
+
+    # Step 1: Still no reward (time=1, reward should arrive at time=2)
+    key, step_key = jax.random.split(key)
+    _, state, reward, _, _ = env.step(step_key, state, Actions.UP, params)
+    assert reward == 0.0
+
+    # Step 2: Reward should arrive now (time=2)
+    key, step_key = jax.random.split(key)
+    _, state, reward, _, _ = env.step(step_key, state, Actions.UP, params)
+    assert reward == 5.0
+
+    # Step 3: No more rewards
+    key, step_key = jax.random.split(key)
+    _, state, reward, _, _ = env.step(step_key, state, Actions.UP, params)
+    assert reward == 0.0
