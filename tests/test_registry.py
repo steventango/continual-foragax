@@ -428,26 +428,26 @@ def test_repeat_parameter_weather_environments():
     )
 
 
-def test_reward_delays_parameter_weather_environments():
-    """Test that the reward_delays parameter controls digestion delay."""
-    # Create environments with different reward_delays values
-    env_delays_0 = make("ForagaxWeather-v1", reward_delays=0, aperture_size=(5, 5))
-    env_delays_5 = make("ForagaxWeather-v1", reward_delays=5, aperture_size=(5, 5))
+def test_reward_delay_parameter_weather_environments():
+    """Test that the reward_delay parameter controls digestion delay."""
+    # Create environments with different reward_delay values
+    env_delays_0 = make("ForagaxWeather-v1", reward_delay=0, aperture_size=(5, 5))
+    env_delays_5 = make("ForagaxWeather-v1", reward_delay=5, aperture_size=(5, 5))
 
     # Get the weather objects
     hot_0, cold_0 = env_delays_0.objects[1], env_delays_0.objects[2]
     hot_5, cold_5 = env_delays_5.objects[1], env_delays_5.objects[2]
 
-    # Check that reward_delays values are set correctly
-    assert hot_0.reward_delays_val == 0
-    assert cold_0.reward_delays_val == 0
-    assert hot_5.reward_delays_val == 5
-    assert cold_5.reward_delays_val == 5
+    # Check that reward_delay values are set correctly
+    assert hot_0.reward_delay_val == 0
+    assert cold_0.reward_delay_val == 0
+    assert hot_5.reward_delay_val == 5
+    assert cold_5.reward_delay_val == 5
 
-    # Test reward_delays function returns the correct values
+    # Test reward_delay function returns the correct values
     key = jax.random.key(0)
-    delays_0 = hot_0.reward_delays(0, key)
-    delays_5 = hot_5.reward_delays(0, key)
+    delays_0 = hot_0.reward_delay(0, key)
+    delays_5 = hot_5.reward_delay(0, key)
 
-    assert delays_0 == 0, "reward_delays should return 0 for delays=0"
-    assert delays_5 == 5, "reward_delays should return 5 for delays=5"
+    assert delays_0 == 0, "reward_delay should return 0 for delays=0"
+    assert delays_5 == 5, "reward_delay should return 5 for delays=5"
