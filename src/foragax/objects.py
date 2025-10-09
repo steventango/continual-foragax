@@ -340,6 +340,7 @@ def create_weather_objects(
     multiplier: float = 1.0,
     same_color: bool = False,
     random_respawn: bool = False,
+    digestion_steps: int = 0,
 ):
     """Create HOT and COLD WeatherObject instances using the specified file.
 
@@ -369,6 +370,7 @@ def create_weather_objects(
         multiplier=multiplier,
         color=hot_color,
         random_respawn=random_respawn,
+        digestion_steps=digestion_steps,
     )
 
     cold_color = hot_color if same_color else (0, 255, 255)
@@ -379,6 +381,7 @@ def create_weather_objects(
         multiplier=-multiplier,
         color=cold_color,
         random_respawn=random_respawn,
+        digestion_steps=digestion_steps,
     )
 
     return hot, cold

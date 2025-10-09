@@ -83,6 +83,19 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
         "nowrap": False,
         "deterministic_spawn": True,
     },
+    "ForagaxWeather-v6": {
+        "size": (15, 15),
+        "aperture_size": None,
+        "objects": None,
+        "biomes": (
+            # Hot biome
+            Biome(start=(0, 3), stop=(15, 5), object_frequencies=(0.5, 0.0)),
+            # Cold biome
+            Biome(start=(0, 10), stop=(15, 12), object_frequencies=(0.0, 0.5)),
+        ),
+        "nowrap": False,
+        "deterministic_spawn": True,
+    },
     "ForagaxTwoBiome-v1": {
         "size": (15, 15),
         "aperture_size": None,
@@ -454,10 +467,19 @@ def make(
             "ForagaxWeather-v3",
             "ForagaxWeather-v4",
             "ForagaxWeather-v5",
+            "ForagaxWeather-v6",
         )
-        random_respawn = env_id in ("ForagaxWeather-v4", "ForagaxWeather-v5")
+        random_respawn = env_id in (
+            "ForagaxWeather-v4",
+            "ForagaxWeather-v5",
+            "ForagaxWeather-v6",
+        )
+        digestion_steps = 10 if env_id in ("ForagaxWeather-v6") else 0
         hot, cold = create_weather_objects(
-            file_index=file_index, same_color=same_color, random_respawn=random_respawn
+            file_index=file_index,
+            same_color=same_color,
+            random_respawn=random_respawn,
+            digestion_steps=digestion_steps,
         )
         config["objects"] = (hot, cold)
 
