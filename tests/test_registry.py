@@ -181,107 +181,6 @@ def test_foragax_weather_v5_color_configuration():
     assert hot_v5.color == cold_v5.color, "v5 should use same color for hot and cold"
 
 
-def test_foragax_weather_v6_registry():
-    """Test that ForagaxWeather-v6 can be created via registry and has correct config."""
-    env = make("ForagaxWeather-v6", aperture_size=(5, 5))
-
-    # Check basic configuration
-    assert env.name == "ForagaxWeather-v6"
-    assert env.deterministic_spawn is True
-    assert env.nowrap is False  # v6 enables wrapping
-
-    # Check that weather objects have random_respawn=True
-    hot, cold = env.objects[1], env.objects[2]  # Skip EMPTY (index 0)
-    assert hot.name == "hot"
-    assert cold.name == "cold"
-    assert hot.random_respawn is True
-    assert cold.random_respawn is True
-
-    # Check digestion steps
-    assert hot.max_digestion_steps == 10  # digestion_steps=10
-    assert cold.max_digestion_steps == 10  # digestion_steps=10
-
-    # Test basic functionality
-    key = jax.random.key(0)
-    obs, state = env.reset(key, env.default_params)
-    assert obs.shape == (5, 5, 1)  # 1 color channel (hot/cold same color, no padding)
-
-    # Test stepping
-    key, step_key = jax.random.split(key)
-    action = env.action_space(env.default_params).sample(step_key)
-    obs2, state2, reward, done, info = env.step(
-        step_key, state, action, env.default_params
-    )
-    assert obs2.shape == (5, 5, 1)
-    assert not done
-
-
-def test_foragax_weather_v6_deterministic_spawn():
-    """Test that ForagaxWeather-v6 uses deterministic spawning."""
-    env = make("ForagaxWeather-v6", aperture_size=(5, 5))
-    params = env.default_params
-
-    # Test that multiple resets with same key produce same object placement
-    key = jax.random.key(42)
-    _, state1 = env.reset(key, params)
-
-    key = jax.random.key(42)  # Same key
-    _, state2 = env.reset(key, params)
-
-    # Object grids should be identical (deterministic spawn)
-    chex.assert_trees_all_equal(state1.object_grid, state2.object_grid)
-
-    # But different keys should produce different placements
-    key1 = jax.random.key(42)
-    key2 = jax.random.key(43)
-    _, state1 = env.reset(key1, params)
-    _, state2 = env.reset(key2, params)
-
-    # Should be different (shuffled deterministically)
-    assert not jnp.array_equal(state1.object_grid, state2.object_grid)
-
-    # Test that number of objects is the same
-    num_hot_1 = jnp.sum(state1.object_grid == 1)
-    num_cold_1 = jnp.sum(state1.object_grid == 2)
-    num_hot_2 = jnp.sum(state2.object_grid == 1)
-    num_cold_2 = jnp.sum(state2.object_grid == 2)
-    assert num_hot_1 == num_hot_2
-    assert num_cold_1 == num_cold_2
-
-
-def test_foragax_weather_v6_random_respawn():
-    """Test that ForagaxWeather-v6 weather objects have random_respawn=True."""
-    env = make("ForagaxWeather-v6", aperture_size=(5, 5))
-
-    # Check that weather objects have random_respawn=True
-    hot, cold = env.objects[1], env.objects[2]  # Skip EMPTY
-    assert hot.random_respawn is True, "Hot objects should have random_respawn=True"
-    assert cold.random_respawn is True, "Cold objects should have random_respawn=True"
-
-
-def test_foragax_weather_v6_color_configuration():
-    """Test that ForagaxWeather-v6 weather objects use the same color."""
-    env = make("ForagaxWeather-v6", aperture_size=(5, 5))
-    hot_v6, cold_v6 = env.objects[1], env.objects[2]
-
-    # Same color configuration: v6 uses same color
-    assert hot_v6.color == cold_v6.color, "v6 should use same color for hot and cold"
-
-
-def test_foragax_weather_v6_digestion_steps():
-    """Test that ForagaxWeather-v6 weather objects have digestion_steps=10."""
-    env = make("ForagaxWeather-v6", aperture_size=(5, 5))
-
-    # Check that weather objects have digestion_steps=10
-    hot, cold = env.objects[1], env.objects[2]  # Skip EMPTY
-    assert hot.digestion_steps(0, jax.random.key(0)) == 10, (
-        "Hot objects should have digestion_steps=10"
-    )
-    assert cold.digestion_steps(0, jax.random.key(0)) == 10, (
-        "Cold objects should have digestion_steps=10"
-    )
-
-
 def test_foragax_twobiome_v10_registry():
     """Test that ForagaxTwoBiome-v10 can be created via registry and has correct config."""
     env = make("ForagaxTwoBiome-v10", aperture_size=(5, 5))
@@ -480,3 +379,75 @@ def test_foragax_twobiome_v13_random_respawn():
         "Deathcap objects should have random_respawn=True"
     )
     assert fake.random_respawn is True, "Fake objects should have random_respawn=True"
+
+
+def test_repeat_parameter_weather_environments():
+    """Test that the repeat parameter controls temperature cycling speed."""
+    # Create environments with different repeat values
+    env_repeat_100 = make("ForagaxWeather-v1", repeat=100, aperture_size=(5, 5))
+    env_repeat_200 = make("ForagaxWeather-v1", repeat=200, aperture_size=(5, 5))
+
+    # Get the weather objects
+    hot_100, cold_100 = env_repeat_100.objects[1], env_repeat_100.objects[2]
+    hot_200, cold_200 = env_repeat_200.objects[1], env_repeat_200.objects[2]
+
+    # Check that repeat values are set correctly
+    assert hot_100.repeat == 100
+    assert cold_100.repeat == 100
+    assert hot_200.repeat == 200
+    assert cold_200.repeat == 200
+
+    # Test temperature cycling by checking rewards at different clock times
+    key = jax.random.key(0)
+
+    # At clock=0, both should give the same temperature (first value)
+    temp_100_t0 = hot_100.reward(0, key)
+    temp_200_t0 = hot_200.reward(0, key)
+    assert temp_100_t0 == temp_200_t0, "Temperatures should be identical at clock=0"
+
+    # At clock=100, repeat_100 should move to next temperature (index 1), repeat_200 should stay at first (index 0)
+    temp_100_t100 = hot_100.reward(100, key)
+    temp_200_t100 = hot_200.reward(100, key)
+    assert temp_100_t0 != temp_100_t100, "repeat_100 should cycle at step 100"
+    assert temp_200_t0 == temp_200_t100, "repeat_200 should not cycle at step 100"
+
+    # At clock=200, repeat_100 should be at index 2, repeat_200 should be at index 1
+    temp_100_t200 = hot_100.reward(200, key)
+    temp_200_t200 = hot_200.reward(200, key)
+    assert temp_100_t200 != temp_200_t200, (
+        "Different repeat values should give different temperatures at step 200"
+    )
+
+    # At clock=400, repeat_100 should be at index 4, repeat_200 should be at index 2
+    temp_100_t400 = hot_100.reward(400, key)
+    temp_200_t400 = hot_200.reward(400, key)
+    assert temp_100_t400 != temp_100_t200, "repeat_100 should cycle again at step 400"
+    assert temp_200_t400 != temp_200_t200, "repeat_200 should cycle again at step 400"
+    assert temp_100_t400 != temp_200_t400, (
+        "Different repeat values should give different temperatures at step 400"
+    )
+
+
+def test_reward_delay_parameter_weather_environments():
+    """Test that the reward_delay parameter controls digestion delay."""
+    # Create environments with different reward_delay values
+    env_delays_0 = make("ForagaxWeather-v1", reward_delay=0, aperture_size=(5, 5))
+    env_delays_5 = make("ForagaxWeather-v1", reward_delay=5, aperture_size=(5, 5))
+
+    # Get the weather objects
+    hot_0, cold_0 = env_delays_0.objects[1], env_delays_0.objects[2]
+    hot_5, cold_5 = env_delays_5.objects[1], env_delays_5.objects[2]
+
+    # Check that reward_delay values are set correctly
+    assert hot_0.reward_delay_val == 0
+    assert cold_0.reward_delay_val == 0
+    assert hot_5.reward_delay_val == 5
+    assert cold_5.reward_delay_val == 5
+
+    # Test reward_delay function returns the correct values
+    key = jax.random.key(0)
+    delays_0 = hot_0.reward_delay(0, key)
+    delays_5 = hot_5.reward_delay(0, key)
+
+    assert delays_0 == 0, "reward_delay should return 0 for delays=0"
+    assert delays_5 == 5, "reward_delay should return 5 for delays=5"

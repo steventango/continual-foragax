@@ -1154,8 +1154,8 @@ def test_info_object_collected_id():
     assert reward == 0.0
 
 
-def test_digestion_delay():
-    """Test that rewards are delayed by digestion_steps for objects with k > 0."""
+def test_reward_delay():
+    """Test that rewards are delayed by reward_delay for objects with k > 0."""
     key = jax.random.key(0)
 
     # Create an object with digestion delay of 2 steps
@@ -1164,7 +1164,7 @@ def test_digestion_delay():
         reward=5.0,
         collectable=True,
         color=(0, 255, 0),
-        digestion_steps=2,
+        reward_delay=2,
     )
 
     env = ForagaxEnv(

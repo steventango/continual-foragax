@@ -113,12 +113,12 @@ class ForagaxEnv(environment.Environment):
 
         self.reward_fns = [o.reward for o in objects]
         self.regen_delay_fns = [o.regen_delay for o in objects]
-        self.digestion_steps_fns = [o.digestion_steps for o in objects]
+        self.reward_delay_fns = [o.reward_delay for o in objects]
 
-        # Compute digestion steps per object (using max_digestion_steps attribute)
-        object_max_digestion_steps = jnp.array([o.max_digestion_steps for o in objects])
-        self.max_digestion_steps = (
-            int(jnp.max(object_max_digestion_steps)) + 1 if len(objects) > 0 else 0
+        # Compute reward steps per object (using max_reward_delay attribute)
+        object_max_reward_delay = jnp.array([o.max_reward_delay for o in objects])
+        self.max_reward_delay = (
+            int(jnp.max(object_max_reward_delay)) + 1 if len(objects) > 0 else 0
         )
 
         self.biome_object_frequencies = jnp.array(
@@ -250,21 +250,21 @@ class ForagaxEnv(environment.Environment):
             obj_at_pos, self.reward_fns, state.time, reward_subkey
         )
         key, digestion_subkey = jax.random.split(key)
-        digestion_steps = jax.lax.switch(
-            obj_at_pos, self.digestion_steps_fns, state.time, digestion_subkey
+        reward_delay = jax.lax.switch(
+            obj_at_pos, self.reward_delay_fns, state.time, digestion_subkey
         )
-        reward = jnp.where(should_collect & (digestion_steps == 0), object_reward, 0.0)
-        if self.max_digestion_steps > 0:
+        reward = jnp.where(should_collect & (reward_delay == 0), object_reward, 0.0)
+        if self.max_reward_delay > 0:
             # Add delayed rewards to buffer
             digestion_buffer = jax.lax.cond(
-                should_collect & (digestion_steps > 0),
+                should_collect & (reward_delay > 0),
                 lambda: digestion_buffer.at[
-                    (state.time + digestion_steps) % self.max_digestion_steps
+                    (state.time + reward_delay) % self.max_reward_delay
                 ].add(object_reward),
                 lambda: digestion_buffer,
             )
             # Deliver current rewards
-            current_index = state.time % self.max_digestion_steps
+            current_index = state.time % self.max_reward_delay
             reward += digestion_buffer[current_index]
             digestion_buffer = digestion_buffer.at[current_index].set(0.0)
 
@@ -383,7 +383,7 @@ class ForagaxEnv(environment.Environment):
             object_grid=object_grid,
             biome_grid=biome_grid,
             time=0,
-            digestion_buffer=jnp.zeros((self.max_digestion_steps,)),
+            digestion_buffer=jnp.zeros((self.max_reward_delay,)),
         )
 
         return self.get_obs(state, params), state
@@ -447,7 +447,7 @@ class ForagaxEnv(environment.Environment):
                 "digestion_buffer": spaces.Box(
                     -jnp.inf,
                     jnp.inf,
-                    (self.max_digestion_steps,),
+                    (self.max_reward_delay,),
                     float,
                 ),
             }
