@@ -274,8 +274,12 @@ def test_foragax_weather_v6_digestion_steps():
 
     # Check that weather objects have digestion_steps=10
     hot, cold = env.objects[1], env.objects[2]  # Skip EMPTY
-    assert hot.digestion_steps(0, jax.random.key(0)) == 10, "Hot objects should have digestion_steps=10"
-    assert cold.digestion_steps(0, jax.random.key(0)) == 10, "Cold objects should have digestion_steps=10"
+    assert hot.digestion_steps(0, jax.random.key(0)) == 10, (
+        "Hot objects should have digestion_steps=10"
+    )
+    assert cold.digestion_steps(0, jax.random.key(0)) == 10, (
+        "Cold objects should have digestion_steps=10"
+    )
 
 
 def test_foragax_twobiome_v10_registry():
