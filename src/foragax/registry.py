@@ -348,7 +348,6 @@ def make(
     observation_type: str = "color",
     aperture_size: Optional[Tuple[int, int]] = (5, 5),
     file_index: int = 0,
-    nowrap: Optional[bool] = None,
     **kwargs: Any,
 ) -> ForagaxEnv:
     """Create a Foragax environment.
@@ -358,9 +357,7 @@ def make(
         observation_type: The type of observation to use. One of "object", "rgb", or "color".
         aperture_size: The size of the agent's observation aperture. If -1, full world observation.
             If None, the default for the environment is used.
-        file_index: File index for weather objects. nowrap: If True, disables
-        wrapping around environment boundaries. If None, uses defaults per
-        environment.
+        file_index: File index for weather objects.
         **kwargs: Additional keyword arguments to pass to the ForagaxEnv constructor.
 
     Returns:
@@ -376,8 +373,6 @@ def make(
         else:
             aperture_size = (aperture_size, aperture_size)
     config["aperture_size"] = aperture_size
-    if nowrap is not None:
-        config["nowrap"] = nowrap
 
     # Handle special size and biome configurations
     if env_id in (
