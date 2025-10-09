@@ -1,3 +1,16 @@
+## 0.30.0 (2025-10-09)
+
+### Feat
+
+- remove ForagaxWeather-v6
+- add repeat and digestion_steps parameters to make function
+
+### Refactor
+
+- rename digestion steps to reward delay
+- rename reward_delays to reward_delay
+- rename digestion_step to reward_delay
+
 ## 0.29.0 (2025-10-09)
 
 ### Feat
