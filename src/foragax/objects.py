@@ -17,14 +17,14 @@ class BaseForagaxObject:
         collectable: bool = False,
         color: Tuple[int, int, int] = (0, 0, 0),
         random_respawn: bool = False,
-        max_digestion_steps: int = 0,
+        max_reward_delays: int = 0,
     ):
         self.name = name
         self.blocking = blocking
         self.collectable = collectable
         self.color = color
         self.random_respawn = random_respawn
-        self.max_digestion_steps = max_digestion_steps
+        self.max_reward_delays = max_reward_delays
 
     @abc.abstractmethod
     def reward(self, clock: int, rng: jax.Array) -> float:
@@ -32,7 +32,7 @@ class BaseForagaxObject:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def digestion_steps(self, clock: int, rng: jax.Array) -> int:
+    def reward_delays(self, clock: int, rng: jax.Array) -> int:
         """Digestion steps function."""
         raise NotImplementedError
 
@@ -49,17 +49,17 @@ class DefaultForagaxObject(BaseForagaxObject):
         regen_delay: Tuple[int, int] = (10, 100),
         color: Tuple[int, int, int] = (255, 255, 255),
         random_respawn: bool = False,
-        digestion_steps: int = 0,
-        max_digestion_steps: Optional[int] = None,
+        reward_delays: int = 0,
+        max_reward_delays: Optional[int] = None,
     ):
-        if max_digestion_steps is None:
-            max_digestion_steps = digestion_steps
+        if max_reward_delays is None:
+            max_reward_delays = reward_delays
         super().__init__(
-            name, blocking, collectable, color, random_respawn, max_digestion_steps
+            name, blocking, collectable, color, random_respawn, max_reward_delays
         )
         self.reward_val = reward
         self.regen_delay_range = regen_delay
-        self.digestion_steps_val = digestion_steps
+        self.reward_delays_val = reward_delays
 
     def reward(self, clock: int, rng: jax.Array) -> float:
         """Default reward function."""
@@ -70,9 +70,9 @@ class DefaultForagaxObject(BaseForagaxObject):
         min_delay, max_delay = self.regen_delay_range
         return jax.random.randint(rng, (), min_delay, max_delay)
 
-    def digestion_steps(self, clock: int, rng: jax.Array) -> int:
+    def reward_delays(self, clock: int, rng: jax.Array) -> int:
         """Default digestion steps function."""
-        return self.digestion_steps_val
+        return self.reward_delays_val
 
 
 class NormalRegenForagaxObject(DefaultForagaxObject):
@@ -87,8 +87,8 @@ class NormalRegenForagaxObject(DefaultForagaxObject):
         std_regen_delay: int = 1,
         color: Tuple[int, int, int] = (0, 0, 0),
         random_respawn: bool = False,
-        digestion_steps: int = 0,
-        max_digestion_steps: Optional[int] = None,
+        reward_delays: int = 0,
+        max_reward_delays: Optional[int] = None,
     ):
         super().__init__(
             name=name,
@@ -97,8 +97,8 @@ class NormalRegenForagaxObject(DefaultForagaxObject):
             regen_delay=(mean_regen_delay, mean_regen_delay),
             color=color,
             random_respawn=random_respawn,
-            digestion_steps=digestion_steps,
-            max_digestion_steps=max_digestion_steps,
+            reward_delays=reward_delays,
+            max_reward_delays=max_reward_delays,
         )
         self.mean_regen_delay = mean_regen_delay
         self.std_regen_delay = std_regen_delay
@@ -122,8 +122,8 @@ class WeatherObject(NormalRegenForagaxObject):
         std_regen_delay: int = 1,
         color: Tuple[int, int, int] = (0, 0, 0),
         random_respawn: bool = False,
-        digestion_steps: int = 0,
-        max_digestion_steps: Optional[int] = None,
+        reward_delays: int = 0,
+        max_reward_delays: Optional[int] = None,
     ):
         super().__init__(
             name=name,
@@ -132,8 +132,8 @@ class WeatherObject(NormalRegenForagaxObject):
             std_regen_delay=std_regen_delay,
             color=color,
             random_respawn=random_respawn,
-            digestion_steps=digestion_steps,
-            max_digestion_steps=max_digestion_steps,
+            reward_delays=reward_delays,
+            max_reward_delays=max_reward_delays,
         )
         self.rewards = rewards
         self.repeat = repeat
@@ -340,7 +340,7 @@ def create_weather_objects(
     multiplier: float = 1.0,
     same_color: bool = False,
     random_respawn: bool = False,
-    digestion_steps: int = 0,
+    reward_delays: int = 0,
 ):
     """Create HOT and COLD WeatherObject instances using the specified file.
 
@@ -370,7 +370,7 @@ def create_weather_objects(
         multiplier=multiplier,
         color=hot_color,
         random_respawn=random_respawn,
-        digestion_steps=digestion_steps,
+        reward_delays=reward_delays,
     )
 
     cold_color = hot_color if same_color else (0, 255, 255)
@@ -381,7 +381,7 @@ def create_weather_objects(
         multiplier=-multiplier,
         color=cold_color,
         random_respawn=random_respawn,
-        digestion_steps=digestion_steps,
+        reward_delays=reward_delays,
     )
 
     return hot, cold

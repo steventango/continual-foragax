@@ -198,8 +198,8 @@ def test_foragax_weather_v6_registry():
     assert cold.random_respawn is True
 
     # Check digestion steps
-    assert hot.max_digestion_steps == 10  # digestion_steps=10
-    assert cold.max_digestion_steps == 10  # digestion_steps=10
+    assert hot.max_reward_delays == 10  # reward_delays=10
+    assert cold.max_reward_delays == 10  # reward_delays=10
 
     # Test basic functionality
     key = jax.random.key(0)
@@ -268,17 +268,17 @@ def test_foragax_weather_v6_color_configuration():
     assert hot_v6.color == cold_v6.color, "v6 should use same color for hot and cold"
 
 
-def test_foragax_weather_v6_digestion_steps():
-    """Test that ForagaxWeather-v6 weather objects have digestion_steps=10."""
+def test_foragax_weather_v6_reward_delays():
+    """Test that ForagaxWeather-v6 weather objects have reward_delays=10."""
     env = make("ForagaxWeather-v6", aperture_size=(5, 5))
 
-    # Check that weather objects have digestion_steps=10
+    # Check that weather objects have reward_delays=10
     hot, cold = env.objects[1], env.objects[2]  # Skip EMPTY
-    assert hot.digestion_steps(0, jax.random.key(0)) == 10, (
-        "Hot objects should have digestion_steps=10"
+    assert hot.reward_delays(0, jax.random.key(0)) == 10, (
+        "Hot objects should have reward_delays=10"
     )
-    assert cold.digestion_steps(0, jax.random.key(0)) == 10, (
-        "Cold objects should have digestion_steps=10"
+    assert cold.reward_delays(0, jax.random.key(0)) == 10, (
+        "Cold objects should have reward_delays=10"
     )
 
 
