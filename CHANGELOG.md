@@ -1,3 +1,12 @@
+## 0.29.0 (2025-10-09)
+
+### Feat
+
+- temperatures in info
+- ForagaxWeather-v6 with delayed rewards
+- remove explicit nowrap parameter from registry
+- add delayed rewards via digesetion
+
 ## 0.28.1 (2025-10-05)
 
 ### Fix
