@@ -33,7 +33,7 @@ class BaseForagaxObject:
 
     @abc.abstractmethod
     def reward_delay(self, clock: int, rng: jax.Array) -> int:
-        """Digestion steps function."""
+        """Reward delay function."""
         raise NotImplementedError
 
 
@@ -71,7 +71,7 @@ class DefaultForagaxObject(BaseForagaxObject):
         return jax.random.randint(rng, (), min_delay, max_delay)
 
     def reward_delay(self, clock: int, rng: jax.Array) -> int:
-        """Default digestion steps function."""
+        """Default reward delay function."""
         return self.reward_delay_val
 
 

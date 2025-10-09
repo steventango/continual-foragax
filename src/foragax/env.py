@@ -115,7 +115,7 @@ class ForagaxEnv(environment.Environment):
         self.regen_delay_fns = [o.regen_delay for o in objects]
         self.reward_delay_fns = [o.reward_delay for o in objects]
 
-        # Compute digestion steps per object (using max_reward_delay attribute)
+        # Compute reward steps per object (using max_reward_delay attribute)
         object_max_reward_delay = jnp.array([o.max_reward_delay for o in objects])
         self.max_reward_delay = (
             int(jnp.max(object_max_reward_delay)) + 1 if len(objects) > 0 else 0
