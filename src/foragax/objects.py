@@ -135,13 +135,12 @@ class WeatherObject(NormalRegenForagaxObject):
             reward_delay=reward_delay,
             max_reward_delay=max_reward_delay,
         )
-        self.rewards = rewards
+        self.rewards = rewards * multiplier
         self.repeat = repeat
-        self.multiplier = multiplier
 
     def reward(self, clock: int, rng: jax.Array) -> float:
         """Reward is based on temperature."""
-        return get_temperature(self.rewards, clock, self.repeat) * self.multiplier
+        return get_temperature(self.rewards, clock, self.repeat)
 
 
 EMPTY = DefaultForagaxObject()
