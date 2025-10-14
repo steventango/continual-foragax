@@ -1,3 +1,9 @@
+## 0.30.1 (2025-10-14)
+
+### Fix
+
+- directly apply multiplier to rewards
+
 ## 0.30.0 (2025-10-09)
 
 ### Feat
