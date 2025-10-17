@@ -200,6 +200,47 @@ class ForagaxEnv(environment.Environment):
             max_steps_in_episode=None,
         )
 
+    def _place_timer_at_position(
+        self, grid: jax.Array, y: int, x: int, timer_val: int
+    ) -> jax.Array:
+        """Place a timer at a specific position."""
+        return grid.at[y, x].set(timer_val)
+
+    def _place_timer_at_random_position(
+        self,
+        grid: jax.Array,
+        y: int,
+        x: int,
+        timer_val: int,
+        biome_grid: jax.Array,
+        rand_key: jax.Array,
+    ) -> jax.Array:
+        """Place a timer at a random valid position within the same biome."""
+        # Set the original position to empty temporarily
+        grid_temp = grid.at[y, x].set(0)
+
+        # Find all valid spawn locations (empty cells within the same biome)
+        biome_id = biome_grid[y, x]
+        biome_mask = biome_grid == biome_id
+        empty_mask = grid_temp == 0
+        valid_spawn_mask = biome_mask & empty_mask
+
+        num_valid_spawns = jnp.sum(valid_spawn_mask)
+
+        # Get indices of valid spawn locations, padded to a static size
+        y_indices, x_indices = jnp.nonzero(
+            valid_spawn_mask, size=self.size[0] * self.size[1], fill_value=-1
+        )
+        valid_spawn_indices = jnp.stack([y_indices, x_indices], axis=1)
+
+        # Select a random valid location
+        random_idx = jax.random.randint(rand_key, (), 0, num_valid_spawns)
+        new_spawn_pos = valid_spawn_indices[random_idx]
+
+        # Place the timer at the new random position
+        new_grid = grid_temp.at[new_spawn_pos[0], new_spawn_pos[1]].set(timer_val)
+        return new_grid
+
     def step_env(
         self,
         key: jax.Array,
@@ -299,36 +340,6 @@ class ForagaxEnv(environment.Environment):
         )
         encoded_timer = obj_at_pos - ((regen_delay + 1) * num_obj_types)
 
-        def place_at_current_pos(current_grid, timer_val):
-            new_grid = current_grid.at[pos[1], pos[0]].set(timer_val)
-            return new_grid, pos
-
-        def place_at_random_pos(current_grid, timer_val):
-            # Set the collected position to empty temporarily
-            grid = current_grid.at[pos[1], pos[0]].set(0)
-
-            # Find all valid spawn locations (empty cells within the same biome)
-            biome_id = state.biome_grid[pos[1], pos[0]]
-            biome_mask = state.biome_grid == biome_id
-            empty_mask = grid == 0
-            valid_spawn_mask = biome_mask & empty_mask
-
-            num_valid_spawns = jnp.sum(valid_spawn_mask)
-
-            # Get indices of valid spawn locations, padded to a static size
-            y_indices, x_indices = jnp.nonzero(
-                valid_spawn_mask, size=self.size[0] * self.size[1], fill_value=-1
-            )
-            valid_spawn_indices = jnp.stack([y_indices, x_indices], axis=1)
-
-            # Select a random valid location
-            random_idx = jax.random.randint(rand_key, (), 0, num_valid_spawns)
-            new_spawn_pos = valid_spawn_indices[random_idx]
-
-            # Place the timer at the new random position
-            new_grid = grid.at[new_spawn_pos[0], new_spawn_pos[1]].set(timer_val)
-            return new_grid, jnp.array([new_spawn_pos[1], new_spawn_pos[0]])
-
         # If collected, replace object with timer; otherwise, keep it
         val_at_pos = object_grid[pos[1], pos[0]]
         should_collect = is_collectable & (val_at_pos > 0)
@@ -338,14 +349,23 @@ class ForagaxEnv(environment.Environment):
         def do_collection():
             return jax.lax.cond(
                 self.object_random_respawn[obj_at_pos],
-                lambda: place_at_random_pos(object_grid, encoded_timer),
-                lambda: place_at_current_pos(object_grid, encoded_timer),
+                lambda: self._place_timer_at_random_position(
+                    object_grid,
+                    pos[1],
+                    pos[0],
+                    encoded_timer,
+                    state.biome_grid,
+                    rand_key,
+                ),
+                lambda: self._place_timer_at_position(
+                    object_grid, pos[1], pos[0], encoded_timer
+                ),
             )
 
         def no_collection():
-            return object_grid, pos
+            return object_grid
 
-        object_grid, collection_pos = jax.lax.cond(
+        object_grid = jax.lax.cond(
             should_collect,
             do_collection,
             no_collection,
@@ -387,48 +407,18 @@ class ForagaxEnv(environment.Environment):
                 # Check if this object should respawn randomly
                 should_random_respawn = self.object_random_respawn[obj_id]
 
-                def place_at_current_pos(current_grid, timer_val):
-                    new_grid = current_grid.at[y, x].set(timer_val)
-                    return new_grid
-
-                def place_at_random_pos(current_grid, timer_val):
-                    # Set the expired position to empty temporarily
-                    grid_temp = current_grid.at[y, x].set(0)
-
-                    # Find all valid spawn locations (empty cells within the same biome)
-                    biome_id = state.biome_grid[y, x]
-                    biome_mask = state.biome_grid == biome_id
-                    empty_mask = grid_temp == 0
-                    valid_spawn_mask = biome_mask & empty_mask
-
-                    num_valid_spawns = jnp.sum(valid_spawn_mask)
-
-                    # Get indices of valid spawn locations, padded to a static size
-                    y_indices, x_indices = jnp.nonzero(
-                        valid_spawn_mask,
-                        size=self.size[0] * self.size[1],
-                        fill_value=-1,
-                    )
-                    valid_spawn_indices = jnp.stack([y_indices, x_indices], axis=1)
-
-                    # Select a random valid location
-                    rand_key = jax.random.split(exp_key)[
-                        1
-                    ]  # Use second split for randomness
-                    random_idx = jax.random.randint(rand_key, (), 0, num_valid_spawns)
-                    new_spawn_pos = valid_spawn_indices[random_idx]
-
-                    # Place the timer at the new random position
-                    new_grid = grid_temp.at[new_spawn_pos[0], new_spawn_pos[1]].set(
-                        timer_val
-                    )
-                    return new_grid
+                # Use second split for randomness in random placement
+                rand_key = jax.random.split(exp_key)[1]
 
                 # Place timer either at current position or random position
                 new_grid = jax.lax.cond(
                     should_random_respawn,
-                    lambda: place_at_random_pos(grid, encoded_exp_timer),
-                    lambda: place_at_current_pos(grid, encoded_exp_timer),
+                    lambda: self._place_timer_at_random_position(
+                        grid, y, x, encoded_exp_timer, state.biome_grid, rand_key
+                    ),
+                    lambda: self._place_timer_at_position(
+                        grid, y, x, encoded_exp_timer
+                    ),
                 )
 
                 return new_grid, spawn_grid
