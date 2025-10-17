@@ -1,3 +1,18 @@
+## 0.31.0 (2025-10-17)
+
+### Feat
+
+- ForagaxTwoBiome-v17 with expiry
+- add object expiry
+
+### Fix
+
+- object expiry with random respawn
+
+### Refactor
+
+- deduplicate place_timer_at_
+
 ## 0.30.1 (2025-10-14)
 
 ### Fix
