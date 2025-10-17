@@ -1080,12 +1080,12 @@ def test_info_multiple_weather_objects():
     assert len(info["temperatures"]) == 3  # EMPTY + 2 objects
     assert info["temperatures"][0] == 0.0  # EMPTY
     assert info["temperatures"][1] == 10.0  # hot object at index 1
-    assert info["temperatures"][2] == 5.0  # cold object at index 2 (raw temperature)
+    assert info["temperatures"][2] == -5.0  # cold object at index 2 (raw temperature)
 
     key, step_key = jax.random.split(key)
     _, state, _, _, info = env.step(step_key, state, Actions.UP, params)
     assert info["temperatures"][1] == 20.0  # hot next
-    assert info["temperatures"][2] == 15.0  # cold next
+    assert info["temperatures"][2] == -15.0  # cold next
 
 
 def test_info_biome_id():
