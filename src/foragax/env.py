@@ -62,6 +62,7 @@ class EnvState(environment.EnvState):
     biome_grid: jax.Array
     time: int
     digestion_buffer: jax.Array
+    object_spawn_time_grid: jax.Array
 
 
 class ForagaxEnv(environment.Environment):
@@ -114,6 +115,12 @@ class ForagaxEnv(environment.Environment):
         self.reward_fns = [o.reward for o in objects]
         self.regen_delay_fns = [o.regen_delay for o in objects]
         self.reward_delay_fns = [o.reward_delay for o in objects]
+        self.expiry_regen_delay_fns = [o.expiry_regen_delay for o in objects]
+
+        # Expiry times per object (None becomes -1 for no expiry)
+        self.object_expiry_time = jnp.array(
+            [o.expiry_time if o.expiry_time is not None else -1 for o in objects]
+        )
 
         # Compute reward steps per object (using max_reward_delay attribute)
         object_max_reward_delay = jnp.array([o.max_reward_delay for o in objects])
@@ -192,6 +199,47 @@ class ForagaxEnv(environment.Environment):
         return EnvParams(
             max_steps_in_episode=None,
         )
+
+    def _place_timer_at_position(
+        self, grid: jax.Array, y: int, x: int, timer_val: int
+    ) -> jax.Array:
+        """Place a timer at a specific position."""
+        return grid.at[y, x].set(timer_val)
+
+    def _place_timer_at_random_position(
+        self,
+        grid: jax.Array,
+        y: int,
+        x: int,
+        timer_val: int,
+        biome_grid: jax.Array,
+        rand_key: jax.Array,
+    ) -> jax.Array:
+        """Place a timer at a random valid position within the same biome."""
+        # Set the original position to empty temporarily
+        grid_temp = grid.at[y, x].set(0)
+
+        # Find all valid spawn locations (empty cells within the same biome)
+        biome_id = biome_grid[y, x]
+        biome_mask = biome_grid == biome_id
+        empty_mask = grid_temp == 0
+        valid_spawn_mask = biome_mask & empty_mask
+
+        num_valid_spawns = jnp.sum(valid_spawn_mask)
+
+        # Get indices of valid spawn locations, padded to a static size
+        y_indices, x_indices = jnp.nonzero(
+            valid_spawn_mask, size=self.size[0] * self.size[1], fill_value=-1
+        )
+        valid_spawn_indices = jnp.stack([y_indices, x_indices], axis=1)
+
+        # Select a random valid location
+        random_idx = jax.random.randint(rand_key, (), 0, num_valid_spawns)
+        new_spawn_pos = valid_spawn_indices[random_idx]
+
+        # Place the timer at the new random position
+        new_grid = grid_temp.at[new_spawn_pos[0], new_spawn_pos[1]].set(timer_val)
+        return new_grid
 
     def step_env(
         self,
@@ -277,39 +325,20 @@ class ForagaxEnv(environment.Environment):
             is_timer, state.object_grid + num_obj_types, state.object_grid
         )
 
+        # Track which objects just respawned (timer -> object transition)
+        # An object respawned if it was negative and is now positive
+        just_respawned = is_timer & (object_grid > 0)
+
+        # Update spawn times for objects that just respawned
+        object_spawn_time_grid = jnp.where(
+            just_respawned, state.time, state.object_spawn_time_grid
+        )
+
         # Collect object: set a timer
         regen_delay = jax.lax.switch(
             obj_at_pos, self.regen_delay_fns, state.time, regen_subkey
         )
         encoded_timer = obj_at_pos - ((regen_delay + 1) * num_obj_types)
-
-        def place_at_current_pos(current_grid, timer_val):
-            return current_grid.at[pos[1], pos[0]].set(timer_val)
-
-        def place_at_random_pos(current_grid, timer_val):
-            # Set the collected position to empty temporarily
-            grid = current_grid.at[pos[1], pos[0]].set(0)
-
-            # Find all valid spawn locations (empty cells within the same biome)
-            biome_id = state.biome_grid[pos[1], pos[0]]
-            biome_mask = state.biome_grid == biome_id
-            empty_mask = grid == 0
-            valid_spawn_mask = biome_mask & empty_mask
-
-            num_valid_spawns = jnp.sum(valid_spawn_mask)
-
-            # Get indices of valid spawn locations, padded to a static size
-            y_indices, x_indices = jnp.nonzero(
-                valid_spawn_mask, size=self.size[0] * self.size[1], fill_value=-1
-            )
-            valid_spawn_indices = jnp.stack([y_indices, x_indices], axis=1)
-
-            # Select a random valid location
-            random_idx = jax.random.randint(rand_key, (), 0, num_valid_spawns)
-            new_spawn_pos = valid_spawn_indices[random_idx]
-
-            # Place the timer at the new random position
-            return grid.at[new_spawn_pos[0], new_spawn_pos[1]].set(timer_val)
 
         # If collected, replace object with timer; otherwise, keep it
         val_at_pos = object_grid[pos[1], pos[0]]
@@ -317,14 +346,108 @@ class ForagaxEnv(environment.Environment):
 
         # When not collecting, the value at the position remains unchanged.
         # When collecting, we either place the timer at the current position or a random one.
+        def do_collection():
+            return jax.lax.cond(
+                self.object_random_respawn[obj_at_pos],
+                lambda: self._place_timer_at_random_position(
+                    object_grid,
+                    pos[1],
+                    pos[0],
+                    encoded_timer,
+                    state.biome_grid,
+                    rand_key,
+                ),
+                lambda: self._place_timer_at_position(
+                    object_grid, pos[1], pos[0], encoded_timer
+                ),
+            )
+
+        def no_collection():
+            return object_grid
+
         object_grid = jax.lax.cond(
             should_collect,
-            lambda: jax.lax.cond(
-                self.object_random_respawn[obj_at_pos],
-                lambda: place_at_random_pos(object_grid, encoded_timer),
-                lambda: place_at_current_pos(object_grid, encoded_timer),
-            ),
-            lambda: object_grid,
+            do_collection,
+            no_collection,
+        )
+
+        # 3.5. HANDLE OBJECT EXPIRY
+        # Check each cell for objects that have exceeded their expiry time
+        current_objects_for_expiry = jnp.maximum(0, object_grid)
+
+        # Calculate age of each object (current_time - spawn_time)
+        object_ages = state.time - object_spawn_time_grid
+
+        # Get expiry time for each object type in the grid
+        expiry_times = self.object_expiry_time[current_objects_for_expiry]
+
+        # Check if object should expire (age >= expiry_time and expiry_time >= 0)
+        should_expire = (
+            (object_ages >= expiry_times)
+            & (expiry_times >= 0)
+            & (current_objects_for_expiry > 0)
+        )
+
+        # For expired objects, calculate expiry regen delay
+        key, expiry_key = jax.random.split(key)
+
+        # Process expiry for all positions that need it
+        def process_expiry(y, x, grid, spawn_grid, key):
+            obj_id = current_objects_for_expiry[y, x]
+            should_exp = should_expire[y, x]
+
+            def expire_object():
+                # Get expiry regen delay for this object
+                exp_key = jax.random.fold_in(key, y * self.size[0] + x)
+                exp_delay = jax.lax.switch(
+                    obj_id, self.expiry_regen_delay_fns, state.time, exp_key
+                )
+                encoded_exp_timer = obj_id - ((exp_delay + 1) * num_obj_types)
+
+                # Check if this object should respawn randomly
+                should_random_respawn = self.object_random_respawn[obj_id]
+
+                # Use second split for randomness in random placement
+                rand_key = jax.random.split(exp_key)[1]
+
+                # Place timer either at current position or random position
+                new_grid = jax.lax.cond(
+                    should_random_respawn,
+                    lambda: self._place_timer_at_random_position(
+                        grid, y, x, encoded_exp_timer, state.biome_grid, rand_key
+                    ),
+                    lambda: self._place_timer_at_position(
+                        grid, y, x, encoded_exp_timer
+                    ),
+                )
+
+                return new_grid, spawn_grid
+
+            def no_expire():
+                return grid, spawn_grid
+
+            return jax.lax.cond(should_exp, expire_object, no_expire)
+
+        # Apply expiry to all cells (vectorized)
+        def scan_expiry_row(carry, y):
+            grid, spawn_grid, key = carry
+
+            def scan_expiry_col(carry_col, x):
+                grid_col, spawn_grid_col, key_col = carry_col
+                grid_col, spawn_grid_col = process_expiry(
+                    y, x, grid_col, spawn_grid_col, key_col
+                )
+                return (grid_col, spawn_grid_col, key_col), None
+
+            (grid, spawn_grid, key), _ = jax.lax.scan(
+                scan_expiry_col, (grid, spawn_grid, key), jnp.arange(self.size[0])
+            )
+            return (grid, spawn_grid, key), None
+
+        (object_grid, object_spawn_time_grid, _), _ = jax.lax.scan(
+            scan_expiry_row,
+            (object_grid, object_spawn_time_grid, expiry_key),
+            jnp.arange(self.size[1]),
         )
 
         info = {"discount": self.discount(state, params)}
@@ -345,6 +468,7 @@ class ForagaxEnv(environment.Environment):
             biome_grid=state.biome_grid,
             time=state.time + 1,
             digestion_buffer=digestion_buffer,
+            object_spawn_time_grid=object_spawn_time_grid,
         )
 
         done = self.is_terminal(state, params)
@@ -378,12 +502,16 @@ class ForagaxEnv(environment.Environment):
         # Place agent in the center of the world
         agent_pos = jnp.array([self.size[0] // 2, self.size[1] // 2])
 
+        # Initialize spawn times to 0 (all objects spawn at time 0)
+        object_spawn_time_grid = jnp.zeros((self.size[1], self.size[0]), dtype=int)
+
         state = EnvState(
             pos=agent_pos,
             object_grid=object_grid,
             biome_grid=biome_grid,
             time=0,
             digestion_buffer=jnp.zeros((self.max_reward_delay,)),
+            object_spawn_time_grid=object_spawn_time_grid,
         )
 
         return self.get_obs(state, params), state
@@ -449,6 +577,12 @@ class ForagaxEnv(environment.Environment):
                     jnp.inf,
                     (self.max_reward_delay,),
                     float,
+                ),
+                "object_spawn_time_grid": spaces.Box(
+                    0,
+                    jnp.inf,
+                    (self.size[1], self.size[0]),
+                    int,
                 ),
             }
         )

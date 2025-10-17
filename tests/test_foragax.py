@@ -20,6 +20,7 @@ from foragax.objects import (
     THORNS,
     WALL,
     DefaultForagaxObject,
+    NormalRegenForagaxObject,
     WeatherObject,
 )
 
@@ -1079,12 +1080,12 @@ def test_info_multiple_weather_objects():
     assert len(info["temperatures"]) == 3  # EMPTY + 2 objects
     assert info["temperatures"][0] == 0.0  # EMPTY
     assert info["temperatures"][1] == 10.0  # hot object at index 1
-    assert info["temperatures"][2] == 5.0  # cold object at index 2 (raw temperature)
+    assert info["temperatures"][2] == -5.0  # cold object at index 2 (raw temperature)
 
     key, step_key = jax.random.split(key)
     _, state, _, _, info = env.step(step_key, state, Actions.UP, params)
     assert info["temperatures"][1] == 20.0  # hot next
-    assert info["temperatures"][2] == 15.0  # cold next
+    assert info["temperatures"][2] == -15.0  # cold next
 
 
 def test_info_biome_id():
@@ -1203,3 +1204,421 @@ def test_reward_delay():
     key, step_key = jax.random.split(key)
     _, state, reward, _, _ = env.step(step_key, state, Actions.UP, params)
     assert reward == 0.0
+
+
+def test_basic_object_expiry():
+    """Test that objects expire and respawn after expiry_time steps."""
+    # Create an object that expires after 5 steps with expiry_regen_delay=(2, 2)
+    # Note: Due to timer encoding, delay=2 actually takes 3 steps (consistent with regen_delay)
+    expiring_object = DefaultForagaxObject(
+        name="expiring",
+        reward=1.0,
+        collectable=False,  # Not collectable, so it won't be removed by collection
+        color=(255, 0, 0),
+        expiry_time=5,
+        expiry_regen_delay=(2, 2),  # Takes 3 steps due to +1 in timer encoding
+    )
+
+    env = ForagaxEnv(
+        size=(3, 3),
+        aperture_size=(3, 3),
+        objects=(expiring_object,),
+        biomes=(Biome(object_frequencies=(1.0,)),),
+        observation_type="object",
+    )
+
+    key = jax.random.key(0)
+    key, key_reset = jax.random.split(key)
+    obs, state = env.reset(key_reset, env.default_params)
+
+    # Initial state - all objects present
+    assert jnp.all(state.object_grid == 1)
+    assert jnp.all(state.object_spawn_time_grid == 0)
+
+    # Step through 5 times - objects should still be present
+    for _ in range(5):
+        key, key_step = jax.random.split(key)
+        obs, state, _, _, _ = env.step(
+            key_step, state, Actions.DOWN, env.default_params
+        )
+
+    assert jnp.all(state.object_grid == 1)
+    assert state.time == 5
+
+    # Step once more - objects should expire and become timers
+    key, key_step = jax.random.split(key)
+    obs, state, _, _, _ = env.step(key_step, state, Actions.DOWN, env.default_params)
+
+    assert jnp.all(state.object_grid < 0)  # All are now timers
+    assert jnp.all(
+        state.object_spawn_time_grid == 0
+    )  # Spawn time NOT updated yet (still at reset value)
+
+    # Step through regen delay (3 more steps due to +1 in encoding)
+    for _ in range(3):
+        key, key_step = jax.random.split(key)
+        obs, state, _, _, _ = env.step(
+            key_step, state, Actions.DOWN, env.default_params
+        )
+
+    assert jnp.all(state.object_grid == 1)  # Objects respawned
+    assert jnp.all(
+        state.object_spawn_time_grid == 8
+    )  # Spawn time = time at beginning of step when respawn occurred
+    assert state.time == 9  # Current time after step completes
+
+
+def test_no_expiry_backwards_compatibility():
+    """Test that objects without expiry_time don't expire."""
+    non_expiring_object = DefaultForagaxObject(
+        name="non_expiring",
+        reward=1.0,
+        collectable=False,
+        color=(0, 255, 0),
+    )
+
+    env = ForagaxEnv(
+        size=(3, 3),
+        aperture_size=(3, 3),
+        objects=(non_expiring_object,),
+        biomes=(Biome(object_frequencies=(1.0,)),),
+        observation_type="object",
+    )
+
+    key = jax.random.key(42)
+    key, key_reset = jax.random.split(key)
+    obs, state = env.reset(key_reset, env.default_params)
+
+    initial_grid = state.object_grid.copy()
+
+    # Step through many timesteps - grid should remain unchanged
+    for _ in range(20):
+        key, key_step = jax.random.split(key)
+        obs, state, _, _, _ = env.step(
+            key_step, state, Actions.DOWN, env.default_params
+        )
+
+    assert jnp.all(state.object_grid == initial_grid)
+    assert jnp.all(state.object_grid > 0)  # No timers
+
+
+def test_expiry_with_collection():
+    """Test that expiry works alongside collection."""
+    collectable_expiring = DefaultForagaxObject(
+        name="collectable_expiring",
+        reward=5.0,
+        collectable=True,
+        color=(255, 255, 0),
+        regen_delay=(3, 3),
+        expiry_time=10,
+        expiry_regen_delay=(5, 5),
+    )
+
+    env = ForagaxEnv(
+        size=(5, 5),
+        aperture_size=(5, 5),
+        objects=(collectable_expiring,),
+        biomes=(Biome(object_frequencies=(0.3,)),),
+        observation_type="object",
+    )
+
+    key = jax.random.key(123)
+    key, key_reset = jax.random.split(key)
+    obs, state = env.reset(key_reset, env.default_params)
+
+    # Count initial objects
+    initial_object_count = jnp.sum(state.object_grid > 0)
+    assert initial_object_count > 0
+
+    # Step through and collect/expire objects
+    collected_count = 0
+    for _ in range(20):
+        key, key_step = jax.random.split(key)
+        obs, state, reward, _, _ = env.step(
+            key_step, state, Actions.UP, env.default_params
+        )
+        if reward > 0:
+            collected_count += 1
+
+    # Should have collected at least some objects
+    assert collected_count > 0
+
+
+def test_expiry_with_normal_regen():
+    """Test expiry with NormalRegenForagaxObject."""
+    normal_expiring = NormalRegenForagaxObject(
+        name="normal_expiring",
+        reward=3.0,
+        collectable=False,
+        mean_regen_delay=10,
+        std_regen_delay=1,
+        color=(128, 128, 255),
+        expiry_time=8,
+        mean_expiry_regen_delay=4,
+        std_expiry_regen_delay=1,
+    )
+
+    env = ForagaxEnv(
+        size=(4, 4),
+        aperture_size=(4, 4),
+        objects=(normal_expiring,),
+        biomes=(Biome(object_frequencies=(1.0,)),),
+        observation_type="object",
+    )
+
+    key = jax.random.key(456)
+    key, key_reset = jax.random.split(key)
+    obs, state = env.reset(key_reset, env.default_params)
+
+    # All objects start present
+    assert jnp.all(state.object_grid == 1)
+
+    # Step until expiry
+    for _ in range(8):
+        key, key_step = jax.random.split(key)
+        obs, state, _, _, _ = env.step(
+            key_step, state, Actions.LEFT, env.default_params
+        )
+
+    # Objects should expire
+    key, key_step = jax.random.split(key)
+    obs, state, _, _, _ = env.step(key_step, state, Actions.LEFT, env.default_params)
+
+    assert jnp.all(state.object_grid < 0)  # All expired
+
+
+def test_mixed_expiry_times():
+    """Test objects with different expiry times."""
+    fast_expiry = DefaultForagaxObject(
+        name="fast",
+        reward=1.0,
+        collectable=False,
+        color=(255, 0, 0),
+        expiry_time=3,
+        expiry_regen_delay=(1, 1),
+    )
+
+    slow_expiry = DefaultForagaxObject(
+        name="slow",
+        reward=2.0,
+        collectable=False,
+        color=(0, 0, 255),
+        expiry_time=6,
+        expiry_regen_delay=(2, 2),
+    )
+
+    env = ForagaxEnv(
+        size=(5, 5),
+        aperture_size=(5, 5),
+        objects=(fast_expiry, slow_expiry),
+        biomes=(Biome(object_frequencies=(0.3, 0.3)),),
+        observation_type="object",
+    )
+
+    key = jax.random.key(789)
+    key, key_reset = jax.random.split(key)
+    obs, state = env.reset(key_reset, env.default_params)
+
+    # Count initial objects
+    fast_count = jnp.sum(state.object_grid == 1)
+    slow_count = jnp.sum(state.object_grid == 2)
+
+    # Step 4 times - fast should expire, slow should not
+    for _ in range(4):
+        key, key_step = jax.random.split(key)
+        obs, state, _, _, _ = env.step(
+            key_step, state, Actions.RIGHT, env.default_params
+        )
+
+    # Fast objects should be timers, slow objects should still be present
+    fast_after = jnp.sum(state.object_grid == 1)
+    slow_after = jnp.sum(state.object_grid == 2)
+
+    # Fast objects should have become timers (decreased count)
+    assert fast_after < fast_count
+    # Slow objects should still be present
+    assert slow_after == slow_count
+
+
+def test_expiry_spawn_time_tracking():
+    """Test that spawn times are correctly tracked for expiry."""
+    expiring_obj = DefaultForagaxObject(
+        name="expiring",
+        reward=1.0,
+        collectable=False,
+        color=(200, 100, 50),
+        expiry_time=5,
+        expiry_regen_delay=(2, 2),
+    )
+
+    env = ForagaxEnv(
+        size=(2, 2),
+        aperture_size=(2, 2),
+        objects=(expiring_obj,),
+        biomes=(Biome(object_frequencies=(1.0,)),),
+        observation_type="object",
+    )
+
+    key = jax.random.key(111)
+    key, key_reset = jax.random.split(key)
+    obs, state = env.reset(key_reset, env.default_params)
+
+    # Initial spawn times should be 0
+    assert jnp.all(state.object_spawn_time_grid == 0)
+
+    # Step until expiry
+    for step in range(6):
+        key, key_step = jax.random.split(key)
+        obs, state, _, _, _ = env.step(
+            key_step, state, Actions.DOWN, env.default_params
+        )
+
+    # After expiry (but before respawn), spawn times should still be 0
+    assert jnp.all(state.object_spawn_time_grid == 0)
+    assert jnp.all(state.object_grid < 0)  # Objects are timers
+
+    # Step through regen delay (3 steps)
+    for step in range(3):
+        key, key_step = jax.random.split(key)
+        obs, state, _, _, _ = env.step(
+            key_step, state, Actions.DOWN, env.default_params
+        )
+
+    # After respawn, spawn times should be updated to when respawn occurred
+    assert jnp.all(
+        state.object_spawn_time_grid == 8
+    )  # Time at beginning of step when respawn occurred
+    assert jnp.all(state.object_grid > 0)  # Objects respawned
+    assert state.time == 9  # Current time after step completes
+
+    # Ages should be 1 (respawned 1 step ago: current_time=9 - spawn_time=8)
+    ages = state.time - state.object_spawn_time_grid
+    assert jnp.all(ages == 1)
+
+
+def test_expiry_with_collectable_spawn_time_update():
+    """Test that spawn times update correctly when objects are collected."""
+    obj = DefaultForagaxObject(
+        name="test",
+        reward=1.0,
+        collectable=True,
+        color=(100, 200, 100),
+        regen_delay=(5, 5),
+        expiry_time=10,
+        expiry_regen_delay=(3, 3),
+    )
+
+    env = ForagaxEnv(
+        size=(3, 3),
+        aperture_size=(3, 3),
+        objects=(obj,),
+        biomes=(Biome(object_frequencies=(1.0,)),),
+        observation_type="object",
+    )
+
+    key = jax.random.key(222)
+    key, key_reset = jax.random.split(key)
+    obs, state = env.reset(key_reset, env.default_params)
+
+    # Initial spawn times should be 0
+    assert jnp.all(state.object_spawn_time_grid == 0)
+
+    # Move and collect object
+    total_reward = 0
+    collected_time = None
+    for step in range(10):
+        key, key_step = jax.random.split(key)
+        action = step % 4
+        obs, state, reward, _, _ = env.step(key_step, state, action, env.default_params)
+        total_reward += reward
+
+        if reward > 0 and collected_time is None:
+            collected_time = state.time
+            # When collected, spawn time should NOT change (still 0)
+            assert jnp.all(state.object_spawn_time_grid == 0)
+            break
+
+    # Should have collected at least one object
+    assert total_reward > 0
+    assert collected_time is not None
+
+    # Step through regen delay (6 more steps due to +1 in encoding)
+    for step in range(6):
+        key, key_step = jax.random.split(key)
+        obs, state, _, _, _ = env.step(
+            key_step, state, Actions.DOWN, env.default_params
+        )
+
+    # After respawn, spawn time should be updated to respawn time
+    # Respawn happens at beginning of step (collected_time + 6 - 1)
+    expected_respawn_time = collected_time + 5
+    # At least one object should have respawned and had its spawn time set
+    assert jnp.any(state.object_spawn_time_grid == expected_respawn_time)
+
+
+def test_expiry_with_random_respawn():
+    """Test that expired objects with random_respawn=True respawn at random locations within the same biome."""
+    expiring_random = DefaultForagaxObject(
+        name="expiring_random",
+        reward=1.0,
+        collectable=False,
+        random_respawn=True,  # Enable random respawn
+        color=(100, 200, 100),
+        expiry_time=3,
+        expiry_regen_delay=(1, 1),  # Short delay for quick test
+    )
+
+    # Create environment with lower frequency to allow empty cells for random respawn
+    env = ForagaxEnv(
+        size=(6, 6),
+        aperture_size=(6, 6),
+        objects=(expiring_random,),
+        biomes=(
+            Biome(
+                start=(0, 0), stop=(6, 6), object_frequencies=(0.5,)
+            ),  # Single biome with 50% occupancy
+        ),
+        observation_type="object",
+    )
+
+    key = jax.random.key(999)
+    key, key_reset = jax.random.split(key)
+    obs, state = env.reset(key_reset, env.default_params)
+
+    # Record initial object positions
+    initial_object_positions = state.object_grid == 1
+
+    # Step until expiry (4 steps - expiry happens when age >= expiry_time)
+    for _ in range(4):
+        key, key_step = jax.random.split(key)
+        obs, state, _, _, _ = env.step(
+            key_step, state, Actions.DOWN, env.default_params
+        )
+
+    # Some objects should have expired and become timers
+    has_timers = jnp.any(state.object_grid < 0)
+    assert has_timers, "At least some objects should have expired"
+
+    # Step through regen delay (2 steps due to +1 encoding)
+    for _ in range(2):
+        key, key_step = jax.random.split(key)
+        obs, state, _, _, _ = env.step(
+            key_step, state, Actions.DOWN, env.default_params
+        )
+
+    # Objects should have respawned
+    final_object_positions = state.object_grid == 1
+
+    # With random respawn, objects should not all be in their original positions
+    # (This is a probabilistic test - with true randomness, it's very unlikely all objects
+    # would end up in exactly the same positions)
+    positions_unchanged = jnp.all(initial_object_positions == final_object_positions)
+    assert not positions_unchanged, (
+        "Objects should respawn at random locations, not all in original positions"
+    )
+
+    # But they should still be within the biome
+    biome_mask = state.biome_grid == 0
+    assert jnp.all(
+        (state.object_grid == 0) | ((state.object_grid == 1) & biome_mask)
+    ), "All objects should be within the biome"

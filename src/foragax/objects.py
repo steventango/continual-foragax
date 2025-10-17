@@ -18,6 +18,7 @@ class BaseForagaxObject:
         color: Tuple[int, int, int] = (0, 0, 0),
         random_respawn: bool = False,
         max_reward_delay: int = 0,
+        expiry_time: Optional[int] = None,
     ):
         self.name = name
         self.blocking = blocking
@@ -25,6 +26,7 @@ class BaseForagaxObject:
         self.color = color
         self.random_respawn = random_respawn
         self.max_reward_delay = max_reward_delay
+        self.expiry_time = expiry_time
 
     @abc.abstractmethod
     def reward(self, clock: int, rng: jax.Array) -> float:
@@ -34,6 +36,11 @@ class BaseForagaxObject:
     @abc.abstractmethod
     def reward_delay(self, clock: int, rng: jax.Array) -> int:
         """Reward delay function."""
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def expiry_regen_delay(self, clock: int, rng: jax.Array) -> int:
+        """Expiry regeneration delay function."""
         raise NotImplementedError
 
 
@@ -51,15 +58,24 @@ class DefaultForagaxObject(BaseForagaxObject):
         random_respawn: bool = False,
         reward_delay: int = 0,
         max_reward_delay: Optional[int] = None,
+        expiry_time: Optional[int] = None,
+        expiry_regen_delay: Tuple[int, int] = (10, 100),
     ):
         if max_reward_delay is None:
             max_reward_delay = reward_delay
         super().__init__(
-            name, blocking, collectable, color, random_respawn, max_reward_delay
+            name,
+            blocking,
+            collectable,
+            color,
+            random_respawn,
+            max_reward_delay,
+            expiry_time,
         )
         self.reward_val = reward
         self.regen_delay_range = regen_delay
         self.reward_delay_val = reward_delay
+        self.expiry_regen_delay_range = expiry_regen_delay
 
     def reward(self, clock: int, rng: jax.Array) -> float:
         """Default reward function."""
@@ -73,6 +89,11 @@ class DefaultForagaxObject(BaseForagaxObject):
     def reward_delay(self, clock: int, rng: jax.Array) -> int:
         """Default reward delay function."""
         return self.reward_delay_val
+
+    def expiry_regen_delay(self, clock: int, rng: jax.Array) -> int:
+        """Default expiry regeneration delay function."""
+        min_delay, max_delay = self.expiry_regen_delay_range
+        return jax.random.randint(rng, (), min_delay, max_delay)
 
 
 class NormalRegenForagaxObject(DefaultForagaxObject):
@@ -89,7 +110,16 @@ class NormalRegenForagaxObject(DefaultForagaxObject):
         random_respawn: bool = False,
         reward_delay: int = 0,
         max_reward_delay: Optional[int] = None,
+        expiry_time: Optional[int] = None,
+        mean_expiry_regen_delay: Optional[int] = None,
+        std_expiry_regen_delay: Optional[int] = None,
     ):
+        # If expiry regen delays not provided, use same as normal regen
+        if mean_expiry_regen_delay is None:
+            mean_expiry_regen_delay = mean_regen_delay
+        if std_expiry_regen_delay is None:
+            std_expiry_regen_delay = std_regen_delay
+
         super().__init__(
             name=name,
             reward=reward,
@@ -99,13 +129,25 @@ class NormalRegenForagaxObject(DefaultForagaxObject):
             random_respawn=random_respawn,
             reward_delay=reward_delay,
             max_reward_delay=max_reward_delay,
+            expiry_time=expiry_time,
+            expiry_regen_delay=(mean_expiry_regen_delay, mean_expiry_regen_delay),
         )
         self.mean_regen_delay = mean_regen_delay
         self.std_regen_delay = std_regen_delay
+        self.mean_expiry_regen_delay = mean_expiry_regen_delay
+        self.std_expiry_regen_delay = std_expiry_regen_delay
 
     def regen_delay(self, clock: int, rng: jax.Array) -> int:
         """Regeneration delay from a normal distribution."""
         delay = self.mean_regen_delay + jax.random.normal(rng) * self.std_regen_delay
+        return jnp.maximum(0, delay).astype(int)
+
+    def expiry_regen_delay(self, clock: int, rng: jax.Array) -> int:
+        """Expiry regeneration delay from a normal distribution."""
+        delay = (
+            self.mean_expiry_regen_delay
+            + jax.random.normal(rng) * self.std_expiry_regen_delay
+        )
         return jnp.maximum(0, delay).astype(int)
 
 
@@ -124,6 +166,9 @@ class WeatherObject(NormalRegenForagaxObject):
         random_respawn: bool = False,
         reward_delay: int = 0,
         max_reward_delay: Optional[int] = None,
+        expiry_time: Optional[int] = None,
+        mean_expiry_regen_delay: Optional[int] = None,
+        std_expiry_regen_delay: Optional[int] = None,
     ):
         super().__init__(
             name=name,
@@ -134,6 +179,9 @@ class WeatherObject(NormalRegenForagaxObject):
             random_respawn=random_respawn,
             reward_delay=reward_delay,
             max_reward_delay=max_reward_delay,
+            expiry_time=expiry_time,
+            mean_expiry_regen_delay=mean_expiry_regen_delay,
+            std_expiry_regen_delay=std_expiry_regen_delay,
         )
         self.rewards = rewards * multiplier
         self.repeat = repeat
@@ -332,6 +380,44 @@ GREEN_FAKE_UNIFORM_RANDOM = DefaultForagaxObject(
     random_respawn=True,
 )
 
+# Random respawn variants with expiry
+BROWN_MOREL_UNIFORM_RANDOM_EXPIRY = DefaultForagaxObject(
+    name="brown_morel",
+    reward=10.0,
+    collectable=True,
+    color=(63, 30, 25),
+    regen_delay=(90, 110),
+    random_respawn=True,
+    expiry_time=500,
+)
+BROWN_OYSTER_UNIFORM_RANDOM_EXPIRY = DefaultForagaxObject(
+    name="brown_oyster",
+    reward=1.0,
+    collectable=True,
+    color=(63, 30, 25),
+    regen_delay=(9, 11),
+    random_respawn=True,
+    expiry_time=500,
+)
+GREEN_DEATHCAP_UNIFORM_RANDOM_EXPIRY = DefaultForagaxObject(
+    name="green_deathcap",
+    reward=-5.0,
+    collectable=True,
+    color=(0, 255, 0),
+    regen_delay=(9, 11),
+    random_respawn=True,
+    expiry_time=500,
+)
+GREEN_FAKE_UNIFORM_RANDOM_EXPIRY = DefaultForagaxObject(
+    name="green_fake",
+    reward=0.0,
+    collectable=True,
+    color=(0, 255, 0),
+    regen_delay=(9, 11),
+    random_respawn=True,
+    expiry_time=500,
+)
+
 
 def create_weather_objects(
     file_index: int = 0,
@@ -340,6 +426,9 @@ def create_weather_objects(
     same_color: bool = False,
     random_respawn: bool = False,
     reward_delay: int = 0,
+    expiry_time: Optional[int] = None,
+    mean_expiry_regen_delay: Optional[int] = None,
+    std_expiry_regen_delay: Optional[int] = None,
 ):
     """Create HOT and COLD WeatherObject instances using the specified file.
 
@@ -348,6 +437,11 @@ def create_weather_objects(
         repeat: How many steps each temperature value repeats for.
         multiplier: Base multiplier applied to HOT; COLD will use -multiplier.
         same_color: If True, both HOT and COLD use the same color.
+        random_respawn: If True, objects respawn at random locations.
+        reward_delay: Number of steps before reward is delivered.
+        expiry_time: Time steps before object expires (None = no expiry).
+        mean_expiry_regen_delay: Mean delay for expiry respawn.
+        std_expiry_regen_delay: Standard deviation for expiry respawn delay.
 
     Returns:
         A tuple (HOT, COLD) of WeatherObject instances.
@@ -370,6 +464,9 @@ def create_weather_objects(
         color=hot_color,
         random_respawn=random_respawn,
         reward_delay=reward_delay,
+        expiry_time=expiry_time,
+        mean_expiry_regen_delay=mean_expiry_regen_delay,
+        std_expiry_regen_delay=std_expiry_regen_delay,
     )
 
     cold_color = hot_color if same_color else (0, 255, 255)
@@ -381,6 +478,9 @@ def create_weather_objects(
         color=cold_color,
         random_respawn=random_respawn,
         reward_delay=reward_delay,
+        expiry_time=expiry_time,
+        mean_expiry_regen_delay=mean_expiry_regen_delay,
+        std_expiry_regen_delay=std_expiry_regen_delay,
     )
 
     return hot, cold

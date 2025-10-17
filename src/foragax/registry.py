@@ -12,18 +12,22 @@ from foragax.objects import (
     BROWN_MOREL_2,
     BROWN_MOREL_UNIFORM,
     BROWN_MOREL_UNIFORM_RANDOM,
+    BROWN_MOREL_UNIFORM_RANDOM_EXPIRY,
     BROWN_OYSTER,
     BROWN_OYSTER_UNIFORM,
     BROWN_OYSTER_UNIFORM_RANDOM,
+    BROWN_OYSTER_UNIFORM_RANDOM_EXPIRY,
     GREEN_DEATHCAP,
     GREEN_DEATHCAP_2,
     GREEN_DEATHCAP_3,
     GREEN_DEATHCAP_UNIFORM,
     GREEN_DEATHCAP_UNIFORM_RANDOM,
+    GREEN_DEATHCAP_UNIFORM_RANDOM_EXPIRY,
     GREEN_FAKE,
     GREEN_FAKE_2,
     GREEN_FAKE_UNIFORM,
     GREEN_FAKE_UNIFORM_RANDOM,
+    GREEN_FAKE_UNIFORM_RANDOM_EXPIRY,
     LARGE_MOREL,
     LARGE_OYSTER,
     MEDIUM_MOREL,
@@ -302,6 +306,26 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
         ),
         "biomes": None,
         "nowrap": True,
+        "deterministic_spawn": True,
+    },
+    "ForagaxTwoBiome-v17": {
+        "size": (15, 15),
+        "aperture_size": None,
+        "objects": (
+            BROWN_MOREL_UNIFORM_RANDOM_EXPIRY,
+            BROWN_OYSTER_UNIFORM_RANDOM_EXPIRY,
+            GREEN_DEATHCAP_UNIFORM_RANDOM_EXPIRY,
+            GREEN_FAKE_UNIFORM_RANDOM_EXPIRY,
+        ),
+        "biomes": (
+            # Morel biome
+            Biome(start=(3, 0), stop=(5, 15), object_frequencies=(0.25, 0.0, 0.5, 0.0)),
+            # Oyster biome
+            Biome(
+                start=(10, 0), stop=(12, 15), object_frequencies=(0.0, 0.25, 0.0, 0.5)
+            ),
+        ),
+        "nowrap": False,
         "deterministic_spawn": True,
     },
     "ForagaxTwoBiomeSmall-v1": {

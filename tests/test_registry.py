@@ -451,3 +451,70 @@ def test_reward_delay_parameter_weather_environments():
 
     assert delays_0 == 0, "reward_delay should return 0 for delays=0"
     assert delays_5 == 5, "reward_delay should return 5 for delays=5"
+
+
+def test_foragax_twobiome_v17_registry():
+    """Test that ForagaxTwoBiome-v17 can be created via registry and has correct config."""
+    env = make("ForagaxTwoBiome-v17", aperture_size=(5, 5))
+
+    # Check basic configuration
+    assert env.name == "ForagaxTwoBiome-v17"
+    assert env.deterministic_spawn is True
+    assert env.nowrap is False
+
+    # Check that objects have random_respawn=True and expiry_time=500
+    morel, oyster, deathcap, fake = (
+        env.objects[1],
+        env.objects[2],
+        env.objects[3],
+        env.objects[4],
+    )  # Skip EMPTY
+    assert morel.name == "brown_morel"
+    assert oyster.name == "brown_oyster"
+    assert deathcap.name == "green_deathcap"
+    assert fake.name == "green_fake"
+    assert morel.random_respawn is True
+    assert oyster.random_respawn is True
+    assert deathcap.random_respawn is True
+    assert fake.random_respawn is True
+    assert morel.expiry_time == 500
+    assert oyster.expiry_time == 500
+    assert deathcap.expiry_time == 500
+    assert fake.expiry_time == 500
+
+    # Test basic functionality
+    key = jax.random.key(0)
+    obs, state = env.reset(key, env.default_params)
+    assert obs.shape == (5, 5, 2)  # 2 color channels (brown, green)
+
+    # Test stepping
+    key, step_key = jax.random.split(key)
+    action = env.action_space(env.default_params).sample(step_key)
+    obs2, state2, reward, done, info = env.step(
+        step_key, state, action, env.default_params
+    )
+    assert obs2.shape == (5, 5, 2)
+    assert not done
+
+
+def test_foragax_twobiome_v17_expiry():
+    """Test that ForagaxTwoBiome-v17 objects have expiry_time=500."""
+    env = make("ForagaxTwoBiome-v17", aperture_size=(5, 5))
+
+    # Check that objects have expiry_time=500
+    morel, oyster, deathcap, fake = (
+        env.objects[1],
+        env.objects[2],
+        env.objects[3],
+        env.objects[4],
+    )
+    assert morel.expiry_time == 500
+    assert oyster.expiry_time == 500
+    assert deathcap.expiry_time == 500
+    assert fake.expiry_time == 500
+
+    # Check that expiry_time is properly stored in the environment
+    assert env.object_expiry_time[1] == 500  # morel
+    assert env.object_expiry_time[2] == 500  # oyster
+    assert env.object_expiry_time[3] == 500  # deathcap
+    assert env.object_expiry_time[4] == 500  # fake
