@@ -1052,7 +1052,7 @@ def test_info_multiple_weather_objects():
     # Create two weather objects
     hot_obj = WeatherObject(
         name="hot",
-        rewards=jnp.array([10.0, 20.0]),
+        rewards=jnp.array([10.0 , 20.0]),
         repeat=1,
         multiplier=1.0,
     )
