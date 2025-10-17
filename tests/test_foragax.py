@@ -1554,3 +1554,71 @@ def test_expiry_with_collectable_spawn_time_update():
     expected_respawn_time = collected_time + 5
     # At least one object should have respawned and had its spawn time set
     assert jnp.any(state.object_spawn_time_grid == expected_respawn_time)
+
+
+def test_expiry_with_random_respawn():
+    """Test that expired objects with random_respawn=True respawn at random locations within the same biome."""
+    expiring_random = DefaultForagaxObject(
+        name="expiring_random",
+        reward=1.0,
+        collectable=False,
+        random_respawn=True,  # Enable random respawn
+        color=(100, 200, 100),
+        expiry_time=3,
+        expiry_regen_delay=(1, 1),  # Short delay for quick test
+    )
+
+    # Create environment with lower frequency to allow empty cells for random respawn
+    env = ForagaxEnv(
+        size=(6, 6),
+        aperture_size=(6, 6),
+        objects=(expiring_random,),
+        biomes=(
+            Biome(
+                start=(0, 0), stop=(6, 6), object_frequencies=(0.5,)
+            ),  # Single biome with 50% occupancy
+        ),
+        observation_type="object",
+    )
+
+    key = jax.random.key(999)
+    key, key_reset = jax.random.split(key)
+    obs, state = env.reset(key_reset, env.default_params)
+
+    # Record initial object positions
+    initial_object_positions = state.object_grid == 1
+
+    # Step until expiry (4 steps - expiry happens when age >= expiry_time)
+    for _ in range(4):
+        key, key_step = jax.random.split(key)
+        obs, state, _, _, _ = env.step(
+            key_step, state, Actions.DOWN, env.default_params
+        )
+
+    # Some objects should have expired and become timers
+    has_timers = jnp.any(state.object_grid < 0)
+    assert has_timers, "At least some objects should have expired"
+
+    # Step through regen delay (2 steps due to +1 encoding)
+    for _ in range(2):
+        key, key_step = jax.random.split(key)
+        obs, state, _, _, _ = env.step(
+            key_step, state, Actions.DOWN, env.default_params
+        )
+
+    # Objects should have respawned
+    final_object_positions = state.object_grid == 1
+
+    # With random respawn, objects should not all be in their original positions
+    # (This is a probabilistic test - with true randomness, it's very unlikely all objects
+    # would end up in exactly the same positions)
+    positions_unchanged = jnp.all(initial_object_positions == final_object_positions)
+    assert not positions_unchanged, (
+        "Objects should respawn at random locations, not all in original positions"
+    )
+
+    # But they should still be within the biome
+    biome_mask = state.biome_grid == 0
+    assert jnp.all(
+        (state.object_grid == 0) | ((state.object_grid == 1) & biome_mask)
+    ), "All objects should be within the biome"
