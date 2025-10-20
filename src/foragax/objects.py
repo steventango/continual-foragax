@@ -191,6 +191,68 @@ class WeatherObject(NormalRegenForagaxObject):
         return get_temperature(self.rewards, clock, self.repeat)
 
 
+class FourierRewardObject(NormalRegenForagaxObject):
+    """Object with reward based on a randomly sampled Fourier series."""
+
+    def __init__(
+        self,
+        name: str,
+        fourier_coeffs: jnp.ndarray,
+        period: int = 1000,
+        mean_regen_delay: int = 10,
+        std_regen_delay: int = 1,
+        color: Tuple[int, int, int] = (0, 0, 0),
+        random_respawn: bool = False,
+        reward_delay: int = 0,
+        max_reward_delay: Optional[int] = None,
+        expiry_time: Optional[int] = None,
+        mean_expiry_regen_delay: Optional[int] = None,
+        std_expiry_regen_delay: Optional[int] = None,
+    ):
+        """Initialize FourierRewardObject.
+
+        Args:
+            name: Object name
+            fourier_coeffs: Array of shape (num_terms, 2) where each row contains [amplitude, phase]
+                The reward is computed as: sum(amplitude * sin(2*pi*k*t/period + phase)) for k=1..num_terms
+            period: Period of the Fourier series
+            mean_regen_delay: Mean regeneration delay
+            std_regen_delay: Standard deviation of regeneration delay
+            color: RGB color tuple
+            random_respawn: Whether to respawn at random locations
+            reward_delay: Delay before reward is delivered
+            max_reward_delay: Maximum reward delay
+            expiry_time: Time before object expires
+            mean_expiry_regen_delay: Mean expiry regeneration delay
+            std_expiry_regen_delay: Standard deviation of expiry regen delay
+        """
+        super().__init__(
+            name=name,
+            collectable=True,
+            mean_regen_delay=mean_regen_delay,
+            std_regen_delay=std_regen_delay,
+            color=color,
+            random_respawn=random_respawn,
+            reward_delay=reward_delay,
+            max_reward_delay=max_reward_delay,
+            expiry_time=expiry_time,
+            mean_expiry_regen_delay=mean_expiry_regen_delay,
+            std_expiry_regen_delay=std_expiry_regen_delay,
+        )
+        self.fourier_coeffs = fourier_coeffs
+        self.period = period
+
+    def reward(self, clock: int, rng: jax.Array) -> float:
+        """Reward based on Fourier series."""
+        t = clock / self.period
+        # Compute sum of amplitude * sin(2*pi*k*t + phase) for each term
+        k = jnp.arange(1, len(self.fourier_coeffs) + 1)
+        amplitudes = self.fourier_coeffs[:, 0]
+        phases = self.fourier_coeffs[:, 1]
+        terms = amplitudes * jnp.sin(2 * jnp.pi * k * t + phases)
+        return jnp.sum(terms)
+
+
 EMPTY = DefaultForagaxObject()
 WALL = DefaultForagaxObject(name="wall", blocking=True, color=(127, 127, 127))
 FLOWER = DefaultForagaxObject(
@@ -475,6 +537,81 @@ def create_weather_objects(
         rewards=rewards,
         repeat=repeat,
         multiplier=-multiplier,
+        color=cold_color,
+        random_respawn=random_respawn,
+        reward_delay=reward_delay,
+        expiry_time=expiry_time,
+        mean_expiry_regen_delay=mean_expiry_regen_delay,
+        std_expiry_regen_delay=std_expiry_regen_delay,
+    )
+
+    return hot, cold
+
+
+def create_fourier_objects(
+    rng_key: jax.Array,
+    num_terms: int = 5,
+    period: int = 1000,
+    amplitude_scale: float = 1.0,
+    same_color: bool = True,
+    random_respawn: bool = False,
+    reward_delay: int = 0,
+    expiry_time: Optional[int] = None,
+    mean_expiry_regen_delay: Optional[int] = None,
+    std_expiry_regen_delay: Optional[int] = None,
+):
+    """Create HOT and COLD FourierRewardObject instances with random coefficients.
+
+    Args:
+        rng_key: JAX random key for generating Fourier coefficients.
+        num_terms: Number of Fourier terms (harmonics).
+        period: Period of the Fourier series.
+        amplitude_scale: Scale factor for amplitudes.
+        same_color: If True, both HOT and COLD use the same color.
+        random_respawn: If True, objects respawn at random locations.
+        reward_delay: Number of steps before reward is delivered.
+        expiry_time: Time steps before object expires (None = no expiry).
+        mean_expiry_regen_delay: Mean delay for expiry respawn.
+        std_expiry_regen_delay: Standard deviation for expiry respawn delay.
+
+    Returns:
+        A tuple (HOT, COLD) of FourierRewardObject instances.
+    """
+    # Generate random Fourier coefficients for hot object
+    key_hot, key_cold = jax.random.split(rng_key)
+
+    # Amplitudes: random from normal distribution scaled by amplitude_scale
+    # Phases: random from uniform [0, 2π]
+    key_amp_hot, key_phase_hot = jax.random.split(key_hot)
+    hot_amplitudes = jax.random.normal(key_amp_hot, (num_terms,)) * amplitude_scale
+    hot_phases = jax.random.uniform(key_phase_hot, (num_terms,)) * 2 * jnp.pi
+    hot_coeffs = jnp.stack([hot_amplitudes, hot_phases], axis=1)
+
+    # Cold object uses negated amplitudes (opposite rewards)
+    key_amp_cold, key_phase_cold = jax.random.split(key_cold)
+    cold_amplitudes = -hot_amplitudes  # Opposite sign
+    cold_phases = jax.random.uniform(key_phase_cold, (num_terms,)) * 2 * jnp.pi
+    cold_coeffs = jnp.stack([cold_amplitudes, cold_phases], axis=1)
+
+    hot_color = (63, 30, 25) if same_color else (255, 128, 0)
+    cold_color = hot_color if same_color else (0, 128, 255)
+
+    hot = FourierRewardObject(
+        name="hot_fourier",
+        fourier_coeffs=hot_coeffs,
+        period=period,
+        color=hot_color,
+        random_respawn=random_respawn,
+        reward_delay=reward_delay,
+        expiry_time=expiry_time,
+        mean_expiry_regen_delay=mean_expiry_regen_delay,
+        std_expiry_regen_delay=std_expiry_regen_delay,
+    )
+
+    cold = FourierRewardObject(
+        name="cold_fourier",
+        fourier_coeffs=cold_coeffs,
+        period=period,
         color=cold_color,
         random_respawn=random_respawn,
         reward_delay=reward_delay,

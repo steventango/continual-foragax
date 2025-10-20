@@ -63,6 +63,11 @@ class EnvState(environment.EnvState):
     time: int
     digestion_buffer: jax.Array
     object_spawn_time_grid: jax.Array
+    biome_objects_collected: jax.Array  # Number of objects collected per biome
+    biome_total_spawned: jax.Array  # Total objects spawned per biome
+    biome_regenerated: jax.Array  # Whether each biome has been regenerated (bool)
+    object_colors: jax.Array  # (num_objects, 3) - RGB colors for each object type
+    fourier_params: jax.Array  # (num_objects, 2*num_harmonics + 1) - [period, a_1, b_1, a_2, b_2, ..., a_n, b_n]
 
 
 class ForagaxEnv(environment.Environment):
@@ -79,6 +84,8 @@ class ForagaxEnv(environment.Environment):
         deterministic_spawn: bool = False,
         teleport_interval: Optional[int] = None,
         observation_type: str = "object",
+        biome_regen_threshold: float = 0.0,
+        alternate_objects: Optional[Tuple[BaseForagaxObject, ...]] = None,
     ):
         super().__init__()
         self._name = name
@@ -100,10 +107,35 @@ class ForagaxEnv(environment.Environment):
         self.nowrap = nowrap
         self.deterministic_spawn = deterministic_spawn
         self.teleport_interval = teleport_interval
+        self.biome_regen_threshold = (
+            biome_regen_threshold  # 0.0 means disabled, 0.9 means 90%
+        )
+        self.num_fourier_harmonics = 50  # Number of harmonics for Fourier series
+
+        # Combine primary and alternate objects into a single list
+        # Primary objects: indices 0 to len(objects)-1
+        # Alternate objects: indices len(objects) to len(objects)+len(alternate_objects)-1
         objects = (EMPTY,) + objects
-        if self.nowrap and not self.full_world:
-            objects = objects + (PADDING,)
-        self.objects = objects
+        if alternate_objects is not None:
+            alternate_objects_tuple = (EMPTY,) + alternate_objects
+            if self.nowrap and not self.full_world:
+                # Add padding to both sets
+                objects = objects + (PADDING,)
+                alternate_objects_tuple = alternate_objects_tuple + (PADDING,)
+            # Combine all objects
+            all_objects = (
+                objects + alternate_objects_tuple[1:]
+            )  # Skip EMPTY from alternates to avoid duplicate
+            self.num_primary_objects = len(objects)
+            self.has_alternate_objects = True
+        else:
+            if self.nowrap and not self.full_world:
+                objects = objects + (PADDING,)
+            all_objects = objects
+            self.num_primary_objects = len(objects)
+            self.has_alternate_objects = False
+
+        self.objects = all_objects
 
         # JIT-compatible versions of object and biome properties
         self.object_ids = jnp.arange(len(objects))
@@ -127,6 +159,57 @@ class ForagaxEnv(environment.Environment):
         self.max_reward_delay = (
             int(jnp.max(object_max_reward_delay)) + 1 if len(objects) > 0 else 0
         )
+
+        # Store initial object colors (will be copied to state)
+        self.initial_object_colors = self.object_colors.copy()
+
+        # Initialize Fourier parameters (will be copied to state and potentially modified)
+        # Shape: (num_objects, 2*num_harmonics + 1) where first element is period, rest are [a_1, b_1, a_2, b_2, ...]
+        # Initially set to zeros - will be populated if needed during biome regeneration
+        self.initial_fourier_params = jnp.zeros(
+            (len(objects), 2 * self.num_fourier_harmonics + 1)
+        )
+
+        # Setup alternate objects if biome regeneration is enabled
+        if self.has_alternate_objects:
+            self.alt_object_ids = jnp.arange(len(self.alternate_objects))
+            self.alt_object_blocking = jnp.array(
+                [o.blocking for o in self.alternate_objects]
+            )
+            self.alt_object_collectable = jnp.array(
+                [o.collectable for o in self.alternate_objects]
+            )
+            self.alt_object_colors = jnp.array(
+                [o.color for o in self.alternate_objects]
+            )
+            self.alt_object_random_respawn = jnp.array(
+                [o.random_respawn for o in self.alternate_objects]
+            )
+
+            self.alt_reward_fns = [o.reward for o in self.alternate_objects]
+            self.alt_regen_delay_fns = [o.regen_delay for o in self.alternate_objects]
+            self.alt_reward_delay_fns = [o.reward_delay for o in self.alternate_objects]
+            self.alt_expiry_regen_delay_fns = [
+                o.expiry_regen_delay for o in self.alternate_objects
+            ]
+
+            self.alt_object_expiry_time = jnp.array(
+                [
+                    o.expiry_time if o.expiry_time is not None else -1
+                    for o in self.alternate_objects
+                ]
+            )
+
+            alt_object_max_reward_delay = jnp.array(
+                [o.max_reward_delay for o in self.alternate_objects]
+            )
+            alt_max_reward_delay = (
+                int(jnp.max(alt_object_max_reward_delay)) + 1
+                if len(self.alternate_objects) > 0
+                else 0
+            )
+            # Use the maximum of both object sets for buffer size
+            self.max_reward_delay = max(self.max_reward_delay, alt_max_reward_delay)
 
         self.biome_object_frequencies = jnp.array(
             [b.object_frequencies for b in biomes]
@@ -189,6 +272,21 @@ class ForagaxEnv(environment.Environment):
                 next_channel += 1
             color_indices = color_indices.at[i].set(color_map[color_tuple])
 
+        # If we have alternate objects, also include their colors in the mapping
+        if self.has_alternate_objects:
+            alt_object_colors_no_empty = self.alt_object_colors[1:]
+            alt_color_indices = jnp.zeros(len(alt_object_colors_no_empty), dtype=int)
+
+            for i, color in enumerate(alt_object_colors_no_empty):
+                color_tuple = tuple(color.tolist())
+                if color_tuple not in color_map:
+                    color_map[color_tuple] = next_channel
+                    unique_colors.append(color)
+                    next_channel += 1
+                alt_color_indices = alt_color_indices.at[i].set(color_map[color_tuple])
+
+            self.alt_object_to_color_map = alt_color_indices
+
         self.unique_colors = jnp.array(unique_colors)
         self.num_color_channels = len(unique_colors)
         # color_indices maps from object_id-1 to color_channel_index
@@ -199,6 +297,38 @@ class ForagaxEnv(environment.Environment):
         return EnvParams(
             max_steps_in_episode=None,
         )
+
+    def _compute_fourier_reward(self, fourier_params: jax.Array, time: int) -> float:
+        """Compute reward from Fourier series parameters using harmonic decomposition.
+
+        Args:
+            fourier_params: Array of shape (2*num_harmonics + 1,) where:
+                - fourier_params[0] = period
+                - fourier_params[1::2] = a_n (cosine coefficients)
+                - fourier_params[2::2] = b_n (sine coefficients)
+            time: Current timestep
+
+        Returns:
+            Reward value computed from normalized Fourier series sum
+        """
+        period = fourier_params[0]
+
+        # Extract cosine and sine coefficients
+        a_n = fourier_params[1::2]  # a_1, a_2, a_3, ...
+        b_n = fourier_params[2::2]  # b_1, b_2, b_3, ...
+
+        # Compute Fourier series: sum of a_n * cos(2πnx/period) + b_n * sin(2πnx/period)
+        n_harmonics = len(a_n)
+        harmonics = jnp.arange(1, n_harmonics + 1)
+
+        # Compute all harmonic contributions
+        cos_terms = a_n * jnp.cos(2 * jnp.pi * harmonics * time / period)
+        sin_terms = b_n * jnp.sin(2 * jnp.pi * harmonics * time / period)
+
+        # Sum all terms (already normalized to [-1, 1] during generation)
+        reward = jnp.sum(cos_terms + sin_terms)
+
+        return reward
 
     def _place_timer_at_position(
         self, grid: jax.Array, y: int, x: int, timer_val: int
@@ -294,9 +424,18 @@ class ForagaxEnv(environment.Environment):
         # Handle digestion: add reward to buffer if collected
         digestion_buffer = state.digestion_buffer
         key, reward_subkey = jax.random.split(key)
-        object_reward = jax.lax.switch(
+
+        # Check if this object has Fourier parameters set (sum of all params > 0)
+        obj_fourier_params = state.fourier_params[obj_at_pos]
+        has_fourier = jnp.sum(jnp.abs(obj_fourier_params)) > 0.0
+
+        # Compute reward: use Fourier if available, otherwise use object's reward function
+        fourier_reward = self._compute_fourier_reward(obj_fourier_params, state.time)
+        default_reward = jax.lax.switch(
             obj_at_pos, self.reward_fns, state.time, reward_subkey
         )
+        object_reward = jnp.where(has_fourier, fourier_reward, default_reward)
+
         key, digestion_subkey = jax.random.split(key)
         reward_delay = jax.lax.switch(
             obj_at_pos, self.reward_delay_fns, state.time, digestion_subkey
@@ -461,6 +600,189 @@ class ForagaxEnv(environment.Environment):
         info["biome_id"] = state.biome_grid[pos[1], pos[0]]
         info["object_collected_id"] = jax.lax.select(should_collect, obj_at_pos, -1)
 
+        # 3.6. TRACK BIOME CONSUMPTION AND REGENERATION
+        # Update collection counter if we collected an object
+        biome_id = state.biome_grid[pos[1], pos[0]]
+        biome_objects_collected = jax.lax.cond(
+            should_collect,
+            lambda: state.biome_objects_collected.at[biome_id].add(1),
+            lambda: state.biome_objects_collected,
+        )
+
+        # Check if any biome should regenerate (>= threshold % collected)
+        biome_consumption_ratio = jnp.where(
+            state.biome_total_spawned > 0,
+            biome_objects_collected / state.biome_total_spawned,
+            0.0,
+        )
+
+        # Regenerate biomes that hit threshold and haven't been regenerated yet
+        should_regenerate_biomes = (
+            (biome_consumption_ratio >= self.biome_regen_threshold)
+            & (self.biome_regen_threshold > 0)
+            & ~state.biome_regenerated
+        )
+
+        # Apply biome regeneration if needed
+        def regenerate_biome(biome_idx, grid, spawn_grid, colors, fourier, regen_key):
+            """Regenerate a single biome with new colors and Fourier parameters."""
+            mask = self.biome_masks[biome_idx]
+
+            # Clear existing objects in this biome and regenerate
+            grid = jnp.where(mask, 0, grid)
+            spawn_grid = jnp.where(mask, state.time, spawn_grid)
+
+            # Generate new objects using the same frequencies
+            regen_key, biome_key, color_key, fourier_key = jax.random.split(
+                regen_key, 4
+            )
+            if self.deterministic_spawn:
+                biome_objects = self.generate_biome_new(biome_idx, biome_key)
+                grid = grid.at[mask].set(biome_objects)
+            else:
+                biome_objects = self.generate_biome_old(biome_idx, biome_key)
+                grid = jnp.where(mask, biome_objects, grid)
+
+            # Generate new random colors for collectable objects in this biome
+            # Simplest approach: Don't loop at all if biome has no objects
+            # Just return unchanged colors and fourier params
+            biome_freqs = self.biome_object_frequencies[biome_idx]
+
+            # If biome has no objects, return early
+            if len(biome_freqs) == 0:
+                # No updates needed
+                pass
+            else:
+                # Update colors and Fourier params for each object type
+                def update_object_params(obj_idx, carry):
+                    colors_updated, fourier_updated, key = carry
+                    actual_obj_idx = obj_idx + 1  # +1 because index 0 is EMPTY
+
+                    # Check if this object is in biome and collectable (using JAX operations)
+                    in_biome = biome_freqs[obj_idx] > 0
+                    is_collectable = self.object_collectable[actual_obj_idx]
+                    should_update = in_biome & is_collectable
+
+                    # Generate new color and Fourier params (even if not used)
+                    key, color_subkey, period_key, coeff_key = jax.random.split(key, 4)
+                    new_color = jax.random.randint(color_subkey, (3,), 0, 256)
+
+                    # Generate Fourier series parameters following the provided approach
+                    # 1. Random period between 10 and 1000
+                    period = jax.random.randint(period_key, (), 10, 1001).astype(
+                        jnp.float32
+                    )
+
+                    # 2. Generate random harmonic coefficients scaled by 1/n
+                    coeff_key, a_key, b_key = jax.random.split(coeff_key, 3)
+                    n_harmonics = self.num_fourier_harmonics
+                    harmonic_indices = jnp.arange(1, n_harmonics + 1)
+
+                    # Random coefficients scaled by 1/n (gives less weight to higher frequencies)
+                    a_n = jax.random.normal(a_key, (n_harmonics,)) / harmonic_indices
+                    b_n = jax.random.normal(b_key, (n_harmonics,)) / harmonic_indices
+
+                    # 3. Compute a sample of the function to find normalization factor
+                    # Sample at regular intervals over one period
+                    n_samples = 100
+                    sample_x = jnp.linspace(0, period, n_samples)
+                    sample_y = jnp.zeros(n_samples)
+
+                    # Compute function values at sample points
+                    for n in range(1, n_harmonics + 1):
+                        sample_y += a_n[n - 1] * jnp.cos(
+                            2 * jnp.pi * n * sample_x / period
+                        )
+                        sample_y += b_n[n - 1] * jnp.sin(
+                            2 * jnp.pi * n * sample_x / period
+                        )
+
+                    # 4. Normalize to [-1, 1]
+                    max_val = jnp.max(jnp.abs(sample_y))
+                    # Avoid division by zero
+                    normalization_factor = jnp.where(max_val > 0, max_val, 1.0)
+                    a_n_normalized = a_n / normalization_factor
+                    b_n_normalized = b_n / normalization_factor
+
+                    # Interleave a_n and b_n: [period, a_1, b_1, a_2, b_2, ...]
+                    coeffs = jnp.empty(2 * n_harmonics)
+                    coeffs = coeffs.at[::2].set(a_n_normalized)
+                    coeffs = coeffs.at[1::2].set(b_n_normalized)
+                    new_fourier_params = jnp.concatenate([jnp.array([period]), coeffs])
+
+                    # Conditionally update (using jnp.where)
+                    colors_updated = jnp.where(
+                        should_update,
+                        colors_updated.at[actual_obj_idx].set(new_color),
+                        colors_updated,
+                    )
+                    fourier_updated = jnp.where(
+                        should_update,
+                        fourier_updated.at[actual_obj_idx].set(new_fourier_params),
+                        fourier_updated,
+                    )
+
+                    return colors_updated, fourier_updated, key
+
+                # Use lax.fori_loop
+                colors, fourier, _ = jax.lax.fori_loop(
+                    0,
+                    len(biome_freqs),
+                    update_object_params,
+                    (colors, fourier, fourier_key),
+                )
+
+            return grid, spawn_grid, colors, fourier, regen_key
+
+        # Regenerate each biome that should be regenerated
+        key, regen_key = jax.random.split(key)
+        object_colors = state.object_colors
+        fourier_params = state.fourier_params
+
+        for biome_idx in range(len(should_regenerate_biomes)):
+            (
+                object_grid,
+                object_spawn_time_grid,
+                object_colors,
+                fourier_params,
+                regen_key,
+            ) = jax.lax.cond(
+                should_regenerate_biomes[biome_idx],
+                lambda og=object_grid,
+                st=object_spawn_time_grid,
+                oc=object_colors,
+                fp=fourier_params,
+                rk=regen_key: regenerate_biome(biome_idx, og, st, oc, fp, rk),
+                lambda og=object_grid,
+                st=object_spawn_time_grid,
+                oc=object_colors,
+                fp=fourier_params,
+                rk=regen_key: (og, st, oc, fp, rk),
+            )
+
+        # Update biome tracking
+        biome_regenerated = state.biome_regenerated | should_regenerate_biomes
+
+        # Reset counters for regenerated biomes
+        biome_objects_collected = jnp.where(
+            should_regenerate_biomes, 0, biome_objects_collected
+        )
+
+        # Recalculate total spawned for regenerated biomes
+        biome_total_spawned = state.biome_total_spawned
+        for biome_idx in range(len(should_regenerate_biomes)):
+
+            def update_total(idx):
+                mask = self.biome_masks[idx]
+                new_total = jnp.sum((object_grid > 0) & mask)
+                return biome_total_spawned.at[idx].set(new_total)
+
+            biome_total_spawned = jax.lax.cond(
+                should_regenerate_biomes[biome_idx],
+                lambda: update_total(biome_idx),
+                lambda: biome_total_spawned,
+            )
+
         # 4. UPDATE STATE
         state = EnvState(
             pos=pos,
@@ -469,6 +791,11 @@ class ForagaxEnv(environment.Environment):
             time=state.time + 1,
             digestion_buffer=digestion_buffer,
             object_spawn_time_grid=object_spawn_time_grid,
+            biome_objects_collected=biome_objects_collected,
+            biome_total_spawned=biome_total_spawned,
+            biome_regenerated=biome_regenerated,
+            object_colors=object_colors,
+            fourier_params=fourier_params,
         )
 
         done = self.is_terminal(state, params)
@@ -505,6 +832,21 @@ class ForagaxEnv(environment.Environment):
         # Initialize spawn times to 0 (all objects spawn at time 0)
         object_spawn_time_grid = jnp.zeros((self.size[1], self.size[0]), dtype=int)
 
+        # Initialize biome consumption tracking
+        num_biomes = self.biome_object_frequencies.shape[0]
+        biome_objects_collected = jnp.zeros(num_biomes, dtype=int)
+
+        # Count total spawned objects per biome
+        biome_total_spawned = jnp.zeros(num_biomes, dtype=int)
+        for i in range(num_biomes):
+            mask = self.biome_masks[i]
+            # Count non-zero (non-empty) objects in this biome
+            biome_total_spawned = biome_total_spawned.at[i].set(
+                jnp.sum((object_grid > 0) & mask)
+            )
+
+        biome_regenerated = jnp.zeros(num_biomes, dtype=bool)
+
         state = EnvState(
             pos=agent_pos,
             object_grid=object_grid,
@@ -512,6 +854,11 @@ class ForagaxEnv(environment.Environment):
             time=0,
             digestion_buffer=jnp.zeros((self.max_reward_delay,)),
             object_spawn_time_grid=object_spawn_time_grid,
+            biome_objects_collected=biome_objects_collected,
+            biome_total_spawned=biome_total_spawned,
+            biome_regenerated=biome_regenerated,
+            object_colors=self.initial_object_colors.copy(),
+            fourier_params=self.initial_fourier_params.copy(),
         )
 
         return self.get_obs(state, params), state
@@ -646,7 +993,7 @@ class ForagaxEnv(environment.Environment):
             # Agent position
             obs = obs.at[state.pos[1], state.pos[0], :].set(0)
             obs = obs.at[state.pos[1], state.pos[0], -1].set(1)
-            colors = self.object_colors / 255.0
+            colors = state.object_colors / 255.0  # Use state colors
             obs = jnp.tensordot(obs, colors, axes=1)
             return obs
         elif self.observation_type == "color":
@@ -673,7 +1020,7 @@ class ForagaxEnv(environment.Environment):
         elif self.observation_type == "rgb":
             num_obj_types = len(self.object_ids)
             aperture_one_hot = jax.nn.one_hot(aperture, num_obj_types)
-            colors = self.object_colors / 255.0
+            colors = state.object_colors / 255.0  # Use state colors
             obs = jnp.tensordot(aperture_one_hot, colors, axes=1)
             return obs
         elif self.observation_type == "color":
@@ -726,7 +1073,7 @@ class ForagaxEnv(environment.Environment):
             render_grid = jnp.maximum(0, state.object_grid)
 
             def update_image(i, img):
-                color = self.object_colors[i]
+                color = state.object_colors[i]  # Use state colors
                 mask = render_grid == i
                 img = jnp.where(mask[..., None], color, img)
                 return img
@@ -790,7 +1137,9 @@ class ForagaxEnv(environment.Environment):
             obs_grid = jnp.maximum(0, state.object_grid)
             aperture = self._get_aperture(obs_grid, state.pos)
             aperture_one_hot = jax.nn.one_hot(aperture, len(self.object_ids))
-            img = jnp.tensordot(aperture_one_hot, self.object_colors, axes=1)
+            img = jnp.tensordot(
+                aperture_one_hot, state.object_colors, axes=1
+            )  # Use state colors
 
             # Draw agent in the center
             center_y, center_x = self.aperture_size[1] // 2, self.aperture_size[0] // 2
