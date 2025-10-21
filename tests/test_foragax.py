@@ -2469,3 +2469,147 @@ def test_empty_object_has_no_sampled_color():
     assert jnp.sum(has_color) > 0, "Non-empty objects should have colors"
 
     print(f"Found {jnp.sum(non_empty_mask)} non-empty positions with colors")
+
+
+def test_fourier_reward_zero_parameters():
+    """Test that Fourier objects with zero parameters return zero reward."""
+    fourier_obj = FourierObject(
+        name="test_fourier",
+        num_fourier_terms=5,
+        base_magnitude=2.0,
+        color=(255, 0, 0),
+    )
+
+    key = jax.random.key(42)
+    zero_params = jnp.zeros(3 + 2 * fourier_obj.num_fourier_terms, dtype=jnp.float32)
+    reward_zero = fourier_obj.reward(100, key, zero_params)
+    assert reward_zero == 0.0, "Zero parameters should give zero reward"
+
+
+def test_fourier_reward_parameter_diversity():
+    """Test that different Fourier objects have different parameters and basic properties."""
+    fourier_obj = FourierObject(
+        name="test_fourier",
+        num_fourier_terms=5,
+        base_magnitude=2.0,
+        color=(255, 0, 0),
+    )
+
+    key = jax.random.key(42)
+    num_test_objects = 10
+    test_timesteps = jnp.array([0, 50, 100, 200, 500, 1000])
+
+    rewards_over_time = []
+    all_params = []
+
+    for i in range(num_test_objects):
+        key, param_key = jax.random.split(key)
+        params = fourier_obj.get_state(param_key)
+        all_params.append(params)
+
+        # Compute rewards at different timesteps
+        object_rewards = []
+        for t in test_timesteps:
+            reward = fourier_obj.reward(t, jax.random.key(i), params)
+            object_rewards.append(reward)
+            # All rewards should be finite
+            assert jnp.isfinite(reward), f"Reward should be finite at timestep {t}"
+            # Rewards should be within expected bounds [-base_magnitude, base_magnitude]
+            assert (
+                -fourier_obj.base_magnitude <= reward <= fourier_obj.base_magnitude
+            ), (
+                f"Reward {reward} should be within [{-fourier_obj.base_magnitude}, {fourier_obj.base_magnitude}]"
+            )
+        rewards_over_time.append(jnp.array(object_rewards))
+
+    # Different objects should have different parameters (with high probability)
+    params_array = jnp.stack(all_params)
+    params_differ = False
+    for i in range(num_test_objects):
+        for j in range(i + 1, num_test_objects):
+            if not jnp.allclose(params_array[i], params_array[j], atol=1e-6):
+                params_differ = True
+                break
+        if params_differ:
+            break
+    assert params_differ, "Different objects should have different parameters"
+
+    # Rewards should vary over time for most objects
+    rewards_array = jnp.stack(rewards_over_time)  # Shape: (num_objects, num_timesteps)
+    for i in range(num_test_objects):
+        obj_rewards = rewards_array[i]
+        reward_variation = jnp.max(obj_rewards) - jnp.min(obj_rewards)
+        assert reward_variation > 1e-6, f"Object {i} rewards should vary over time"
+
+
+def test_fourier_reward_periodicity():
+    """Test that Fourier rewards exhibit proper periodicity."""
+    fourier_obj = FourierObject(
+        name="test_fourier",
+        num_fourier_terms=5,
+        base_magnitude=2.0,
+        color=(255, 0, 0),
+    )
+
+    key = jax.random.key(42)
+    test_period = 100  # Use a reasonable period for testing
+    period_params = jnp.array(
+        [test_period, -1.0, 1.0, 1.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        dtype=jnp.float32,
+    )  # Simple sine wave
+
+    reward_t0 = fourier_obj.reward(0, key, period_params)
+    reward_t_period = fourier_obj.reward(test_period, key, period_params)
+    reward_t_2period = fourier_obj.reward(2 * test_period, key, period_params)
+
+    # Should be approximately periodic
+    chex.assert_trees_all_close(reward_t0, reward_t_period, rtol=1e-5)
+    chex.assert_trees_all_close(reward_t0, reward_t_2period, rtol=1e-5)
+
+
+def test_fourier_reward_mathematical_properties():
+    """Test mathematical correctness of Fourier series computation."""
+    fourier_obj = FourierObject(
+        name="test_fourier",
+        num_fourier_terms=5,
+        base_magnitude=2.0,
+        color=(255, 0, 0),
+    )
+
+    key = jax.random.key(42)
+
+    # Create a simple single-term Fourier series: a1*cos(t) + b1*sin(t)
+    simple_params = jnp.array(
+        [
+            2 * jnp.pi,
+            -1.0,
+            1.0,  # period=2π, min=-1, max=1
+            0.5,
+            0.5,  # a1=0.5, b1=0.5 (should give 0.5*(cos(t) + sin(t)))
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+        ],
+        dtype=jnp.float32,
+    )
+
+    # At t=0: 0.5*(cos(0) + sin(0)) = 0.5*(1 + 0) = 0.5
+    reward_t0_simple = fourier_obj.reward(0, key, simple_params)
+    # The actual reward is normalized: 2*(raw - min)/(max - min) - 1, then * base_magnitude
+    # raw = 0.5, min=-1, max=1, so: 2*(0.5 - (-1))/(1 - (-1)) - 1 = 2*(1.5)/2 - 1 = 1.5 - 1 = 0.5
+    # Then: 0.5 * base_magnitude = 0.5 * 2.0 = 1.0
+    assert jnp.allclose(reward_t0_simple, 1.0, atol=1e-5), (
+        f"Expected ~1.0, got {reward_t0_simple}"
+    )
+
+    # At t=π/4: 0.5*(cos(π/4) + sin(π/4)) = 0.5*(0.707 + 0.707) = 0.5*1.414 ≈ 0.707
+    t_quarter = jnp.pi / 4
+    reward_t_quarter = fourier_obj.reward(t_quarter, key, simple_params)
+    raw_quarter = 0.5 * (jnp.cos(t_quarter) + jnp.sin(t_quarter))
+    expected_quarter = (
+        2 * (raw_quarter - (-1)) / (1 - (-1)) - 1
+    ) * fourier_obj.base_magnitude
+    chex.assert_trees_all_close(reward_t_quarter, expected_quarter, rtol=1e-4)
