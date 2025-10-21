@@ -31,6 +31,7 @@ from foragax.objects import (
     LARGE_MOREL,
     LARGE_OYSTER,
     MEDIUM_MOREL,
+    create_fourier_objects,
     create_weather_objects,
 )
 
@@ -86,6 +87,21 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
         ),
         "nowrap": False,
         "deterministic_spawn": True,
+    },
+    "ForagaxDiwali-v1": {
+        "size": (15, 15),
+        "aperture_size": None,
+        "objects": None,
+        "biomes": (
+            # Hot biome
+            Biome(start=(0, 3), stop=(15, 5), object_frequencies=(0.5, 0.0)),
+            # Cold biome
+            Biome(start=(0, 10), stop=(15, 12), object_frequencies=(0.0, 0.5)),
+        ),
+        "nowrap": False,
+        "deterministic_spawn": True,
+        "dynamic_biomes": True,
+        "biome_consumption_threshold": 0.9,
     },
     "ForagaxTwoBiome-v1": {
         "size": (15, 15),
@@ -495,6 +511,12 @@ def make(
             reward_delay=reward_delay,
         )
         config["objects"] = (hot, cold)
+
+    if env_id == "ForagaxDiwali-v1":
+        config["objects"] = create_fourier_objects(
+            num_fourier_terms=10,
+            reward_delay=reward_delay,
+        )
 
     if env_id == "ForagaxTwoBiome-v16":
         config["teleport_interval"] = 10000

@@ -2,6 +2,8 @@ import chex
 import jax
 import jax.numpy as jnp
 
+from foragax.env import Actions
+from foragax.objects import FourierObject
 from foragax.registry import make
 
 
@@ -518,3 +520,46 @@ def test_foragax_twobiome_v17_expiry():
     assert env.object_expiry_time[2] == 500  # oyster
     assert env.object_expiry_time[3] == 500  # deathcap
     assert env.object_expiry_time[4] == 500  # fake
+
+
+def test_foragax_diwali_v1_creation():
+    """Test that ForagaxDiwali-v1 can be created and initialized."""
+    env = make("ForagaxDiwali-v1", observation_type="object", aperture_size=(5, 5))
+
+    # Check that dynamic biomes are enabled
+    assert env.dynamic_biomes, "Dynamic biomes should be enabled for ForagaxDiwali-v1"
+    assert env.biome_consumption_threshold == 0.9, "Threshold should be 0.9"
+    assert env.num_fourier_terms == 10, "Should have 10 Fourier terms"
+
+    # Check that objects are FourierObjects
+    assert isinstance(env.objects[1], FourierObject), (
+        "First object should be FourierObject"
+    )
+    assert isinstance(env.objects[2], FourierObject), (
+        "Second object should be FourierObject"
+    )
+
+    # Initialize environment
+    key = jax.random.key(0)
+    obs, state = env.reset(key, env.default_params)
+
+    # Check state has new fields
+    assert hasattr(state, "object_color_grid"), "State should have object_color_grid"
+    assert hasattr(state, "object_state_grid"), "State should have object_state_grid"
+    assert hasattr(state, "biome_consumption_count"), (
+        "State should have biome_consumption_count"
+    )
+    assert hasattr(state, "biome_total_objects"), (
+        "State should have biome_total_objects"
+    )
+    assert hasattr(state, "biome_generation"), "State should have biome_generation"
+
+    # Check shapes
+    chex.assert_shape(state.object_color_grid, (15, 15, 3))
+    chex.assert_shape(state.object_state_grid, (15, 15, 22))  # 2 + 2*10 = 22 params
+    chex.assert_shape(state.biome_consumption_count, (2,))  # 2 biomes
+    chex.assert_shape(state.biome_total_objects, (2,))
+    chex.assert_shape(state.biome_generation, (2,))
+
+    # Check initial generation is 0
+    assert jnp.all(state.biome_generation == 0), "Initial generation should be 0"
