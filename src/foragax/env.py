@@ -604,127 +604,105 @@ class ForagaxEnv(environment.Environment):
     ) -> Tuple[jax.Array, ...]:
         """Check all biomes for consumption threshold and respawn if needed."""
 
-        def check_biome(i, carry):
-            (
-                obj_grid,
-                color_grid,
-                params_grid,
-                biome_state,
-                spawn_grid,
-                gen_grid,
-                k,
-            ) = carry
+        num_biomes = self.biome_object_frequencies.shape[0]
 
-            consumption_rate = biome_state.consumption_count[i] / jnp.maximum(
-                1.0, biome_state.total_objects[i].astype(float)
+        # Compute consumption rates for all biomes
+        consumption_rates = biome_state.consumption_count / jnp.maximum(
+            1.0, biome_state.total_objects.astype(float)
+        )
+        should_respawn = consumption_rates >= self.biome_consumption_threshold
+
+        # Split key for all biomes in parallel
+        key, subkey = jax.random.split(key)
+        biome_keys = jax.random.split(subkey, num_biomes)
+
+        # Compute all new spawns in parallel using vmap for random, switch for deterministic
+        if self.deterministic_spawn:
+            # Use switch to dispatch to concrete biome spawns for deterministic
+            def make_spawn_fn(biome_idx):
+                def spawn_fn(key):
+                    return self._spawn_biome_objects(biome_idx, key, deterministic=True)
+
+                return spawn_fn
+
+            spawn_fns = [make_spawn_fn(idx) for idx in range(num_biomes)]
+
+            # Apply switch for each biome
+            all_new_objects_list = []
+            all_new_colors_list = []
+            all_new_params_list = []
+            for i in range(num_biomes):
+                obj, col, par = jax.lax.switch(i, spawn_fns, biome_keys[i])
+                all_new_objects_list.append(obj)
+                all_new_colors_list.append(col)
+                all_new_params_list.append(par)
+
+            all_new_objects = jnp.stack(all_new_objects_list)
+            all_new_colors = jnp.stack(all_new_colors_list)
+            all_new_params = jnp.stack(all_new_params_list)
+        else:
+            # Random spawn works with vmap
+            all_new_objects, all_new_colors, all_new_params = jax.vmap(
+                lambda i, k: self._spawn_biome_objects(i, k, deterministic=False)
+            )(jnp.arange(num_biomes), biome_keys)
+
+        # Initialize updated grids
+        new_obj_grid = object_grid
+        new_color_grid = object_color_grid
+        new_params_grid = object_state_grid
+        new_spawn_grid = object_spawn_time_grid
+        new_gen_grid = object_generation_grid
+
+        # Update biome state
+        new_consumption_count = jnp.where(
+            should_respawn, 0, biome_state.consumption_count
+        )
+        new_generation = biome_state.generation + should_respawn.astype(int)
+
+        # Compute new total objects for respawning biomes
+        def count_objects(i):
+            return jnp.sum((all_new_objects[i] > 0) & self.biome_masks_array[i])
+
+        new_object_counts = jax.vmap(count_objects)(jnp.arange(num_biomes))
+        new_total_objects = jnp.where(
+            should_respawn, new_object_counts, biome_state.total_objects
+        )
+
+        new_biome_state = BiomeState(
+            consumption_count=new_consumption_count,
+            total_objects=new_total_objects,
+            generation=new_generation,
+        )
+
+        # Update grids for respawning biomes
+        for i in range(num_biomes):
+            biome_mask = self.biome_masks_array[i]
+            new_gen_value = new_biome_state.generation[i]
+
+            # Only update where new spawn has objects and biome should respawn
+            is_new_object = (
+                (all_new_objects[i] > 0) & biome_mask & should_respawn[i][..., None]
             )
 
-            should_respawn = consumption_rate >= self.biome_consumption_threshold
+            new_obj_grid = jnp.where(is_new_object, all_new_objects[i], new_obj_grid)
+            new_color_grid = jnp.where(
+                is_new_object[..., None], all_new_colors[i], new_color_grid
+            )
+            new_params_grid = jnp.where(
+                is_new_object[..., None], all_new_params[i], new_params_grid
+            )
+            new_gen_grid = jnp.where(is_new_object, new_gen_value, new_gen_grid)
+            new_spawn_grid = jnp.where(is_new_object, current_time, new_spawn_grid)
 
-            def respawn_biome_i():
-                # Get biome mask and properties
-                biome_mask = self.biome_masks_array[i]
-
-                # Generate new objects for this biome using unified spawn method
-                # Use deterministic spawn if configured, otherwise use random spawn
-                # For deterministic spawn with fori_loop, we need to handle the traced index
-                # by using switch to dispatch to concrete biome-specific spawn functions
-                k_new, spawn_key = jax.random.split(k)
-
-                if self.deterministic_spawn:
-                    # Create spawn functions for each biome (using concrete indices)
-                    def make_spawn_fn(biome_idx):
-                        def spawn_fn(key):
-                            return self._spawn_biome_objects(
-                                biome_idx, key, deterministic=True
-                            )
-
-                        return spawn_fn
-
-                    # Create list of spawn functions (one per biome)
-                    spawn_fns = [make_spawn_fn(idx) for idx in range(len(self.biome_masks))]
-
-                    # Use switch to select the correct spawn function based on traced index i
-                    new_biome_objects_full, new_biome_colors_full, new_biome_params_full = (
-                        jax.lax.switch(i, spawn_fns, spawn_key)
-                    )
-                else:
-                    # Random spawn works fine with traced index
-                    new_biome_objects_full, new_biome_colors_full, new_biome_params_full = (
-                        self._spawn_biome_objects(i, spawn_key, deterministic=False)
-                    )
-
-                # CRITICAL FIX: Only replace where new spawn is NOT empty
-                # Keep old objects where new spawn is empty (0)
-                # Count new objects BEFORE merging
-                new_object_count = jnp.sum((new_biome_objects_full > 0) & biome_mask)
-
-                is_new_object = (new_biome_objects_full > 0) & biome_mask
-                new_obj_grid = jnp.where(
-                    is_new_object, new_biome_objects_full, obj_grid
-                )
-
-                # Update biome state
-                new_biome_state = BiomeState(
-                    consumption_count=biome_state.consumption_count.at[i].set(0),
-                    total_objects=biome_state.total_objects.at[i].set(new_object_count),
-                    generation=biome_state.generation.at[i].add(1),
-                )
-                new_gen_value = new_biome_state.generation[i]
-
-                # Use precomputed colors and params for NEW objects only
-                new_params_grid = jnp.where(
-                    is_new_object[..., None], new_biome_params_full, params_grid
-                )
-                new_color_grid = jnp.where(
-                    is_new_object[..., None], new_biome_colors_full, color_grid
-                )
-
-                # Tag new objects with the new generation number
-                new_gen_grid = jnp.where(is_new_object, new_gen_value, gen_grid)
-
-                # Reset spawn times ONLY for newly placed objects
-                new_spawn_grid = jnp.where(is_new_object, current_time, spawn_grid)
-
-                return (
-                    new_obj_grid,
-                    new_color_grid,
-                    new_params_grid,
-                    new_biome_state,
-                    new_spawn_grid,
-                    new_gen_grid,
-                    k_new,
-                )
-
-            def no_respawn():
-                return (
-                    obj_grid,
-                    color_grid,
-                    params_grid,
-                    biome_state,
-                    spawn_grid,
-                    gen_grid,
-                    k,
-                )
-
-            return jax.lax.cond(should_respawn, respawn_biome_i, no_respawn)
-
-        # Process all biomes
-        init_carry = (
-            object_grid,
-            object_color_grid,
-            object_state_grid,
-            biome_state,
-            object_spawn_time_grid,
-            object_generation_grid,
+        return (
+            new_obj_grid,
+            new_color_grid,
+            new_params_grid,
+            new_biome_state,
+            new_spawn_grid,
+            new_gen_grid,
             key,
         )
-
-        final_carry = jax.lax.fori_loop(
-            0, self.biome_object_frequencies.shape[0], check_biome, init_carry
-        )
-
-        return final_carry
 
     def reset_env(
         self, key: jax.Array, params: EnvParams
