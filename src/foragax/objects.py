@@ -335,8 +335,15 @@ class FourierObject(BaseForagaxObject):
 
         # Apply min-max normalization to [-1, 1], then scale by base_magnitude
         # Formula: 2 * (x - min) / (max - min) - 1
+        # If min == max (constant function), return 0
         range_val = jnp.maximum(y_max - y_min, 1e-8)  # Avoid division by zero
-        reward = (2.0 * (reward - y_min) / range_val - 1.0) * self.base_magnitude
+        # Check if this is a constant function (min == max)
+        is_constant = jnp.abs(y_max - y_min) < 1e-8
+        reward = jnp.where(
+            is_constant,
+            0.0,
+            (2.0 * (reward - y_min) / range_val - 1.0) * self.base_magnitude,
+        )
 
         return reward
 
