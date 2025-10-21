@@ -57,6 +57,15 @@ class EnvParams(environment.EnvParams):
 
 
 @struct.dataclass
+class BiomeState:
+    """Biome-level tracking state (num_biomes,)."""
+
+    consumption_count: jax.Array  # objects consumed per biome
+    total_objects: jax.Array  # total objects spawned per biome
+    generation: jax.Array  # current generation per biome
+
+
+@struct.dataclass
 class EnvState(environment.EnvState):
     pos: jax.Array
     object_grid: jax.Array
@@ -67,9 +76,7 @@ class EnvState(environment.EnvState):
     object_color_grid: jax.Array  # (H, W, 3) - RGB color per object
     object_generation_grid: jax.Array  # (H, W) - generation number for each object
     object_state_grid: jax.Array  # (H, W, N) - Fourier params per object
-    biome_consumption_count: jax.Array  # (num_biomes,) - objects consumed per biome
-    biome_total_objects: jax.Array  # (num_biomes,) - total objects spawned per biome
-    biome_generation: jax.Array  # (num_biomes,) - current generation per biome
+    biome_state: BiomeState
 
 
 class ForagaxEnv(environment.Environment):
@@ -503,9 +510,6 @@ class ForagaxEnv(environment.Environment):
         )
 
         # 3.6. HANDLE DYNAMIC BIOME CONSUMPTION AND RESPAWNING
-        biome_consumption_count = state.biome_consumption_count
-        biome_total_objects = state.biome_total_objects
-        biome_generation = state.biome_generation
         object_generation_grid = state.object_generation_grid
         # object_color_grid is already updated above
         object_state_grid = state.object_state_grid
@@ -515,9 +519,10 @@ class ForagaxEnv(environment.Environment):
             # Only count if the object belongs to the current generation of its biome
             collected_biome_id = state.biome_grid[pos[1], pos[0]]
             object_gen_at_pos = state.object_generation_grid[pos[1], pos[0]]
-            current_biome_gen = state.biome_generation[collected_biome_id]
+            current_biome_gen = state.biome_state.generation[collected_biome_id]
             is_current_generation = object_gen_at_pos == current_biome_gen
 
+            biome_consumption_count = state.biome_state.consumption_count
             biome_consumption_count = jax.lax.cond(
                 should_collect & is_current_generation,
                 lambda: biome_consumption_count.at[collected_biome_id].add(1),
@@ -526,29 +531,31 @@ class ForagaxEnv(environment.Environment):
 
             # Check each biome for threshold crossing and respawn if needed
             key, respawn_key = jax.random.split(key)
+            biome_state = BiomeState(
+                consumption_count=biome_consumption_count,
+                total_objects=state.biome_state.total_objects,
+                generation=state.biome_state.generation,
+            )
             (
                 object_grid,
                 object_color_grid,
                 object_state_grid,
-                biome_generation,
-                biome_consumption_count,
-                biome_total_objects,
+                biome_state,
                 object_spawn_time_grid,
                 object_generation_grid,
                 respawn_key,
             ) = self._check_and_respawn_biomes(
                 object_grid,
-                state.biome_grid,
                 object_color_grid,
                 object_state_grid,
-                biome_generation,
-                biome_consumption_count,
-                biome_total_objects,
+                biome_state,
                 object_spawn_time_grid,
                 state.object_generation_grid,
                 state.time,
                 respawn_key,
             )
+        else:
+            biome_state = state.biome_state
 
         info = {"discount": self.discount(state, params)}
         temperatures = jnp.zeros(len(self.objects))
@@ -571,9 +578,7 @@ class ForagaxEnv(environment.Environment):
             object_spawn_time_grid=object_spawn_time_grid,
             object_color_grid=object_color_grid,
             object_state_grid=object_state_grid,
-            biome_consumption_count=biome_consumption_count,
-            biome_total_objects=biome_total_objects,
-            biome_generation=biome_generation,
+            biome_state=biome_state,
             object_generation_grid=object_generation_grid,
         )
 
@@ -589,12 +594,9 @@ class ForagaxEnv(environment.Environment):
     def _check_and_respawn_biomes(
         self,
         object_grid: jax.Array,
-        biome_grid: jax.Array,
         object_color_grid: jax.Array,
         object_state_grid: jax.Array,
-        biome_generation: jax.Array,
-        biome_consumption_count: jax.Array,
-        biome_total_objects: jax.Array,
+        biome_state: BiomeState,
         object_spawn_time_grid: jax.Array,
         object_generation_grid: jax.Array,
         current_time: int,
@@ -607,15 +609,15 @@ class ForagaxEnv(environment.Environment):
                 obj_grid,
                 color_grid,
                 params_grid,
-                gen,
-                consumption,
-                total,
+                biome_state,
                 spawn_grid,
                 gen_grid,
                 k,
             ) = carry
 
-            consumption_rate = consumption[i] / jnp.maximum(1.0, total[i].astype(float))
+            consumption_rate = biome_state.consumption_count[i] / jnp.maximum(
+                1.0, biome_state.total_objects[i].astype(float)
+            )
 
             should_respawn = consumption_rate >= self.biome_consumption_threshold
 
@@ -662,9 +664,13 @@ class ForagaxEnv(environment.Environment):
                     is_new_object, new_biome_objects_full, obj_grid
                 )
 
-                # Update generation counter
-                new_gen = gen.at[i].add(1)
-                new_gen_value = new_gen[i]
+                # Update biome state
+                new_biome_state = BiomeState(
+                    consumption_count=biome_state.consumption_count.at[i].set(0),
+                    total_objects=biome_state.total_objects.at[i].set(new_object_count),
+                    generation=biome_state.generation.at[i].add(1),
+                )
+                new_gen_value = new_biome_state.generation[i]
 
                 # Use precomputed colors and params for NEW objects only
                 new_params_grid = jnp.where(
@@ -677,12 +683,6 @@ class ForagaxEnv(environment.Environment):
                 # Tag new objects with the new generation number
                 new_gen_grid = jnp.where(is_new_object, new_gen_value, gen_grid)
 
-                # Reset consumption count and update total objects
-                # IMPORTANT: Count only NEWLY spawned objects, not old preserved objects
-                # This ensures consumption tracking is based on the current generation
-                new_consumption = consumption.at[i].set(0)
-                new_total = total.at[i].set(new_object_count)
-
                 # Reset spawn times ONLY for newly placed objects
                 new_spawn_grid = jnp.where(is_new_object, current_time, spawn_grid)
 
@@ -690,9 +690,7 @@ class ForagaxEnv(environment.Environment):
                     new_obj_grid,
                     new_color_grid,
                     new_params_grid,
-                    new_gen,
-                    new_consumption,
-                    new_total,
+                    new_biome_state,
                     new_spawn_grid,
                     new_gen_grid,
                     k_new,
@@ -703,9 +701,7 @@ class ForagaxEnv(environment.Environment):
                     obj_grid,
                     color_grid,
                     params_grid,
-                    gen,
-                    consumption,
-                    total,
+                    biome_state,
                     spawn_grid,
                     gen_grid,
                     k,
@@ -718,9 +714,7 @@ class ForagaxEnv(environment.Environment):
             object_grid,
             object_color_grid,
             object_state_grid,
-            biome_generation,
-            biome_consumption_count,
-            biome_total_objects,
+            biome_state,
             object_spawn_time_grid,
             object_generation_grid,
             key,
@@ -800,9 +794,11 @@ class ForagaxEnv(environment.Environment):
             object_spawn_time_grid=object_spawn_time_grid,
             object_color_grid=object_color_grid,
             object_state_grid=object_state_grid,
-            biome_consumption_count=biome_consumption_count,
-            biome_total_objects=biome_total_objects,
-            biome_generation=biome_generation,
+            biome_state=BiomeState(
+                consumption_count=biome_consumption_count,
+                total_objects=biome_total_objects,
+                generation=biome_generation,
+            ),
             object_generation_grid=object_generation_grid,
         )
 
@@ -991,23 +987,27 @@ class ForagaxEnv(environment.Environment):
                     (self.size[1], self.size[0], num_object_params),
                     float,
                 ),
-                "biome_consumption_count": spaces.Box(
-                    0,
-                    jnp.inf,
-                    (self.biome_object_frequencies.shape[0],),
-                    int,
-                ),
-                "biome_total_objects": spaces.Box(
-                    0,
-                    jnp.inf,
-                    (self.biome_object_frequencies.shape[0],),
-                    int,
-                ),
-                "biome_generation": spaces.Box(
-                    0,
-                    jnp.inf,
-                    (self.biome_object_frequencies.shape[0],),
-                    int,
+                "biome_state": spaces.Dict(
+                    {
+                        "consumption_count": spaces.Box(
+                            0,
+                            jnp.inf,
+                            (self.biome_object_frequencies.shape[0],),
+                            int,
+                        ),
+                        "total_objects": spaces.Box(
+                            0,
+                            jnp.inf,
+                            (self.biome_object_frequencies.shape[0],),
+                            int,
+                        ),
+                        "generation": spaces.Box(
+                            0,
+                            jnp.inf,
+                            (self.biome_object_frequencies.shape[0],),
+                            int,
+                        ),
+                    }
                 ),
             }
         )

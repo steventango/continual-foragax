@@ -546,20 +546,21 @@ def test_foragax_diwali_v1_creation():
     # Check state has new fields
     assert hasattr(state, "object_color_grid"), "State should have object_color_grid"
     assert hasattr(state, "object_state_grid"), "State should have object_state_grid"
-    assert hasattr(state, "biome_consumption_count"), (
-        "State should have biome_consumption_count"
+    assert hasattr(state, "biome_state"), "State should have biome_state"
+    assert hasattr(state.biome_state, "consumption_count"), (
+        "BiomeState should have consumption_count"
     )
-    assert hasattr(state, "biome_total_objects"), (
-        "State should have biome_total_objects"
+    assert hasattr(state.biome_state, "total_objects"), (
+        "BiomeState should have total_objects"
     )
-    assert hasattr(state, "biome_generation"), "State should have biome_generation"
+    assert hasattr(state.biome_state, "generation"), "BiomeState should have generation"
 
     # Check shapes
     chex.assert_shape(state.object_color_grid, (15, 15, 3))
     chex.assert_shape(state.object_state_grid, (15, 15, 22))  # 2 + 2*10 = 22 params
-    chex.assert_shape(state.biome_consumption_count, (2,))  # 2 biomes
-    chex.assert_shape(state.biome_total_objects, (2,))
-    chex.assert_shape(state.biome_generation, (2,))
+    chex.assert_shape(state.biome_state.consumption_count, (2,))  # 2 biomes
+    chex.assert_shape(state.biome_state.total_objects, (2,))
+    chex.assert_shape(state.biome_state.generation, (2,))
 
     # Check initial generation is 0
-    assert jnp.all(state.biome_generation == 0), "Initial generation should be 0"
+    assert jnp.all(state.biome_state.generation == 0), "Initial generation should be 0"

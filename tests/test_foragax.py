@@ -1645,8 +1645,8 @@ def test_dynamic_biome_respawn_threshold():
     obs, state = env.reset(key, env.default_params)
 
     # Record initial state
-    initial_generation = state.biome_generation[0]
-    initial_total = state.biome_total_objects[0]
+    initial_generation = state.biome_state.generation[0]
+    initial_total = state.biome_state.total_objects[0]
     initial_params = state.object_state_grid.copy()
 
     # Calculate how many objects need to be consumed to trigger respawn (70% of 16 = 11.2, so 12)
@@ -1658,8 +1658,8 @@ def test_dynamic_biome_respawn_threshold():
     max_steps = 50  # Safety limit
 
     while (
-        current_state.biome_consumption_count[0] < threshold_count
-        and current_state.biome_generation[0] == initial_generation
+        current_state.biome_state.consumption_count[0] < threshold_count
+        and current_state.biome_state.generation[0] == initial_generation
         and steps_taken < max_steps
     ):
         key, key_step = jax.random.split(key)
@@ -1671,13 +1671,13 @@ def test_dynamic_biome_respawn_threshold():
         steps_taken += 1
 
     # Check that respawn occurred
-    assert current_state.biome_generation[0] > initial_generation, (
-        f"Generation should increase. Consumed {current_state.biome_consumption_count[0]}/{threshold_count} in {steps_taken} steps"
+    assert current_state.biome_state.generation[0] > initial_generation, (
+        f"Generation should increase. Consumed {current_state.biome_state.consumption_count[0]}/{threshold_count} in {steps_taken} steps"
     )
-    assert current_state.biome_consumption_count[0] == 0, (
+    assert current_state.biome_state.consumption_count[0] == 0, (
         "Consumption should reset after respawn"
     )
-    assert current_state.biome_total_objects[0] > 0, "Objects should be respawned"
+    assert current_state.biome_state.total_objects[0] > 0, "Objects should be respawned"
 
     # Reward parameters should have changed
     current_params = current_state.object_state_grid
@@ -1880,12 +1880,12 @@ def test_biome_regeneration_preserves_old_objects():
                     )
 
                     # Stop once regeneration happens
-                    if current_state.biome_generation[0] > 0:
+                    if current_state.biome_state.generation[0] > 0:
                         break
-        if current_state.biome_generation[0] > 0:
+        if current_state.biome_state.generation[0] > 0:
             break
 
-    assert current_state.biome_generation[0] > 0, "Biome should have regenerated"
+    assert current_state.biome_state.generation[0] > 0, "Biome should have regenerated"
 
     # Verify regeneration behavior:
     # 1. Object grid has changed
@@ -1917,13 +1917,13 @@ def test_biome_regeneration_preserves_old_objects():
     )
 
     # 3. Consumption counter should be reset
-    assert current_state.biome_consumption_count[0] == 0, (
+    assert current_state.biome_state.consumption_count[0] == 0, (
         "Consumption count should reset"
     )
 
     # 4. New total objects should be tracked correctly
     actual_objects = jnp.sum((current_state.object_grid > 0) & biome_0_mask)
-    new_total = current_state.biome_total_objects[0]
+    new_total = current_state.biome_state.total_objects[0]
     assert new_total <= actual_objects, (
         f"New total {new_total} should be <= actual {actual_objects} "
         "(actual may include preserved old objects)"
@@ -1994,10 +1994,10 @@ def test_biome_regeneration_updates_only_new_objects():
                 if info["object_collected_id"] >= 0:
                     collections += 1
 
-        if current_state.biome_generation[0] > 0:
+        if current_state.biome_state.generation[0] > 0:
             break
 
-    assert current_state.biome_generation[0] > 0, (
+    assert current_state.biome_state.generation[0] > 0, (
         f"Biome should have respawned after {collections} collections"
     )
 
@@ -2080,9 +2080,9 @@ def test_consumption_threshold_per_generation():
     biome_mask = state.biome_grid == 0
     initial_objects = jnp.sum((state.object_grid > 0) & biome_mask)
     assert initial_objects == 5, f"Should start with 5 objects, got {initial_objects}"
-    assert state.biome_generation[0] == 0, "Should start at generation 0"
-    assert state.biome_total_objects[0] == 5, "Should track 5 total objects"
-    assert state.biome_consumption_count[0] == 0, "Should start with 0 consumption"
+    assert state.biome_state.generation[0] == 0, "Should start at generation 0"
+    assert state.biome_state.total_objects[0] == 5, "Should track 5 total objects"
+    assert state.biome_state.consumption_count[0] == 0, "Should start with 0 consumption"
 
     # Store generation 0 properties and positions
     gen0_params = {}
@@ -2136,10 +2136,10 @@ def test_consumption_threshold_per_generation():
         steps += 1
 
     # Verify generation 1 spawned
-    assert current_state.biome_generation[0] == 1, (
+    assert current_state.biome_state.generation[0] == 1, (
         "Should be at generation 1 after consuming 3 objects"
     )
-    assert current_state.biome_consumption_count[0] == 0, (
+    assert current_state.biome_state.consumption_count[0] == 0, (
         "Consumption should reset to 0 after respawn"
     )
 
@@ -2150,7 +2150,7 @@ def test_consumption_threshold_per_generation():
     assert gen1_objects_total >= 5, (
         f"Should have at least 5 objects (new gen1 + preserved gen0), got {gen1_objects_total}"
     )
-    assert current_state.biome_total_objects[0] == 5, (
+    assert current_state.biome_state.total_objects[0] == 5, (
         "Should track 5 NEW objects spawned in gen 1"
     )
 
@@ -2185,7 +2185,7 @@ def test_consumption_threshold_per_generation():
                     gen0_remaining_positions.append(pos)
 
     # Consume a gen0 object and verify they DON'T count toward gen1 consumption
-    consumption_before = current_state.biome_consumption_count[0]
+    consumption_before = current_state.biome_state.consumption_count[0]
 
     # Just consume one gen0 object - position agent adjacent and move onto it
     assert len(gen0_remaining_positions) > 0, (
@@ -2216,7 +2216,7 @@ def test_consumption_threshold_per_generation():
     assert info["object_collected_id"] >= 0, "Should have collected a gen0 object"
 
     # Consumption count should NOT increase when collecting old gen0 objects
-    assert current_state.biome_consumption_count[0] == consumption_before, (
+    assert current_state.biome_state.consumption_count[0] == consumption_before, (
         "Consuming gen0 objects should NOT count toward gen1 consumption"
     )
 
@@ -2261,7 +2261,7 @@ def test_biome_respawn_maintains_total_object_count_nondeterministic():
 
     # Record initial object count
     biome_mask = state.biome_grid == 0
-    initial_total = state.biome_total_objects[0]
+    initial_total = state.biome_state.total_objects[0]
     initial_count = jnp.sum((state.object_grid > 0) & biome_mask)
 
     assert initial_total == initial_count, "Initial total should match actual count"
@@ -2292,13 +2292,13 @@ def test_biome_respawn_maintains_total_object_count_nondeterministic():
             break
 
     # Verify respawn happened
-    assert current_state.biome_generation[0] == 1, (
+    assert current_state.biome_state.generation[0] == 1, (
         f"Should have respawned after collecting {collected}/{initial_total} "
         f"(threshold: {env.biome_consumption_threshold})"
     )
 
     # Check new object count
-    new_total = current_state.biome_total_objects[0]
+    new_total = current_state.biome_state.total_objects[0]
     new_count_all = jnp.sum((current_state.object_grid > 0) & biome_mask)
 
     # The new_total should reflect only NEWLY spawned objects (from this generation)
@@ -2360,7 +2360,7 @@ def test_biome_respawn_maintains_total_object_count_deterministic():
 
     # Record initial object count
     biome_mask = state.biome_grid == 0
-    initial_total = state.biome_total_objects[0]
+    initial_total = state.biome_state.total_objects[0]
     initial_count = jnp.sum((state.object_grid > 0) & biome_mask)
 
     assert initial_total == initial_count, "Initial total should match actual count"
@@ -2391,13 +2391,13 @@ def test_biome_respawn_maintains_total_object_count_deterministic():
             break
 
     # Verify respawn happened
-    assert current_state.biome_generation[0] == 1, (
+    assert current_state.biome_state.generation[0] == 1, (
         f"Should have respawned after collecting {collected}/{initial_total} "
         f"(threshold: {env.biome_consumption_threshold})"
     )
 
     # Check new object count
-    new_total = current_state.biome_total_objects[0]
+    new_total = current_state.biome_state.total_objects[0]
     new_count_all = jnp.sum((current_state.object_grid > 0) & biome_mask)
 
     assert new_total == initial_total, (
