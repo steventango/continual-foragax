@@ -28,9 +28,36 @@ class BaseForagaxObject:
         self.max_reward_delay = max_reward_delay
         self.expiry_time = expiry_time
 
+    def get_state(self, key: jax.Array) -> jax.Array:
+        """Generate per-object reward parameters to store in the environment state.
+
+        By default, objects don't use per-instance params. Override this method
+        to provide per-instance parameters that will be stored in object_state_grid.
+
+        Args:
+            key: JAX random key for parameter generation
+
+        Returns:
+            Array of parameters (can be empty array for objects without params)
+        """
+        return jnp.array([], dtype=jnp.float32)
+
     @abc.abstractmethod
-    def reward(self, clock: int, rng: jax.Array) -> float:
-        """Reward function."""
+    def reward(
+        self, clock: int, rng: jax.Array, params: Optional[jax.Array] = None
+    ) -> float:
+        """Reward function.
+
+        Args:
+            clock: Current time step
+            rng: JAX random key
+            params: Optional per-object parameters from object_state_grid
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def regen_delay(self, clock: int, rng: jax.Array) -> int:
+        """Regeneration delay function."""
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -77,7 +104,9 @@ class DefaultForagaxObject(BaseForagaxObject):
         self.reward_delay_val = reward_delay
         self.expiry_regen_delay_range = expiry_regen_delay
 
-    def reward(self, clock: int, rng: jax.Array) -> float:
+    def reward(
+        self, clock: int, rng: jax.Array, params: Optional[jax.Array] = None
+    ) -> float:
         """Default reward function."""
         return self.reward_val
 
@@ -186,9 +215,142 @@ class WeatherObject(NormalRegenForagaxObject):
         self.rewards = rewards * multiplier
         self.repeat = repeat
 
-    def reward(self, clock: int, rng: jax.Array) -> float:
+    def reward(
+        self, clock: int, rng: jax.Array, params: Optional[jax.Array] = None
+    ) -> float:
         """Reward is based on temperature."""
         return get_temperature(self.rewards, clock, self.repeat)
+
+
+class FourierObject(BaseForagaxObject):
+    """Object with reward based on Fourier series with per-instance parameters.
+
+    This object doesn't respawn on its own. Instead, objects are respawned
+    biome-wide when consumption threshold is reached, with new random parameters.
+
+    The reward function is a Fourier series with random period and harmonics,
+    with coefficients scaled by 1/n and normalized to [-1, 1].
+    """
+
+    def __init__(
+        self,
+        name: str,
+        num_fourier_terms: int = 10,
+        base_magnitude: float = 1.0,
+        color: Tuple[int, int, int] = (0, 0, 0),
+        reward_delay: int = 0,
+        max_reward_delay: Optional[int] = None,
+    ):
+        if max_reward_delay is None:
+            max_reward_delay = reward_delay
+        super().__init__(
+            name=name,
+            blocking=False,
+            collectable=True,
+            color=color,
+            random_respawn=False,  # Objects don't respawn individually
+            max_reward_delay=max_reward_delay,
+            expiry_time=None,
+        )
+        self.num_fourier_terms = num_fourier_terms
+        self.base_magnitude = base_magnitude
+        self.reward_delay_val = reward_delay
+
+    def get_state(self, key: jax.Array) -> jax.Array:
+        """Generate random Fourier series parameters.
+
+        Returns array of shape (3 + 2*num_fourier_terms,) containing:
+        [period, y_min, y_max, a1, b1, a2, b2, ...]
+        """
+        # Sample period uniformly from [10, 1000]
+        key, period_key = jax.random.split(key)
+        period = jax.random.randint(period_key, (), 10, 1001).astype(jnp.float32)
+
+        # Generate coefficients with 1/n scaling
+        key, a_key = jax.random.split(key)
+        n_values = jnp.arange(1, self.num_fourier_terms + 1, dtype=jnp.float32)
+        a_coeffs = jax.random.normal(a_key, (self.num_fourier_terms,)) / n_values
+
+        key, b_key = jax.random.split(key)
+        b_coeffs = jax.random.normal(b_key, (self.num_fourier_terms,)) / n_values
+
+        # Compute min-max values for normalization
+        num_samples = 1000
+        t_samples = jnp.linspace(0, 2 * jnp.pi, num_samples)
+        y_samples = jnp.zeros(num_samples)
+        for n in range(1, self.num_fourier_terms + 1):
+            y_samples += a_coeffs[n - 1] * jnp.cos(n * t_samples)
+            y_samples += b_coeffs[n - 1] * jnp.sin(n * t_samples)
+
+        # Store min and max for proper min-max normalization
+        y_min = jnp.min(y_samples)
+        y_max = jnp.max(y_samples)
+
+        # Combine into parameter vector: [period, y_min, y_max, a1, b1, a2, b2, ...]
+        ab_interleaved = jnp.empty(2 * self.num_fourier_terms, dtype=jnp.float32)
+        ab_interleaved = ab_interleaved.at[::2].set(a_coeffs)
+        ab_interleaved = ab_interleaved.at[1::2].set(b_coeffs)
+        params_vec = jnp.concatenate(
+            [jnp.array([period, y_min, y_max]), ab_interleaved]
+        )
+
+        return params_vec
+
+    def reward(
+        self, clock: int, rng: jax.Array, params: Optional[jax.Array] = None
+    ) -> float:
+        """Compute reward from Fourier series parameters.
+
+        Args:
+            clock: Current timestep
+            rng: Random key (unused for Fourier objects)
+            params: Array of shape (3 + 2*num_fourier_terms,) containing
+                    [period, y_min, y_max, a1, b1, a2, b2, ...]
+
+        Returns:
+            Reward value computed from Fourier series, normalized to [-base_magnitude, base_magnitude]
+        """
+        if params is None or len(params) == 0:
+            return 0.0
+
+        # Extract period and min-max values
+        period = params[0]
+        y_min = params[1]
+        y_max = params[2]
+
+        # Normalize time to [0, 2π] using the object's period
+        t = 2.0 * jnp.pi * (clock % period) / period
+
+        # Extract interleaved coefficients: [a1, b1, a2, b2, ...]
+        ab_coeffs = params[3:]
+        n_terms = len(ab_coeffs) // 2
+
+        # Compute Fourier series: sum(a_n*cos(n*t) + b_n*sin(n*t))
+        reward = 0.0
+        for i in range(n_terms):
+            freq = i + 1
+            a_i = ab_coeffs[2 * i]  # a coefficient at index 2i
+            b_i = ab_coeffs[2 * i + 1]  # b coefficient at index 2i+1
+            reward += a_i * jnp.cos(freq * t) + b_i * jnp.sin(freq * t)
+
+        # Apply min-max normalization to [-1, 1], then scale by base_magnitude
+        # Formula: 2 * (x - min) / (max - min) - 1
+        range_val = jnp.maximum(y_max - y_min, 1e-8)  # Avoid division by zero
+        reward = (2.0 * (reward - y_min) / range_val - 1.0) * self.base_magnitude
+
+        return reward
+
+    def reward_delay(self, clock: int, rng: jax.Array) -> int:
+        """Reward delay function."""
+        return self.reward_delay_val
+
+    def regen_delay(self, clock: int, rng: jax.Array) -> int:
+        """No individual regeneration - returns infinity."""
+        return jnp.iinfo(jnp.int32).max
+
+    def expiry_regen_delay(self, clock: int, rng: jax.Array) -> int:
+        """No expiry regeneration."""
+        return jnp.iinfo(jnp.int32).max
 
 
 EMPTY = DefaultForagaxObject()
@@ -481,6 +643,40 @@ def create_weather_objects(
         expiry_time=expiry_time,
         mean_expiry_regen_delay=mean_expiry_regen_delay,
         std_expiry_regen_delay=std_expiry_regen_delay,
+    )
+
+    return hot, cold
+
+
+def create_fourier_objects(
+    num_fourier_terms: int = 10,
+    base_magnitude: float = 1.0,
+    reward_delay: int = 0,
+):
+    """Create HOT and COLD FourierWeatherObject instances.
+
+    Args:
+        num_fourier_terms: Number of Fourier terms in the reward function (default: 1000).
+        base_magnitude: Base magnitude for Fourier coefficients.
+        reward_delay: Number of steps before reward is delivered.
+
+    Returns:
+        A tuple (HOT, COLD) of FourierWeatherObject instances.
+    """
+    hot = FourierObject(
+        name="hot_fourier",
+        num_fourier_terms=num_fourier_terms,
+        base_magnitude=base_magnitude,
+        color=(0, 0, 0),
+        reward_delay=reward_delay,
+    )
+
+    cold = FourierObject(
+        name="cold_fourier",
+        num_fourier_terms=num_fourier_terms,
+        base_magnitude=base_magnitude,
+        color=(0, 0, 0),
+        reward_delay=reward_delay,
     )
 
     return hot, cold

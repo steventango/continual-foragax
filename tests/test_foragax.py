@@ -20,8 +20,10 @@ from foragax.objects import (
     THORNS,
     WALL,
     DefaultForagaxObject,
+    FourierObject,
     NormalRegenForagaxObject,
     WeatherObject,
+    create_fourier_objects,
 )
 
 
@@ -902,8 +904,6 @@ def test_empty_environment_observation():
 def test_single_color_all_objects():
     """Test when all objects have the same color."""
     # Create multiple objects with same color
-    from foragax.objects import DefaultForagaxObject
-
     obj1 = DefaultForagaxObject(name="obj1", color=(50, 100, 150))
     obj2 = DefaultForagaxObject(name="obj2", color=(50, 100, 150))
     obj3 = DefaultForagaxObject(name="obj3", color=(50, 100, 150))
@@ -1622,3 +1622,850 @@ def test_expiry_with_random_respawn():
     assert jnp.all(
         (state.object_grid == 0) | ((state.object_grid == 1) & biome_mask)
     ), "All objects should be within the biome"
+
+
+def test_dynamic_biome_respawn_threshold():
+    """Test that biomes respawn when consumption threshold is reached."""
+    hot = create_fourier_objects(num_fourier_terms=2, base_magnitude=1.0)[0]
+
+    env = ForagaxEnv(
+        name="TestDynamicBiome",
+        size=(4, 4),
+        aperture_size=(3, 3),
+        objects=(hot,),
+        biomes=(Biome(start=(0, 0), stop=(4, 4), object_frequencies=(1.0,)),),
+        nowrap=True,
+        deterministic_spawn=True,
+        observation_type="object",
+        dynamic_biomes=True,
+        biome_consumption_threshold=0.7,
+    )
+
+    key = jax.random.key(123)
+    obs, state = env.reset(key, env.default_params)
+
+    # Record initial state
+    initial_generation = state.biome_generation[0]
+    initial_total = state.biome_total_objects[0]
+    initial_params = state.object_state_grid.copy()
+
+    # Calculate how many objects need to be consumed to trigger respawn (70% of 16 = 11.2, so 12)
+    threshold_count = int(jnp.ceil(initial_total * 0.7))
+
+    # Collect objects by taking steps - agent will collect when moving onto objects
+    current_state = state
+    steps_taken = 0
+    max_steps = 50  # Safety limit
+
+    while (
+        current_state.biome_consumption_count[0] < threshold_count
+        and current_state.biome_generation[0] == initial_generation
+        and steps_taken < max_steps
+    ):
+        key, key_step = jax.random.split(key)
+        # Take a random action
+        action = jax.random.randint(key_step, (), 0, 4)
+        obs, current_state, reward, done, info = env.step(
+            key_step, current_state, action, env.default_params
+        )
+        steps_taken += 1
+
+    # Check that respawn occurred
+    assert current_state.biome_generation[0] > initial_generation, (
+        f"Generation should increase. Consumed {current_state.biome_consumption_count[0]}/{threshold_count} in {steps_taken} steps"
+    )
+    assert current_state.biome_consumption_count[0] == 0, (
+        "Consumption should reset after respawn"
+    )
+    assert current_state.biome_total_objects[0] > 0, "Objects should be respawned"
+
+    # Reward parameters should have changed
+    current_params = current_state.object_state_grid
+    params_changed = jnp.any(jnp.abs(current_params - initial_params) > 0.01)
+    assert params_changed, "Reward parameters should change after respawn"
+
+
+def test_object_no_individual_respawn():
+    """Test that objects with max regen_delay do not have a timer placed."""
+    # Create an object with infinite regen delay (no individual respawn)
+    no_respawn_obj = DefaultForagaxObject(
+        name="no_respawn",
+        reward=1.0,
+        collectable=True,
+        regen_delay=(jnp.iinfo(jnp.int32).max, jnp.iinfo(jnp.int32).max),
+        color=(255, 0, 0),
+    )
+
+    env = ForagaxEnv(
+        size=(3, 3),
+        aperture_size=(3, 3),
+        objects=(no_respawn_obj,),
+        biomes=(Biome(start=(0, 0), stop=(3, 3), object_frequencies=(1.0,)),),
+        nowrap=True,
+        observation_type="object",
+    )
+
+    key = jax.random.key(42)
+    obs, state = env.reset(key, env.default_params)
+
+    # Find an object position
+    obj_pos = jnp.argwhere(state.object_grid > 0)[0]
+    y, x = obj_pos
+
+    # Position agent above the object so moving down collects it
+    state = state.replace(pos=jnp.array([x, y - 1]))
+    key, key_step = jax.random.split(key)
+    obs, state, reward, done, info = env.step(
+        key_step, state, Actions.DOWN, env.default_params
+    )
+
+    # Verify object was collected
+    assert info["object_collected_id"] == 1, "Object should have been collected"
+
+    # Check that no timer was placed (position should be 0, not negative)
+    assert state.object_grid[y, x] == 0, (
+        f"No timer should be placed for objects with max regen_delay, "
+        f"but got {state.object_grid[y, x]}"
+    )
+
+
+def test_object_color_grid_cleared_on_collection():
+    """Test that object_color_grid is cleared when objects are collected."""
+    key = jax.random.key(0)
+    env = ForagaxEnv(
+        size=(7, 7),
+        objects=(FLOWER,),
+        biomes=(Biome(object_frequencies=(1.0,)),),
+        observation_type="color",
+        dynamic_biomes=True,  # Enable dynamic biomes to test color grid
+    )
+    params = env.default_params
+    _, state = env.reset(key, params)
+
+    flower_id = 1  # 0 is EMPTY
+
+    # Find a flower position
+    flower_positions = jnp.argwhere(state.object_grid == flower_id)
+    flower_pos = flower_positions[0]
+    y, x = flower_pos
+
+    # Move agent to flower and collect it
+    # Position agent above the flower so moving down collects it
+    state = state.replace(pos=jnp.array([x, y - 1]))
+    key, step_key = jax.random.split(key)
+    _, state, reward, _, _ = env.step(step_key, state, Actions.DOWN, params)
+
+    assert reward == FLOWER.reward_val
+
+    # Check that the color grid at the collected position is cleared (should be [255, 255, 255])
+    collected_color = state.object_color_grid[y, x]
+    expected_empty_color = jnp.array([255, 255, 255], dtype=jnp.uint8)
+    chex.assert_trees_all_equal(collected_color, expected_empty_color)
+
+    # Check that other positions with objects still have their colors
+    other_flower_positions = jnp.argwhere(
+        (state.object_grid == flower_id) & (state.object_grid != 0)
+    )
+    other_pos = other_flower_positions[0]
+    other_color = state.object_color_grid[other_pos[0], other_pos[1]]
+    # Should not be the empty color
+    assert not jnp.allclose(other_color, expected_empty_color)
+
+
+def test_object_color_grid_cleared_on_expiry():
+    """Test that object_color_grid is cleared when objects expire."""
+    # Create an object that expires quickly
+    expiring_obj = DefaultForagaxObject(
+        name="expiring",
+        reward=1.0,
+        collectable=False,
+        color=(255, 0, 0),
+        expiry_time=3,
+        expiry_regen_delay=(1, 1),
+    )
+
+    env = ForagaxEnv(
+        size=(5, 5),
+        aperture_size=(5, 5),
+        objects=(expiring_obj,),
+        biomes=(Biome(object_frequencies=(0.5,)),),
+        observation_type="color",
+        dynamic_biomes=True,  # Enable dynamic biomes to test color grid
+    )
+
+    key = jax.random.key(42)
+    key, key_reset = jax.random.split(key)
+    obs, state = env.reset(key_reset, env.default_params)
+
+    # Find an object position
+    obj_positions = jnp.argwhere(state.object_grid == 1)
+    obj_pos = obj_positions[0]
+    y, x = obj_pos
+
+    # Step until expiry (4 steps: expiry happens when age >= expiry_time)
+    for _ in range(4):
+        key, key_step = jax.random.split(key)
+        obs, state, _, _, _ = env.step(
+            key_step, state, Actions.DOWN, env.default_params
+        )
+
+    # Object should have expired and color should be cleared
+    expired_color = state.object_color_grid[y, x]
+    expected_empty_color = jnp.array([255, 255, 255], dtype=jnp.uint8)
+    chex.assert_trees_all_equal(expired_color, expected_empty_color)
+
+
+def test_biome_regeneration_preserves_old_objects():
+    """Test that biome regeneration only replaces intersecting objects."""
+    # Create a simple environment with one biome
+    OBJ_A = FourierObject(
+        name="OBJ_A",
+        base_magnitude=1.0,
+        color=(255, 0, 0),
+    )
+    OBJ_B = FourierObject(
+        name="OBJ_B",
+        base_magnitude=1.0,
+        color=(0, 255, 0),
+    )
+
+    # Small grid for easier testing
+    size = (10, 10)
+    biomes = (
+        Biome(
+            start=(0, 0),
+            stop=(10, 10),
+            object_frequencies=(0.5, 0.3),  # 80% occupancy
+        ),
+    )
+
+    env = ForagaxEnv(
+        size=size,
+        aperture_size=5,
+        objects=(OBJ_A, OBJ_B),
+        biomes=biomes,
+        dynamic_biomes=True,
+        biome_consumption_threshold=0.1,  # 10% threshold for easier testing
+        deterministic_spawn=False,  # Use random spawn for realistic test
+    )
+
+    key = jax.random.key(42)
+    key_reset, key_step = jax.random.split(key)
+
+    # Reset environment
+    obs, state = env.reset(key_reset, env.default_params)
+
+    # Store initial object grid and object state
+    initial_object_grid = state.object_grid.copy()
+    initial_object_state_grid = state.object_state_grid.copy()
+
+    # Consume objects until biome regeneration triggers
+    # Directly manipulate state to collect objects and trigger respawn
+    current_state = state
+
+    # Collect all objects to trigger regeneration
+    for y in range(size[1]):
+        for x in range(size[0]):
+            if current_state.object_grid[y, x] > 0:
+                obj_id = int(current_state.object_grid[y, x])
+                if (
+                    obj_id < len(env.object_collectable)
+                    and env.object_collectable[obj_id]
+                ):
+                    # Teleport agent to object and collect it
+                    current_state = current_state.replace(pos=jnp.array([x, y]))
+                    key_step, step_key = jax.random.split(key_step)
+                    obs, current_state, reward, done, info = env.step(
+                        step_key, current_state, 0, env.default_params
+                    )
+
+                    # Stop once regeneration happens
+                    if current_state.biome_generation[0] > 0:
+                        break
+        if current_state.biome_generation[0] > 0:
+            break
+
+    assert current_state.biome_generation[0] > 0, "Biome should have regenerated"
+
+    # Verify regeneration behavior:
+    # 1. Object grid has changed
+    assert not jnp.array_equal(initial_object_grid, current_state.object_grid), (
+        "Object grid should have changed after respawn"
+    )
+
+    # 2. At least one old object should persist (wasn't replaced by new spawn)
+    biome_0_mask = current_state.biome_grid == 0
+    old_objects_remaining = 0
+    for y in range(size[1]):
+        for x in range(size[0]):
+            if biome_0_mask[y, x]:
+                # Check if this position had an object initially and still has the same object
+                if (
+                    initial_object_grid[y, x] > 0
+                    and current_state.object_grid[y, x] > 0
+                ):
+                    # For FourierObjects, check if the state parameters are identical
+                    # If they are, it's the same object instance (not a new spawn)
+                    if jnp.array_equal(
+                        initial_object_state_grid[y, x],
+                        current_state.object_state_grid[y, x],
+                    ):
+                        old_objects_remaining += 1
+
+    assert old_objects_remaining > 0, (
+        "At least one old object should persist after regeneration"
+    )
+
+    # 3. Consumption counter should be reset
+    assert current_state.biome_consumption_count[0] == 0, (
+        "Consumption count should reset"
+    )
+
+    # 4. New total objects should be tracked correctly
+    actual_objects = jnp.sum((current_state.object_grid > 0) & biome_0_mask)
+    new_total = current_state.biome_total_objects[0]
+    assert new_total <= actual_objects, (
+        f"New total {new_total} should be <= actual {actual_objects} "
+        "(actual may include preserved old objects)"
+    )
+
+
+def test_biome_regeneration_updates_only_new_objects():
+    """Test that object properties are only updated for newly spawned objects."""
+    # Create environment with Fourier objects
+    OBJ = FourierObject(
+        name="OBJ",
+        base_magnitude=1.0,
+        color=(255, 0, 0),
+    )
+
+    size = (10, 10)
+    biomes = (
+        Biome(
+            start=(0, 0),
+            stop=(10, 10),
+            object_frequencies=(0.8,),  # High occupancy
+        ),
+    )
+
+    env = ForagaxEnv(
+        size=size,
+        aperture_size=5,
+        objects=(OBJ,),
+        biomes=biomes,
+        dynamic_biomes=True,
+        biome_consumption_threshold=0.4,  # Lower threshold for easier testing
+        deterministic_spawn=False,
+    )
+
+    key = jax.random.key(123)
+    key_reset, key_step = jax.random.split(key)
+
+    obs, state = env.reset(key_reset, env.default_params)
+
+    # Store initial Fourier parameters for all object positions
+    initial_params = {}
+    for y in range(size[1]):
+        for x in range(size[0]):
+            if state.object_grid[y, x] > 0:
+                initial_params[(x, y)] = state.object_state_grid[y, x].copy()
+
+    print(f"Initial objects: {len(initial_params)}")
+
+    # Force respawn by consuming objects
+    current_state = state
+    biome_mask = state.biome_grid == 0
+    objects_in_biome = jnp.sum((state.object_grid > 0) & biome_mask)
+    consumption_needed = int(jnp.ceil(objects_in_biome * 0.5))
+
+    collections = 0
+    for y in range(size[1]):
+        for x in range(size[0]):
+            if (
+                collections >= consumption_needed + 10
+            ):  # Collect extra to ensure threshold is hit
+                break
+            if biome_mask[y, x] and current_state.object_grid[y, x] > 0:
+                current_state = current_state.replace(pos=jnp.array([x, y]))
+                key_step, step_key = jax.random.split(key_step)
+                obs, current_state, reward, done, info = env.step(
+                    step_key, current_state, 0, env.default_params
+                )
+                if info["object_collected_id"] >= 0:
+                    collections += 1
+
+        if current_state.biome_generation[0] > 0:
+            break
+
+    assert current_state.biome_generation[0] > 0, (
+        f"Biome should have respawned after {collections} collections"
+    )
+
+    # After respawn, check that:
+    # 1. NEW object positions have DIFFERENT parameters
+    # 2. OLD object positions (not replaced) should have SAME parameters OR
+    #    be replaced with new objects
+
+    params_changed_count = 0
+    params_same_count = 0
+
+    for y in range(size[1]):
+        for x in range(size[0]):
+            if current_state.object_grid[y, x] > 0:
+                new_params = current_state.object_state_grid[y, x]
+
+                # Check if this position had an object initially
+                if (x, y) in initial_params:
+                    old_params = initial_params[(x, y)]
+                    if jnp.allclose(old_params, new_params):
+                        params_same_count += 1
+                    else:
+                        params_changed_count += 1
+                else:
+                    # This is a truly new object
+                    params_changed_count += 1
+
+    print(f"Parameters changed: {params_changed_count}")
+    print(f"Parameters same: {params_same_count}")
+
+    # The respawn should generate new objects with new parameters
+    # Some positions might be replaced, others might not be
+    # But we should see SOME new parameters
+    assert params_changed_count > 0, "Should have some objects with new parameters"
+
+
+def test_consumption_threshold_per_generation():
+    """Test that consumption tracking resets per generation.
+
+    With deterministic spawn and threshold 0.5:
+    - Initial spawn: 5 objects (generation 0)
+    - After consuming 3 objects: spawn 5 new objects (generation 1)
+    - Consuming remaining gen0 objects should NOT count toward gen1 consumption
+
+    The key is that consumption count resets to 0 after each regeneration,
+    and only objects from the current generation count toward consumption.
+    """
+    OBJ_A = FourierObject(
+        name="OBJ_A",
+        base_magnitude=1.0,
+        color=(255, 0, 0),
+    )
+
+    size = (3, 3)  # 9 cells total
+    biomes = (
+        Biome(
+            start=(0, 0),
+            stop=(3, 3),
+            object_frequencies=(0.5,),  # All cells have objects
+        ),
+    )
+
+    env = ForagaxEnv(
+        size=size,
+        aperture_size=3,
+        objects=(OBJ_A,),
+        biomes=biomes,
+        dynamic_biomes=True,
+        biome_consumption_threshold=0.5,  # 50% threshold
+        deterministic_spawn=True,  # Deterministic spawn for predictable behavior
+    )
+
+    key = jax.random.key(42)
+    key_reset, key_step = jax.random.split(key)
+
+    # Reset environment
+    obs, state = env.reset(key_reset, env.default_params)
+
+    # Verify initial state
+    biome_mask = state.biome_grid == 0
+    initial_objects = jnp.sum((state.object_grid > 0) & biome_mask)
+    assert initial_objects == 5, f"Should start with 5 objects, got {initial_objects}"
+    assert state.biome_generation[0] == 0, "Should start at generation 0"
+    assert state.biome_total_objects[0] == 5, "Should track 5 total objects"
+    assert state.biome_consumption_count[0] == 0, "Should start with 0 consumption"
+
+    # Store generation 0 properties and positions
+    gen0_params = {}
+    for y in range(size[1]):
+        for x in range(size[0]):
+            if state.object_grid[y, x] > 0:
+                gen0_params[(x, y)] = state.object_state_grid[y, x].copy()
+
+    # Consume 3 objects (>= 50% of 5 = 2.5, so 3 triggers respawn)
+    # We need to collect objects by moving onto them, not by teleporting
+    current_state = state
+    collections = 0
+    target_collections = 3
+    gen0_collected_positions = set()
+
+    # Collect objects by actually moving onto them
+    max_steps = 100  # Safety limit
+    steps = 0
+    while collections < target_collections and steps < max_steps:
+        # Find the nearest object
+        found = False
+        for y in range(size[1]):
+            for x in range(size[0]):
+                if current_state.object_grid[y, x] > 0:
+                    # Position agent next to object (above it)
+                    if y > 0:
+                        current_state = current_state.replace(pos=jnp.array([x, y - 1]))
+                        action = 0  # DOWN
+                    elif x > 0:
+                        current_state = current_state.replace(pos=jnp.array([x - 1, y]))
+                        action = 1  # RIGHT
+                    elif y < size[1] - 1:
+                        current_state = current_state.replace(pos=jnp.array([x, y + 1]))
+                        action = 2  # UP
+                    else:
+                        current_state = current_state.replace(pos=jnp.array([x + 1, y]))
+                        action = 3  # LEFT
+
+                    key_step, step_key = jax.random.split(key_step)
+                    obs, current_state, reward, done, info = env.step(
+                        step_key, current_state, action, env.default_params
+                    )
+
+                    if info["object_collected_id"] >= 0:
+                        gen0_collected_positions.add((x, y))
+                        collections += 1
+                        found = True
+                        break
+            if found:
+                break
+        steps += 1
+
+    # Verify generation 1 spawned
+    assert current_state.biome_generation[0] == 1, (
+        "Should be at generation 1 after consuming 3 objects"
+    )
+    assert current_state.biome_consumption_count[0] == 0, (
+        "Consumption should reset to 0 after respawn"
+    )
+
+    # Verify we have objects from generation 1
+    # Note: total visible objects includes both gen 1 (new) and gen 0 (preserved)
+    # biome_total_objects tracks only the NEW gen 1 objects spawned
+    gen1_objects_total = jnp.sum((current_state.object_grid > 0) & biome_mask)
+    assert gen1_objects_total >= 5, (
+        f"Should have at least 5 objects (new gen1 + preserved gen0), got {gen1_objects_total}"
+    )
+    assert current_state.biome_total_objects[0] == 5, (
+        "Should track 5 NEW objects spawned in gen 1"
+    )
+
+    # Store generation 1 properties
+    gen1_params = {}
+    for y in range(size[1]):
+        for x in range(size[0]):
+            if current_state.object_grid[y, x] > 0:
+                gen1_params[(x, y)] = current_state.object_state_grid[y, x].copy()
+
+    # Verify that generation 1 has DIFFERENT parameters than generation 0
+    params_different = False
+    for pos in gen1_params:
+        if pos in gen0_params:
+            if not jnp.allclose(gen0_params[pos], gen1_params[pos]):
+                params_different = True
+                break
+    assert params_different, (
+        "Generation 1 should have different Fourier parameters than generation 0"
+    )
+
+    # Find any remaining gen0 objects (preserved because new spawn didn't place object there)
+    gen0_remaining_positions = []
+    for pos in gen0_params:
+        if pos not in gen0_collected_positions:  # Not collected
+            # Check if it's still the same object by comparing params
+            x, y = pos  # pos is (x, y) tuple
+            if current_state.object_grid[y, x] > 0:
+                if jnp.allclose(
+                    gen0_params[pos], current_state.object_state_grid[y, x]
+                ):
+                    gen0_remaining_positions.append(pos)
+
+    # Consume a gen0 object and verify they DON'T count toward gen1 consumption
+    consumption_before = current_state.biome_consumption_count[0]
+
+    # Just consume one gen0 object - position agent adjacent and move onto it
+    assert len(gen0_remaining_positions) > 0, (
+        "Should have at least one gen0 object remaining"
+    )
+    x, y = gen0_remaining_positions[0]
+
+    # Position agent next to the object and move onto it
+    if y > 0:
+        current_state = current_state.replace(pos=jnp.array([x, y - 1]))
+        action = 0  # DOWN
+    elif x > 0:
+        current_state = current_state.replace(pos=jnp.array([x - 1, y]))
+        action = 1  # RIGHT
+    elif y < size[1] - 1:
+        current_state = current_state.replace(pos=jnp.array([x, y + 1]))
+        action = 2  # UP
+    else:
+        current_state = current_state.replace(pos=jnp.array([x + 1, y]))
+        action = 3  # LEFT
+
+    key_step, step_key = jax.random.split(key_step)
+    obs, current_state, reward, done, info = env.step(
+        step_key, current_state, action, env.default_params
+    )
+
+    # Assert that we collected an object
+    assert info["object_collected_id"] >= 0, "Should have collected a gen0 object"
+
+    # Consumption count should NOT increase when collecting old gen0 objects
+    assert current_state.biome_consumption_count[0] == consumption_before, (
+        "Consuming gen0 objects should NOT count toward gen1 consumption"
+    )
+
+
+def test_biome_respawn_maintains_total_object_count_nondeterministic():
+    """Test that biome respawn maintains the same total object count.
+
+    When a biome respawns, it should generate a NEW set of objects based on
+    the biome's object frequencies, replacing ALL objects in the biome.
+    The total object count should remain approximately the same (within
+    statistical variance for random spawn).
+    """
+    OBJ = FourierObject(
+        name="OBJ",
+        base_magnitude=1.0,
+        color=(255, 0, 0),
+    )
+
+    size = (5, 5)  # 25 cells
+    biomes = (
+        Biome(
+            start=(0, 0),
+            stop=(5, 5),
+            object_frequencies=(0.6,),  # ~60% occupancy = ~15 objects
+        ),
+    )
+
+    env = ForagaxEnv(
+        size=size,
+        aperture_size=5,
+        objects=(OBJ,),
+        biomes=biomes,
+        dynamic_biomes=True,
+        biome_consumption_threshold=0.5,  # 50% threshold
+        deterministic_spawn=False,  # Random spawn to test statistical behavior
+    )
+
+    key = jax.random.key(42)
+    key_reset, key_step = jax.random.split(key)
+
+    obs, state = env.reset(key_reset, env.default_params)
+
+    # Record initial object count
+    biome_mask = state.biome_grid == 0
+    initial_total = state.biome_total_objects[0]
+    initial_count = jnp.sum((state.object_grid > 0) & biome_mask)
+
+    assert initial_total == initial_count, "Initial total should match actual count"
+
+    # Consume objects to trigger respawn
+    # Collect enough objects by stepping through the grid systematically
+    current_state = state
+    target_collections = (initial_total // 2) + 1  # Need > 50%
+
+    # Collect objects by moving agent directly to each object position
+    collected = 0
+    for y in range(size[1]):
+        for x in range(size[0]):
+            if collected >= target_collections:
+                break
+            # Check if there's a collectable object at this position in ORIGINAL state
+            if state.object_grid[y, x] > 0:
+                # Move agent to this position
+                current_state = current_state.replace(pos=jnp.array([x, y]))
+                # Take NOOP action to collect
+                key_step, step_key = jax.random.split(key_step)
+                obs, current_state, reward, done, info = env.step(
+                    step_key, current_state, 0, env.default_params
+                )
+                if info["object_collected_id"] >= 0:
+                    collected += 1
+        if collected >= target_collections:
+            break
+
+    # Verify respawn happened
+    assert current_state.biome_generation[0] == 1, (
+        f"Should have respawned after collecting {collected}/{initial_total} "
+        f"(threshold: {env.biome_consumption_threshold})"
+    )
+
+    # Check new object count
+    new_total = current_state.biome_total_objects[0]
+    new_count_all = jnp.sum((current_state.object_grid > 0) & biome_mask)
+
+    # The new_total should reflect only NEWLY spawned objects (from this generation)
+    # NOT the total including old preserved objects
+    # So new_total should be similar to initial_total (both based on same frequency)
+    variance_threshold = 0.3
+    lower_bound = initial_total * (1 - variance_threshold)
+    upper_bound = initial_total * (1 + variance_threshold)
+
+    assert lower_bound <= new_total <= upper_bound, (
+        f"New total {new_total} should be similar to initial total {initial_total} "
+        f"(expected range: {lower_bound:.1f} - {upper_bound:.1f})"
+    )
+
+    # The total_in_biome might be higher than new_total because it includes
+    # old unconsumed objects that were preserved
+    assert new_count_all >= new_total, (
+        f"Total in biome {new_count_all} should be >= new_total {new_total} "
+        "(may include preserved old objects)"
+    )
+
+
+def test_biome_respawn_maintains_total_object_count_deterministic():
+    """Test that biome respawn maintains the same total object count.
+
+    When a biome respawns, it should generate a NEW set of objects based on
+    the biome's object frequencies, replacing ALL objects in the biome.
+    The total object count should remain the same.
+    """
+    OBJ = FourierObject(
+        name="OBJ",
+        base_magnitude=1.0,
+        color=(255, 0, 0),
+    )
+
+    size = (5, 5)  # 25 cells
+    biomes = (
+        Biome(
+            start=(0, 0),
+            stop=(5, 5),
+            object_frequencies=(0.6,),  # ~60% occupancy = ~15 objects
+        ),
+    )
+
+    env = ForagaxEnv(
+        size=size,
+        aperture_size=5,
+        objects=(OBJ,),
+        biomes=biomes,
+        dynamic_biomes=True,
+        biome_consumption_threshold=0.5,  # 50% threshold
+        deterministic_spawn=True,
+    )
+
+    key = jax.random.key(42)
+    key_reset, key_step = jax.random.split(key)
+
+    obs, state = env.reset(key_reset, env.default_params)
+
+    # Record initial object count
+    biome_mask = state.biome_grid == 0
+    initial_total = state.biome_total_objects[0]
+    initial_count = jnp.sum((state.object_grid > 0) & biome_mask)
+
+    assert initial_total == initial_count, "Initial total should match actual count"
+
+    # Consume objects to trigger respawn
+    # Collect enough objects by stepping through the grid systematically
+    current_state = state
+    target_collections = (initial_total // 2) + 1  # Need > 50%
+
+    # Collect objects by moving agent directly to each object position
+    collected = 0
+    for y in range(size[1]):
+        for x in range(size[0]):
+            if collected >= target_collections:
+                break
+            # Check if there's a collectable object at this position in ORIGINAL state
+            if state.object_grid[y, x] > 0:
+                # Move agent to this position
+                current_state = current_state.replace(pos=jnp.array([x, y]))
+                # Take NOOP action to collect
+                key_step, step_key = jax.random.split(key_step)
+                obs, current_state, reward, done, info = env.step(
+                    step_key, current_state, 0, env.default_params
+                )
+                if info["object_collected_id"] >= 0:
+                    collected += 1
+        if collected >= target_collections:
+            break
+
+    # Verify respawn happened
+    assert current_state.biome_generation[0] == 1, (
+        f"Should have respawned after collecting {collected}/{initial_total} "
+        f"(threshold: {env.biome_consumption_threshold})"
+    )
+
+    # Check new object count
+    new_total = current_state.biome_total_objects[0]
+    new_count_all = jnp.sum((current_state.object_grid > 0) & biome_mask)
+
+    assert new_total == initial_total, (
+        f"New total {new_total} should equal initial total {initial_total} "
+    )
+
+    # The total_in_biome might be higher than new_total because it includes
+    # old unconsumed objects that were preserved
+    assert new_count_all >= new_total, (
+        f"Total in biome {new_count_all} should be >= new_total {new_total} "
+        "(may include preserved old objects)"
+    )
+
+
+def test_empty_object_has_no_sampled_color():
+    """Test that EMPTY object (index 0) does not get a sampled color during spawn."""
+    OBJ_A = FourierObject(
+        name="OBJ_A",
+        base_magnitude=1.0,
+        color=(255, 0, 0),
+    )
+    OBJ_B = FourierObject(
+        name="OBJ_B",
+        base_magnitude=1.0,
+        color=(0, 255, 0),
+    )
+
+    size = (10, 10)
+    biomes = (
+        Biome(
+            start=(0, 0),
+            stop=(10, 10),
+            object_frequencies=(0.3, 0.3),  # 60% occupancy, 40% empty
+        ),
+    )
+
+    env = ForagaxEnv(
+        size=size,
+        aperture_size=5,
+        objects=(OBJ_A, OBJ_B),
+        biomes=biomes,
+        dynamic_biomes=True,
+        biome_consumption_threshold=0.9,
+        deterministic_spawn=False,
+    )
+
+    key = jax.random.key(999)
+    obs, state = env.reset(key, env.default_params)
+
+    # Check that all EMPTY positions (object_grid == 0) have color [255, 255, 255]
+    empty_mask = state.object_grid == 0
+    empty_colors = state.object_color_grid[empty_mask]
+
+    # All empty positions should have [255, 255, 255] color (default empty color)
+    expected_empty_color = jnp.full(3, 255, dtype=jnp.uint8)
+
+    # Check each empty position
+    for color in empty_colors:
+        chex.assert_trees_all_equal(color, expected_empty_color)
+
+    print(f"Found {jnp.sum(empty_mask)} empty positions, all with [0, 0, 0] color")
+
+    # Additionally check that non-empty objects DO have colors
+    non_empty_mask = state.object_grid > 0
+    non_empty_colors = state.object_color_grid[non_empty_mask]
+
+    # At least some non-empty objects should have non-zero colors
+    has_color = jnp.any(non_empty_colors != 0, axis=1)
+    assert jnp.sum(has_color) > 0, "Non-empty objects should have colors"
+
+    print(f"Found {jnp.sum(non_empty_mask)} non-empty positions with colors")

@@ -19,6 +19,7 @@ from foragax.objects import (
     EMPTY,
     PADDING,
     BaseForagaxObject,
+    FourierObject,
     WeatherObject,
 )
 from foragax.rendering import apply_true_borders
@@ -63,6 +64,12 @@ class EnvState(environment.EnvState):
     time: int
     digestion_buffer: jax.Array
     object_spawn_time_grid: jax.Array
+    object_color_grid: jax.Array  # (H, W, 3) - RGB color per object
+    object_generation_grid: jax.Array  # (H, W) - generation number for each object
+    object_state_grid: jax.Array  # (H, W, N) - Fourier params per object
+    biome_consumption_count: jax.Array  # (num_biomes,) - objects consumed per biome
+    biome_total_objects: jax.Array  # (num_biomes,) - total objects spawned per biome
+    biome_generation: jax.Array  # (num_biomes,) - current generation per biome
 
 
 class ForagaxEnv(environment.Environment):
@@ -79,6 +86,8 @@ class ForagaxEnv(environment.Environment):
         deterministic_spawn: bool = False,
         teleport_interval: Optional[int] = None,
         observation_type: str = "object",
+        dynamic_biomes: bool = False,
+        biome_consumption_threshold: float = 0.9,
     ):
         super().__init__()
         self._name = name
@@ -100,10 +109,23 @@ class ForagaxEnv(environment.Environment):
         self.nowrap = nowrap
         self.deterministic_spawn = deterministic_spawn
         self.teleport_interval = teleport_interval
+        self.dynamic_biomes = dynamic_biomes
+        self.biome_consumption_threshold = biome_consumption_threshold
+
         objects = (EMPTY,) + objects
         if self.nowrap and not self.full_world:
             objects = objects + (PADDING,)
         self.objects = objects
+
+        # Infer num_fourier_terms from objects
+        self.num_fourier_terms = max(
+            (
+                obj.num_fourier_terms
+                for obj in self.objects
+                if isinstance(obj, FourierObject)
+            ),
+            default=0,
+        )
 
         # JIT-compatible versions of object and biome properties
         self.object_ids = jnp.arange(len(objects))
@@ -138,6 +160,7 @@ class ForagaxEnv(environment.Environment):
             [b.stop if b.stop is not None else (-1, -1) for b in biomes]
         )
         self.biome_sizes = np.prod(self.biome_stops - self.biome_starts, axis=1)
+        self.biome_sizes_jax = jnp.array(self.biome_sizes)  # JAX version for indexing
         self.biome_starts_jax = jnp.array(self.biome_starts)
         self.biome_stops_jax = jnp.array(self.biome_stops)
         biome_centers = []
@@ -149,6 +172,7 @@ class ForagaxEnv(environment.Environment):
             biome_centers.append((center_x, center_y))
         self.biome_centers_jax = jnp.array(biome_centers)
         self.biome_masks = []
+        biome_masks_array = []
         for i in range(self.biome_object_frequencies.shape[0]):
             # Create mask for the biome
             start = jax.lax.select(
@@ -170,6 +194,10 @@ class ForagaxEnv(environment.Environment):
                 & (cols < stop[0])
             )
             self.biome_masks.append(mask)
+            biome_masks_array.append(mask)
+
+        # Convert to JAX array for indexing in JIT-compiled code
+        self.biome_masks_array = jnp.array(biome_masks_array)
 
         # Compute unique colors and mapping for partial observability (for 'color' observation_type)
         # Exclude EMPTY (index 0) from color channels
@@ -200,46 +228,61 @@ class ForagaxEnv(environment.Environment):
             max_steps_in_episode=None,
         )
 
-    def _place_timer_at_position(
-        self, grid: jax.Array, y: int, x: int, timer_val: int
-    ) -> jax.Array:
-        """Place a timer at a specific position."""
-        return grid.at[y, x].set(timer_val)
-
-    def _place_timer_at_random_position(
+    def _place_timer(
         self,
         grid: jax.Array,
         y: int,
         x: int,
         timer_val: int,
+        random_respawn: bool,
         biome_grid: jax.Array,
         rand_key: jax.Array,
     ) -> jax.Array:
-        """Place a timer at a random valid position within the same biome."""
-        # Set the original position to empty temporarily
-        grid_temp = grid.at[y, x].set(0)
+        """Place a timer at position or randomly within the same biome.
 
-        # Find all valid spawn locations (empty cells within the same biome)
-        biome_id = biome_grid[y, x]
-        biome_mask = biome_grid == biome_id
-        empty_mask = grid_temp == 0
-        valid_spawn_mask = biome_mask & empty_mask
+        Args:
+            grid: Object grid
+            y, x: Original position
+            timer_val: Timer value to place (negative for countdown, 0 for permanent removal)
+            random_respawn: If True, place at random location in same biome
+            biome_grid: Biome assignment grid
+            rand_key: Random key for random placement
 
-        num_valid_spawns = jnp.sum(valid_spawn_mask)
+        Returns:
+            Updated grid with timer placed
+        """
 
-        # Get indices of valid spawn locations, padded to a static size
-        y_indices, x_indices = jnp.nonzero(
-            valid_spawn_mask, size=self.size[0] * self.size[1], fill_value=-1
-        )
-        valid_spawn_indices = jnp.stack([y_indices, x_indices], axis=1)
+        # Handle permanent removal (timer_val == 0)
+        def place_empty():
+            return grid.at[y, x].set(0)
 
-        # Select a random valid location
-        random_idx = jax.random.randint(rand_key, (), 0, num_valid_spawns)
-        new_spawn_pos = valid_spawn_indices[random_idx]
+        # Handle timer placement
+        def place_timer():
+            # Non-random: place at original position
+            def place_at_position():
+                return grid.at[y, x].set(timer_val)
 
-        # Place the timer at the new random position
-        new_grid = grid_temp.at[new_spawn_pos[0], new_spawn_pos[1]].set(timer_val)
-        return new_grid
+            # Random: place at random location in same biome
+            def place_randomly():
+                grid_temp = grid.at[y, x].set(0)
+                biome_id = biome_grid[y, x]
+                biome_mask = biome_grid == biome_id
+                empty_mask = grid_temp == 0
+                valid_spawn_mask = biome_mask & empty_mask
+                num_valid_spawns = jnp.sum(valid_spawn_mask)
+
+                y_indices, x_indices = jnp.nonzero(
+                    valid_spawn_mask, size=self.size[0] * self.size[1], fill_value=-1
+                )
+                valid_spawn_indices = jnp.stack([y_indices, x_indices], axis=1)
+                random_idx = jax.random.randint(rand_key, (), 0, num_valid_spawns)
+                new_spawn_pos = valid_spawn_indices[random_idx]
+
+                return grid_temp.at[new_spawn_pos[0], new_spawn_pos[1]].set(timer_val)
+
+            return jax.lax.cond(random_respawn, place_randomly, place_at_position)
+
+        return jax.lax.cond(timer_val == 0, place_empty, place_timer)
 
     def step_env(
         self,
@@ -294,9 +337,12 @@ class ForagaxEnv(environment.Environment):
         # Handle digestion: add reward to buffer if collected
         digestion_buffer = state.digestion_buffer
         key, reward_subkey = jax.random.split(key)
+
+        object_params = state.object_state_grid[pos[1], pos[0]]
         object_reward = jax.lax.switch(
-            obj_at_pos, self.reward_fns, state.time, reward_subkey
+            obj_at_pos, self.reward_fns, state.time, reward_subkey, object_params
         )
+
         key, digestion_subkey = jax.random.split(key)
         reward_delay = jax.lax.switch(
             obj_at_pos, self.reward_delay_fns, state.time, digestion_subkey
@@ -338,37 +384,39 @@ class ForagaxEnv(environment.Environment):
         regen_delay = jax.lax.switch(
             obj_at_pos, self.regen_delay_fns, state.time, regen_subkey
         )
-        encoded_timer = obj_at_pos - ((regen_delay + 1) * num_obj_types)
+        encoded_timer = jax.lax.cond(
+            regen_delay == jnp.iinfo(jnp.int32).max,
+            lambda: 0,
+            lambda: obj_at_pos - ((regen_delay + 1) * num_obj_types),
+        )
 
         # If collected, replace object with timer; otherwise, keep it
         val_at_pos = object_grid[pos[1], pos[0]]
-        should_collect = is_collectable & (val_at_pos > 0)
+        # Use original should_collect for consumption tracking
+        should_collect_now = is_collectable & (val_at_pos > 0)
 
-        # When not collecting, the value at the position remains unchanged.
-        # When collecting, we either place the timer at the current position or a random one.
-        def do_collection():
-            return jax.lax.cond(
-                self.object_random_respawn[obj_at_pos],
-                lambda: self._place_timer_at_random_position(
-                    object_grid,
-                    pos[1],
-                    pos[0],
-                    encoded_timer,
-                    state.biome_grid,
-                    rand_key,
-                ),
-                lambda: self._place_timer_at_position(
-                    object_grid, pos[1], pos[0], encoded_timer
-                ),
-            )
-
-        def no_collection():
-            return object_grid
-
+        # Place timer on collection
         object_grid = jax.lax.cond(
-            should_collect,
-            do_collection,
-            no_collection,
+            should_collect_now,
+            lambda: self._place_timer(
+                object_grid,
+                pos[1],
+                pos[0],
+                encoded_timer,
+                self.object_random_respawn[obj_at_pos],
+                state.biome_grid,
+                rand_key,
+            ),
+            lambda: object_grid,
+        )
+
+        # Clear color grid when object is collected
+        object_color_grid = jax.lax.cond(
+            should_collect_now,
+            lambda: state.object_color_grid.at[pos[1], pos[0]].set(
+                jnp.full((3,), 255, dtype=jnp.uint8)
+            ),
+            lambda: state.object_color_grid,
         )
 
         # 3.5. HANDLE OBJECT EXPIRY
@@ -392,63 +440,115 @@ class ForagaxEnv(environment.Environment):
         key, expiry_key = jax.random.split(key)
 
         # Process expiry for all positions that need it
-        def process_expiry(y, x, grid, spawn_grid, key):
+        def process_expiry(y, x, grid, color_grid, spawn_grid, key):
             obj_id = current_objects_for_expiry[y, x]
             should_exp = should_expire[y, x]
 
             def expire_object():
-                # Get expiry regen delay for this object
                 exp_key = jax.random.fold_in(key, y * self.size[0] + x)
                 exp_delay = jax.lax.switch(
                     obj_id, self.expiry_regen_delay_fns, state.time, exp_key
                 )
-                encoded_exp_timer = obj_id - ((exp_delay + 1) * num_obj_types)
-
-                # Check if this object should respawn randomly
-                should_random_respawn = self.object_random_respawn[obj_id]
-
-                # Use second split for randomness in random placement
-                rand_key = jax.random.split(exp_key)[1]
-
-                # Place timer either at current position or random position
-                new_grid = jax.lax.cond(
-                    should_random_respawn,
-                    lambda: self._place_timer_at_random_position(
-                        grid, y, x, encoded_exp_timer, state.biome_grid, rand_key
-                    ),
-                    lambda: self._place_timer_at_position(
-                        grid, y, x, encoded_exp_timer
-                    ),
+                encoded_exp_timer = jax.lax.cond(
+                    exp_delay == jnp.iinfo(jnp.int32).max,
+                    lambda: 0,
+                    lambda: obj_id - ((exp_delay + 1) * num_obj_types),
                 )
 
-                return new_grid, spawn_grid
+                # Use unified timer placement method
+                rand_key = jax.random.split(exp_key)[1]
+                new_grid = self._place_timer(
+                    grid,
+                    y,
+                    x,
+                    encoded_exp_timer,
+                    self.object_random_respawn[obj_id],
+                    state.biome_grid,
+                    rand_key,
+                )
+
+                # Clear color grid when object expires
+                empty_color = jnp.full((3,), 255, dtype=jnp.uint8)
+                new_color_grid = color_grid.at[y, x].set(empty_color)
+
+                return new_grid, new_color_grid, spawn_grid
 
             def no_expire():
-                return grid, spawn_grid
+                return grid, color_grid, spawn_grid
 
             return jax.lax.cond(should_exp, expire_object, no_expire)
 
         # Apply expiry to all cells (vectorized)
         def scan_expiry_row(carry, y):
-            grid, spawn_grid, key = carry
+            grid, color_grid, spawn_grid, key = carry
 
             def scan_expiry_col(carry_col, x):
-                grid_col, spawn_grid_col, key_col = carry_col
-                grid_col, spawn_grid_col = process_expiry(
-                    y, x, grid_col, spawn_grid_col, key_col
+                grid_col, color_grid_col, spawn_grid_col, key_col = carry_col
+                grid_col, color_grid_col, spawn_grid_col = process_expiry(
+                    y, x, grid_col, color_grid_col, spawn_grid_col, key_col
                 )
-                return (grid_col, spawn_grid_col, key_col), None
+                return (grid_col, color_grid_col, spawn_grid_col, key_col), None
 
-            (grid, spawn_grid, key), _ = jax.lax.scan(
-                scan_expiry_col, (grid, spawn_grid, key), jnp.arange(self.size[0])
+            (grid, color_grid, spawn_grid, key), _ = jax.lax.scan(
+                scan_expiry_col,
+                (grid, color_grid, spawn_grid, key),
+                jnp.arange(self.size[0]),
             )
-            return (grid, spawn_grid, key), None
+            return (grid, color_grid, spawn_grid, key), None
 
-        (object_grid, object_spawn_time_grid, _), _ = jax.lax.scan(
+        (object_grid, object_color_grid, object_spawn_time_grid, _), _ = jax.lax.scan(
             scan_expiry_row,
-            (object_grid, object_spawn_time_grid, expiry_key),
+            (object_grid, object_color_grid, object_spawn_time_grid, expiry_key),
             jnp.arange(self.size[1]),
         )
+
+        # 3.6. HANDLE DYNAMIC BIOME CONSUMPTION AND RESPAWNING
+        biome_consumption_count = state.biome_consumption_count
+        biome_total_objects = state.biome_total_objects
+        biome_generation = state.biome_generation
+        object_generation_grid = state.object_generation_grid
+        # object_color_grid is already updated above
+        object_state_grid = state.object_state_grid
+
+        if self.dynamic_biomes:
+            # Update consumption count if an object was collected
+            # Only count if the object belongs to the current generation of its biome
+            collected_biome_id = state.biome_grid[pos[1], pos[0]]
+            object_gen_at_pos = state.object_generation_grid[pos[1], pos[0]]
+            current_biome_gen = state.biome_generation[collected_biome_id]
+            is_current_generation = object_gen_at_pos == current_biome_gen
+
+            biome_consumption_count = jax.lax.cond(
+                should_collect & is_current_generation,
+                lambda: biome_consumption_count.at[collected_biome_id].add(1),
+                lambda: biome_consumption_count,
+            )
+
+            # Check each biome for threshold crossing and respawn if needed
+            key, respawn_key = jax.random.split(key)
+            (
+                object_grid,
+                object_color_grid,
+                object_state_grid,
+                biome_generation,
+                biome_consumption_count,
+                biome_total_objects,
+                object_spawn_time_grid,
+                object_generation_grid,
+                respawn_key,
+            ) = self._check_and_respawn_biomes(
+                object_grid,
+                state.biome_grid,
+                object_color_grid,
+                object_state_grid,
+                biome_generation,
+                biome_consumption_count,
+                biome_total_objects,
+                object_spawn_time_grid,
+                state.object_generation_grid,
+                state.time,
+                respawn_key,
+            )
 
         info = {"discount": self.discount(state, params)}
         temperatures = jnp.zeros(len(self.objects))
@@ -469,6 +569,12 @@ class ForagaxEnv(environment.Environment):
             time=state.time + 1,
             digestion_buffer=digestion_buffer,
             object_spawn_time_grid=object_spawn_time_grid,
+            object_color_grid=object_color_grid,
+            object_state_grid=object_state_grid,
+            biome_consumption_count=biome_consumption_count,
+            biome_total_objects=biome_total_objects,
+            biome_generation=biome_generation,
+            object_generation_grid=object_generation_grid,
         )
 
         done = self.is_terminal(state, params)
@@ -480,30 +586,210 @@ class ForagaxEnv(environment.Environment):
             info,
         )
 
+    def _check_and_respawn_biomes(
+        self,
+        object_grid: jax.Array,
+        biome_grid: jax.Array,
+        object_color_grid: jax.Array,
+        object_state_grid: jax.Array,
+        biome_generation: jax.Array,
+        biome_consumption_count: jax.Array,
+        biome_total_objects: jax.Array,
+        object_spawn_time_grid: jax.Array,
+        object_generation_grid: jax.Array,
+        current_time: int,
+        key: jax.Array,
+    ) -> Tuple[jax.Array, ...]:
+        """Check all biomes for consumption threshold and respawn if needed."""
+
+        def check_biome(i, carry):
+            (
+                obj_grid,
+                color_grid,
+                params_grid,
+                gen,
+                consumption,
+                total,
+                spawn_grid,
+                gen_grid,
+                k,
+            ) = carry
+
+            consumption_rate = consumption[i] / jnp.maximum(1.0, total[i].astype(float))
+
+            should_respawn = consumption_rate >= self.biome_consumption_threshold
+
+            def respawn_biome_i():
+                # Get biome mask and properties
+                biome_mask = self.biome_masks_array[i]
+
+                # Generate new objects for this biome using unified spawn method
+                # Use deterministic spawn if configured, otherwise use random spawn
+                # For deterministic spawn with fori_loop, we need to handle the traced index
+                # by using switch to dispatch to concrete biome-specific spawn functions
+                k_new, spawn_key = jax.random.split(k)
+
+                if self.deterministic_spawn:
+                    # Create spawn functions for each biome (using concrete indices)
+                    def make_spawn_fn(biome_idx):
+                        def spawn_fn(key):
+                            return self._spawn_biome_objects(
+                                biome_idx, key, deterministic=True
+                            )
+
+                        return spawn_fn
+
+                    # Create list of spawn functions (one per biome)
+                    spawn_fns = [make_spawn_fn(idx) for idx in range(len(self.biome_masks))]
+
+                    # Use switch to select the correct spawn function based on traced index i
+                    new_biome_objects_full, new_biome_colors_full, new_biome_params_full = (
+                        jax.lax.switch(i, spawn_fns, spawn_key)
+                    )
+                else:
+                    # Random spawn works fine with traced index
+                    new_biome_objects_full, new_biome_colors_full, new_biome_params_full = (
+                        self._spawn_biome_objects(i, spawn_key, deterministic=False)
+                    )
+
+                # CRITICAL FIX: Only replace where new spawn is NOT empty
+                # Keep old objects where new spawn is empty (0)
+                # Count new objects BEFORE merging
+                new_object_count = jnp.sum((new_biome_objects_full > 0) & biome_mask)
+
+                is_new_object = (new_biome_objects_full > 0) & biome_mask
+                new_obj_grid = jnp.where(
+                    is_new_object, new_biome_objects_full, obj_grid
+                )
+
+                # Update generation counter
+                new_gen = gen.at[i].add(1)
+                new_gen_value = new_gen[i]
+
+                # Use precomputed colors and params for NEW objects only
+                new_params_grid = jnp.where(
+                    is_new_object[..., None], new_biome_params_full, params_grid
+                )
+                new_color_grid = jnp.where(
+                    is_new_object[..., None], new_biome_colors_full, color_grid
+                )
+
+                # Tag new objects with the new generation number
+                new_gen_grid = jnp.where(is_new_object, new_gen_value, gen_grid)
+
+                # Reset consumption count and update total objects
+                # IMPORTANT: Count only NEWLY spawned objects, not old preserved objects
+                # This ensures consumption tracking is based on the current generation
+                new_consumption = consumption.at[i].set(0)
+                new_total = total.at[i].set(new_object_count)
+
+                # Reset spawn times ONLY for newly placed objects
+                new_spawn_grid = jnp.where(is_new_object, current_time, spawn_grid)
+
+                return (
+                    new_obj_grid,
+                    new_color_grid,
+                    new_params_grid,
+                    new_gen,
+                    new_consumption,
+                    new_total,
+                    new_spawn_grid,
+                    new_gen_grid,
+                    k_new,
+                )
+
+            def no_respawn():
+                return (
+                    obj_grid,
+                    color_grid,
+                    params_grid,
+                    gen,
+                    consumption,
+                    total,
+                    spawn_grid,
+                    gen_grid,
+                    k,
+                )
+
+            return jax.lax.cond(should_respawn, respawn_biome_i, no_respawn)
+
+        # Process all biomes
+        init_carry = (
+            object_grid,
+            object_color_grid,
+            object_state_grid,
+            biome_generation,
+            biome_consumption_count,
+            biome_total_objects,
+            object_spawn_time_grid,
+            object_generation_grid,
+            key,
+        )
+
+        final_carry = jax.lax.fori_loop(
+            0, self.biome_object_frequencies.shape[0], check_biome, init_carry
+        )
+
+        return final_carry
+
     def reset_env(
         self, key: jax.Array, params: EnvParams
     ) -> Tuple[jax.Array, EnvState]:
         """Reset environment state."""
         object_grid = jnp.zeros((self.size[1], self.size[0]), dtype=int)
+        object_color_grid = jnp.full(
+            (self.size[1], self.size[0], 3), 255, dtype=jnp.uint8
+        )
+        num_object_params = 2 + 2 * self.num_fourier_terms
+        object_state_grid = jnp.zeros(
+            (self.size[1], self.size[0], num_object_params), dtype=jnp.float32
+        )
         biome_grid = jnp.full((self.size[1], self.size[0]), -1, dtype=int)
+
         key, iter_key = jax.random.split(key)
+
+        # Spawn objects in each biome using unified method
         for i in range(self.biome_object_frequencies.shape[0]):
             iter_key, biome_key = jax.random.split(iter_key)
             mask = self.biome_masks[i]
             biome_grid = jnp.where(mask, i, biome_grid)
 
-            if self.deterministic_spawn:
-                biome_objects = self.generate_biome_new(i, biome_key)
-                object_grid = object_grid.at[mask].set(biome_objects)
-            else:
-                biome_objects = self.generate_biome_old(i, biome_key)
-                object_grid = jnp.where(mask, biome_objects, object_grid)
+            # Use unified spawn method
+            biome_objects, biome_colors, biome_object_state = self._spawn_biome_objects(
+                i, biome_key, self.deterministic_spawn
+            )
+
+            # Merge biome objects/colors/params into global grids
+            object_grid = jnp.where(mask, biome_objects, object_grid)
+            object_color_grid = jnp.where(
+                mask[..., None], biome_colors, object_color_grid
+            )
+            object_state_grid = jnp.where(
+                mask[..., None], biome_object_state, object_state_grid
+            )
 
         # Place agent in the center of the world
         agent_pos = jnp.array([self.size[0] // 2, self.size[1] // 2])
 
         # Initialize spawn times to 0 (all objects spawn at time 0)
         object_spawn_time_grid = jnp.zeros((self.size[1], self.size[0]), dtype=int)
+
+        # Initialize generation grid - all objects start in generation 0
+        object_generation_grid = jnp.zeros((self.size[1], self.size[0]), dtype=int)
+
+        # Initialize biome consumption tracking
+        num_biomes = self.biome_object_frequencies.shape[0]
+        biome_consumption_count = jnp.zeros(num_biomes, dtype=int)
+        biome_total_objects = jnp.zeros(num_biomes, dtype=int)
+
+        # Count objects in each biome
+        for i in range(num_biomes):
+            mask = self.biome_masks[i]
+            # Count non-empty objects (object_id > 0)
+            total = jnp.sum((object_grid > 0) & mask)
+            biome_total_objects = biome_total_objects.at[i].set(total)
+
+        biome_generation = jnp.zeros(num_biomes, dtype=int)
 
         state = EnvState(
             pos=agent_pos,
@@ -512,28 +798,130 @@ class ForagaxEnv(environment.Environment):
             time=0,
             digestion_buffer=jnp.zeros((self.max_reward_delay,)),
             object_spawn_time_grid=object_spawn_time_grid,
+            object_color_grid=object_color_grid,
+            object_state_grid=object_state_grid,
+            biome_consumption_count=biome_consumption_count,
+            biome_total_objects=biome_total_objects,
+            biome_generation=biome_generation,
+            object_generation_grid=object_generation_grid,
         )
 
         return self.get_obs(state, params), state
 
-    def generate_biome_old(self, i: int, biome_key: jax.Array):
-        biome_freqs = self.biome_object_frequencies[i]
-        grid_rand = jax.random.uniform(biome_key, (self.size[1], self.size[0]))
-        empty_freq = 1.0 - jnp.sum(biome_freqs)
-        all_freqs = jnp.concatenate([jnp.array([empty_freq]), biome_freqs])
-        cumulative_freqs = jnp.cumsum(jnp.concatenate([jnp.array([0.0]), all_freqs]))
-        biome_objects = jnp.searchsorted(cumulative_freqs, grid_rand, side="right") - 1
-        return biome_objects
+    def _spawn_biome_objects(
+        self,
+        biome_idx: int,
+        key: jax.Array,
+        deterministic: bool = False,
+    ) -> Tuple[jax.Array, jax.Array, jax.Array]:
+        """Spawn objects in a biome.
 
-    def generate_biome_new(self, i: int, biome_key: jax.Array):
-        biome_freqs = self.biome_object_frequencies[i]
-        grid = jnp.linspace(0, 1, self.biome_sizes[i], endpoint=False)
-        biome_objects = len(biome_freqs) - jnp.searchsorted(
-            jnp.cumsum(biome_freqs[::-1]), grid, side="right"
+        Returns:
+            object_grid: (H, W) array of object IDs
+            color_grid: (H, W, 3) array of RGB colors
+            state_grid: (H, W, num_state_params) array of object state parameters
+        """
+        biome_freqs = self.biome_object_frequencies[biome_idx]
+        biome_mask = self.biome_masks_array[biome_idx]
+
+        key, spawn_key, color_key, params_key = jax.random.split(key, 4)
+
+        # Generate object IDs using deterministic or random spawn
+        if deterministic:
+            # Deterministic spawn: exact number of each object type
+            # NOTE: Requires concrete biome_idx to compute size at trace time
+            # Get static biome bounds
+            biome_start = self.biome_starts[biome_idx]
+            biome_stop = self.biome_stops[biome_idx]
+            biome_height = biome_stop[1] - biome_start[1]
+            biome_width = biome_stop[0] - biome_start[0]
+            biome_size = int(self.biome_sizes[biome_idx])
+
+            grid = jnp.linspace(0, 1, biome_size, endpoint=False)
+            biome_objects_flat = len(biome_freqs) - jnp.searchsorted(
+                jnp.cumsum(biome_freqs[::-1]), grid, side="right"
+            )
+            biome_objects_flat = jax.random.permutation(spawn_key, biome_objects_flat)
+
+            # Reshape to match biome dimensions (use concrete dimensions)
+            biome_objects = biome_objects_flat.reshape(biome_height, biome_width)
+
+            # Place in full grid using slicing with static bounds
+            object_grid = jnp.zeros((self.size[1], self.size[0]), dtype=int)
+            object_grid = object_grid.at[
+                biome_start[1] : biome_stop[1], biome_start[0] : biome_stop[0]
+            ].set(biome_objects)
+        else:
+            # Random spawn: probabilistic placement (works with traced biome_idx)
+            grid_rand = jax.random.uniform(spawn_key, (self.size[1], self.size[0]))
+            empty_freq = 1.0 - jnp.sum(biome_freqs)
+            all_freqs = jnp.concatenate([jnp.array([empty_freq]), biome_freqs])
+            cumulative_freqs = jnp.cumsum(
+                jnp.concatenate([jnp.array([0.0]), all_freqs])
+            )
+            object_grid = (
+                jnp.searchsorted(cumulative_freqs, grid_rand, side="right") - 1
+            )
+
+        # Initialize color grid
+        color_grid = jnp.full((self.size[1], self.size[0], 3), 255, dtype=jnp.uint8)
+
+        # Sample ONE color per object type in this biome (not per instance)
+        # This gives objects of the same type the same color within a biome generation
+        # Skip index 0 (EMPTY object) - only sample colors for actual objects
+        num_object_types = len(self.objects)
+        num_actual_objects = num_object_types - 1  # Exclude EMPTY
+
+        if num_actual_objects > 0:
+            biome_object_colors = jax.random.randint(
+                color_key,
+                (num_actual_objects, 3),
+                minval=0,
+                maxval=256,
+                dtype=jnp.uint8,
+            )
+
+            # Assign colors based on object type (starting from index 1)
+            for obj_idx in range(1, num_object_types):
+                obj_mask = (object_grid == obj_idx) & biome_mask
+                obj_color = biome_object_colors[
+                    obj_idx - 1
+                ]  # Offset by 1 since we skip EMPTY
+                color_grid = jnp.where(obj_mask[..., None], obj_color, color_grid)
+
+        # Initialize parameters grid
+        num_object_params = 2 + 2 * self.num_fourier_terms
+        params_grid = jnp.zeros(
+            (self.size[1], self.size[0], num_object_params), dtype=jnp.float32
         )
-        flat_biome_objects = biome_objects.flatten()
-        shuffled_objects = jax.random.permutation(biome_key, flat_biome_objects)
-        return shuffled_objects
+
+        # Generate per-object parameters for each object type
+        for obj_idx in range(num_object_types):
+            # Get params for this object type - this happens at trace time
+            params_key, obj_key = jax.random.split(params_key)
+            obj_params = self.objects[obj_idx].get_state(obj_key)
+
+            # Skip if no params (e.g., for EMPTY or default objects)
+            if len(obj_params) == 0:
+                continue
+
+            # Ensure params match expected size
+            if len(obj_params) != num_object_params:
+                if len(obj_params) < num_object_params:
+                    obj_params = jnp.pad(
+                        obj_params,
+                        (0, num_object_params - len(obj_params)),
+                        constant_values=0.0,
+                    )
+                else:
+                    # Truncate if too long
+                    obj_params = obj_params[:num_object_params]
+
+            # Assign to all objects of this type in this biome
+            obj_mask = (object_grid == obj_idx) & biome_mask
+            params_grid = jnp.where(obj_mask[..., None], obj_params, params_grid)
+
+        return object_grid, color_grid, params_grid
 
     def is_terminal(self, state: EnvState, params: EnvParams) -> jax.Array:
         """Foragax is a continuing environment."""
@@ -556,6 +944,7 @@ class ForagaxEnv(environment.Environment):
 
     def state_space(self, params: EnvParams) -> spaces.Dict:
         """State space of the environment."""
+        num_object_params = 2 + 2 * self.num_fourier_terms
         return spaces.Dict(
             {
                 "pos": spaces.Box(0, max(self.size), (2,), int),
@@ -584,11 +973,53 @@ class ForagaxEnv(environment.Environment):
                     (self.size[1], self.size[0]),
                     int,
                 ),
+                "object_color_grid": spaces.Box(
+                    0,
+                    255,
+                    (self.size[1], self.size[0], 3),
+                    int,
+                ),
+                "object_generation_grid": spaces.Box(
+                    0,
+                    jnp.inf,
+                    (self.size[1], self.size[0]),
+                    int,
+                ),
+                "object_state_grid": spaces.Box(
+                    -jnp.inf,
+                    jnp.inf,
+                    (self.size[1], self.size[0], num_object_params),
+                    float,
+                ),
+                "biome_consumption_count": spaces.Box(
+                    0,
+                    jnp.inf,
+                    (self.biome_object_frequencies.shape[0],),
+                    int,
+                ),
+                "biome_total_objects": spaces.Box(
+                    0,
+                    jnp.inf,
+                    (self.biome_object_frequencies.shape[0],),
+                    int,
+                ),
+                "biome_generation": spaces.Box(
+                    0,
+                    jnp.inf,
+                    (self.biome_object_frequencies.shape[0],),
+                    int,
+                ),
             }
         )
 
-    def _get_aperture(self, object_grid: jax.Array, pos: jax.Array) -> jax.Array:
-        """Extract the aperture view from the object grid."""
+    def _compute_aperture_coordinates(
+        self, pos: jax.Array
+    ) -> Tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
+        """Compute aperture coordinates for the given position.
+
+        Returns:
+            (y_coords, x_coords, y_coords_clamped/mod, x_coords_clamped/mod)
+        """
         ap_h, ap_w = self.aperture_size
         start_y = pos[1] - ap_h // 2
         start_x = pos[0] - ap_w // 2
@@ -599,20 +1030,31 @@ class ForagaxEnv(environment.Environment):
         x_coords = start_x + x_offsets
 
         if self.nowrap:
-            # Clamp coordinates to bounds
-            y_coords_clamped = jnp.clip(y_coords, 0, self.size[1] - 1)
-            x_coords_clamped = jnp.clip(x_coords, 0, self.size[0] - 1)
-            values = object_grid[y_coords_clamped, x_coords_clamped]
-            # Mark out-of-bounds positions with -1
+            y_coords_adj = jnp.clip(y_coords, 0, self.size[1] - 1)
+            x_coords_adj = jnp.clip(x_coords, 0, self.size[0] - 1)
+        else:
+            y_coords_adj = jnp.mod(y_coords, self.size[1])
+            x_coords_adj = jnp.mod(x_coords, self.size[0])
+
+        return y_coords, x_coords, y_coords_adj, x_coords_adj
+
+    def _get_aperture(self, object_grid: jax.Array, pos: jax.Array) -> jax.Array:
+        """Extract the aperture view from the object grid."""
+        y_coords, x_coords, y_coords_adj, x_coords_adj = (
+            self._compute_aperture_coordinates(pos)
+        )
+
+        values = object_grid[y_coords_adj, x_coords_adj]
+
+        if self.nowrap:
+            # Mark out-of-bounds positions with padding
             y_out = (y_coords < 0) | (y_coords >= self.size[1])
             x_out = (x_coords < 0) | (x_coords >= self.size[0])
             out_of_bounds = y_out | x_out
             padding_index = self.object_ids[-1]
             aperture = jnp.where(out_of_bounds, padding_index, values)
         else:
-            y_coords_mod = jnp.mod(y_coords, self.size[1])
-            x_coords_mod = jnp.mod(x_coords, self.size[0])
-            aperture = object_grid[y_coords_mod, x_coords_mod]
+            aperture = values
 
         return aperture
 
@@ -721,48 +1163,43 @@ class ForagaxEnv(environment.Environment):
 
         if is_world_mode:
             # Create an RGB image from the object grid
-            img = jnp.zeros((self.size[1], self.size[0], 3))
-            # Decode grid for rendering: non-negative are objects, negative are empty
-            render_grid = jnp.maximum(0, state.object_grid)
+            # Use stateful object colors if dynamic_biomes is enabled, else use default colors
+            if self.dynamic_biomes:
+                # Use per-instance colors from state
+                img = state.object_color_grid.copy()
+            else:
+                # Use default object colors
+                img = jnp.zeros((self.size[1], self.size[0], 3))
+                render_grid = jnp.maximum(0, state.object_grid)
 
-            def update_image(i, img):
-                color = self.object_colors[i]
-                mask = render_grid == i
-                img = jnp.where(mask[..., None], color, img)
-                return img
+                def update_image(i, img):
+                    color = self.object_colors[i]
+                    mask = render_grid == i
+                    img = jnp.where(mask[..., None], color, img)
+                    return img
 
-            img = jax.lax.fori_loop(0, len(self.object_ids), update_image, img)
+                img = jax.lax.fori_loop(0, len(self.object_ids), update_image, img)
 
             # Tint the agent's aperture
-            ap_h, ap_w = self.aperture_size
-            start_y = state.pos[1] - ap_h // 2
-            start_x = state.pos[0] - ap_w // 2
+            y_coords, x_coords, y_coords_adj, x_coords_adj = (
+                self._compute_aperture_coordinates(state.pos)
+            )
 
             alpha = 0.2
             agent_color = jnp.array(AGENT.color)
 
-            # Create indices for the aperture
-            y_offsets = jnp.arange(ap_h)
-            x_offsets = jnp.arange(ap_w)
-            y_coords_original = start_y + y_offsets[:, None]
-            x_coords_original = start_x + x_offsets
-
             if self.nowrap:
-                y_coords = jnp.clip(y_coords_original, 0, self.size[1] - 1)
-                x_coords = jnp.clip(x_coords_original, 0, self.size[0] - 1)
                 # Create tint mask: any in-bounds original position maps to a cell makes it tinted
                 tint_mask = jnp.zeros((self.size[1], self.size[0]), dtype=int)
-                tint_mask = tint_mask.at[y_coords, x_coords].set(1)
+                tint_mask = tint_mask.at[y_coords_adj, x_coords_adj].set(1)
                 # Apply tint to masked positions
                 original_colors = img
                 tinted_colors = (1 - alpha) * original_colors + alpha * agent_color
                 img = jnp.where(tint_mask[..., None], tinted_colors, img)
             else:
-                y_coords = jnp.mod(y_coords_original, self.size[1])
-                x_coords = jnp.mod(x_coords_original, self.size[0])
-                original_colors = img[y_coords, x_coords]
+                original_colors = img[y_coords_adj, x_coords_adj]
                 tinted_colors = (1 - alpha) * original_colors + alpha * agent_color
-                img = img.at[y_coords, x_coords].set(tinted_colors)
+                img = img.at[y_coords_adj, x_coords_adj].set(tinted_colors)
 
             # Agent color
             img = img.at[state.pos[1], state.pos[0]].set(jnp.array(AGENT.color))
@@ -789,8 +1226,25 @@ class ForagaxEnv(environment.Environment):
         elif is_aperture_mode:
             obs_grid = jnp.maximum(0, state.object_grid)
             aperture = self._get_aperture(obs_grid, state.pos)
-            aperture_one_hot = jax.nn.one_hot(aperture, len(self.object_ids))
-            img = jnp.tensordot(aperture_one_hot, self.object_colors, axes=1)
+
+            if self.dynamic_biomes:
+                # Use per-instance colors from state - extract aperture view
+                y_coords, x_coords, y_coords_adj, x_coords_adj = (
+                    self._compute_aperture_coordinates(state.pos)
+                )
+                img = state.object_color_grid[y_coords_adj, x_coords_adj]
+
+                if self.nowrap:
+                    # For out-of-bounds, use padding object color
+                    y_out = (y_coords < 0) | (y_coords >= self.size[1])
+                    x_out = (x_coords < 0) | (x_coords >= self.size[0])
+                    out_of_bounds = y_out | x_out
+                    padding_color = jnp.array(self.objects[-1].color, dtype=jnp.float32)
+                    img = jnp.where(out_of_bounds[..., None], padding_color, img)
+            else:
+                # Use default object colors
+                aperture_one_hot = jax.nn.one_hot(aperture, len(self.object_ids))
+                img = jnp.tensordot(aperture_one_hot, self.object_colors, axes=1)
 
             # Draw agent in the center
             center_y, center_x = self.aperture_size[1] // 2, self.aperture_size[0] // 2
