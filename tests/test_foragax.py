@@ -288,19 +288,22 @@ def test_respawn():
     key, step_key = jax.random.split(key)
     _, state, reward, _, _ = env.step(step_key, state, Actions.DOWN, params)
     assert reward == FLOWER.reward_val
-    assert state.object_state.object_id[4, 3] < 0
+    assert state.object_state.object_id[4, 3] == 0  # Object removed
+    assert state.object_state.respawn_timer[4, 3] > 0  # Timer set
 
-    steps_until_respawn = -state.object_state.object_id[4, 3] // 2
+    steps_until_respawn = int(state.object_state.respawn_timer[4, 3])
 
     # Step until it respawns
     for i in range(steps_until_respawn):
         key, step_key = jax.random.split(key)
         _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
-        assert state.object_state.object_id[4, 3] < 0
+        if i < steps_until_respawn - 1:
+            assert state.object_state.object_id[4, 3] == 0  # Still empty
+            assert state.object_state.respawn_timer[4, 3] > 0  # Timer still counting
 
-    key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+    # After timer reaches 0, object should respawn
     assert state.object_state.object_id[4, 3] == flower_id
+    assert state.object_state.respawn_timer[4, 3] == 0
 
 
 def test_random_respawn():
@@ -347,9 +350,9 @@ def test_random_respawn():
     # Original position should be empty
     assert new_state.object_state.object_id[original_pos[1], original_pos[0]] == 0
 
-    # A timer should be placed somewhere
-    assert jnp.sum(new_state.object_state.object_id < 0) == 1
-    timer_pos_flat = jnp.argmin(new_state.object_state.object_id)
+    # A timer should be placed somewhere (check respawn_timer instead of object_id)
+    assert jnp.sum(new_state.object_state.respawn_timer > 0) == 1
+    timer_pos_flat = jnp.argmax(new_state.object_state.respawn_timer)
     timer_pos = jnp.array(jnp.unravel_index(timer_pos_flat, (7, 7)))
     # New position should not be the original position
     assert not jnp.array_equal(timer_pos, original_pos)
@@ -360,6 +363,12 @@ def test_random_respawn():
 
     # New position should be on an empty cell (not the wall)
     assert not jnp.array_equal(timer_pos, jnp.array([4, 4]))
+
+    # Verify respawn_object_id is set correctly
+    assert (
+        new_state.object_state.respawn_object_id[timer_pos[0], timer_pos[1]]
+        == flower_id
+    )
 
 
 def test_random_respawn_no_empty_space():
@@ -402,7 +411,12 @@ def test_random_respawn_no_empty_space():
 
     assert reward == flower_random.reward_val
     # The timer should be placed back at the original position
-    assert new_state.object_state.object_id[original_pos[1], original_pos[0]] < 0
+    assert new_state.object_state.object_id[original_pos[1], original_pos[0]] == 0
+    assert new_state.object_state.respawn_timer[original_pos[1], original_pos[0]] > 0
+    assert (
+        new_state.object_state.respawn_object_id[original_pos[1], original_pos[0]]
+        == flower_id
+    )
 
 
 def test_wrapping_dynamics():
@@ -1263,7 +1277,11 @@ def test_basic_object_expiry():
     key, key_step = jax.random.split(key)
     obs, state, _, _, _ = env.step(key_step, state, Actions.DOWN, env.default_params)
 
-    assert jnp.all(state.object_state.object_id < 0)  # All are now timers
+    assert jnp.all(state.object_state.object_id == 0)  # All objects removed
+    assert jnp.all(state.object_state.respawn_timer > 0)  # All have timers
+    assert jnp.all(
+        state.object_state.respawn_object_id == 1
+    )  # Will respawn as object 1
     assert jnp.all(
         state.object_state.spawn_time == 0
     )  # Spawn time NOT updated yet (still at reset value)
@@ -1276,6 +1294,7 @@ def test_basic_object_expiry():
         )
 
     assert jnp.all(state.object_state.object_id == 1)  # Objects respawned
+    assert jnp.all(state.object_state.respawn_timer == 0)  # Timers cleared
     assert jnp.all(
         state.object_state.spawn_time == 8
     )  # Spawn time = time at beginning of step when respawn occurred
@@ -1398,7 +1417,8 @@ def test_expiry_with_normal_regen():
     key, key_step = jax.random.split(key)
     obs, state, _, _, _ = env.step(key_step, state, Actions.LEFT, env.default_params)
 
-    assert jnp.all(state.object_state.object_id < 0)  # All expired
+    assert jnp.all(state.object_state.object_id == 0)  # All objects removed
+    assert jnp.all(state.object_state.respawn_timer > 0)  # All have timers
 
 
 def test_mixed_expiry_times():
@@ -1489,7 +1509,8 @@ def test_expiry_spawn_time_tracking():
 
     # After expiry (but before respawn), spawn times should still be 0
     assert jnp.all(state.object_state.spawn_time == 0)
-    assert jnp.all(state.object_state.object_id < 0)  # Objects are timers
+    assert jnp.all(state.object_state.object_id == 0)  # Objects removed
+    assert jnp.all(state.object_state.respawn_timer > 0)  # Timers set
 
     # Step through regen delay (3 steps)
     for step in range(3):
@@ -1503,6 +1524,7 @@ def test_expiry_spawn_time_tracking():
         state.object_state.spawn_time == 8
     )  # Time at beginning of step when respawn occurred
     assert jnp.all(state.object_state.object_id > 0)  # Objects respawned
+    assert jnp.all(state.object_state.respawn_timer == 0)  # Timers cleared
     assert state.time == 9  # Current time after step completes
 
     # Ages should be 1 (respawned 1 step ago: current_time=9 - spawn_time=8)
@@ -1609,9 +1631,15 @@ def test_expiry_with_random_respawn():
             key_step, state, Actions.DOWN, env.default_params
         )
 
-    # Some objects should have expired and become timers
-    has_timers = jnp.any(state.object_state.object_id < 0)
+    # Some objects should have expired and have timers
+    has_timers = jnp.any(state.object_state.respawn_timer > 0)
     assert has_timers, "At least some objects should have expired"
+    # With random respawn, timers may be placed at different locations than where objects expired
+    # So we just check that timers exist and respawn_object_id is set correctly
+    assert jnp.all(
+        (state.object_state.respawn_timer > 0)
+        == (state.object_state.respawn_object_id > 0)
+    )
 
     # Step through regen delay (2 steps due to +1 encoding)
     for _ in range(2):

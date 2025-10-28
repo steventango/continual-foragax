@@ -48,7 +48,9 @@ class ObjectState:
     """Per-cell object state information.
 
     This struct encapsulates all state information about objects in the grid:
-    - object_id: (H, W) The object type (positive) or timer countdown (negative)
+    - object_id: (H, W) The object type (0 for empty, positive for object type)
+    - respawn_timer: (H, W) Countdown timer for respawning (0 = no timer, positive = countdown remaining)
+    - respawn_object_id: (H, W) What object type will spawn when timer reaches 0
     - spawn_time: (H, W) When each object was spawned (for expiry tracking)
     - color: (H, W, 3) RGB color for each object instance (for dynamic biomes)
     - generation: (H, W) Which biome generation each object belongs to
@@ -56,7 +58,11 @@ class ObjectState:
     - biome_id: (H, W) Which biome each cell belongs to
     """
 
-    object_id: jax.Array  # (H, W) - Positive = object type, negative = timer
+    object_id: jax.Array  # (H, W) - Object type ID (0 = empty, >0 = object type)
+    respawn_timer: (
+        jax.Array
+    )  # (H, W) - Respawn countdown (0 = no timer, >0 = countdown)
+    respawn_object_id: jax.Array  # (H, W) - Object type to spawn when timer reaches 0
     spawn_time: jax.Array  # (H, W) - Timestep when object spawned
     color: jax.Array  # (H, W, 3) - RGB color per instance
     generation: jax.Array  # (H, W) - Biome generation number
@@ -69,6 +75,8 @@ class ObjectState:
         h, w = size[1], size[0]
         return cls(
             object_id=jnp.zeros((h, w), dtype=int),
+            respawn_timer=jnp.zeros((h, w), dtype=int),
+            respawn_object_id=jnp.zeros((h, w), dtype=int),
             spawn_time=jnp.zeros((h, w), dtype=int),
             color=jnp.full((h, w, 3), 255, dtype=jnp.uint8),
             generation=jnp.zeros((h, w), dtype=int),
@@ -272,6 +280,7 @@ class ForagaxEnv(environment.Environment):
         object_state: ObjectState,
         y: int,
         x: int,
+        object_type: int,
         timer_val: int,
         random_respawn: bool,
         rand_key: jax.Array,
@@ -281,7 +290,8 @@ class ForagaxEnv(environment.Environment):
         Args:
             object_state: Current object state
             y, x: Original position
-            timer_val: Timer value to place (negative for countdown, 0 for permanent removal)
+            object_type: The object type ID that will respawn (0 for permanent removal)
+            timer_val: Timer countdown value (0 for permanent removal, positive for countdown)
             random_respawn: If True, place at random location in same biome
             rand_key: Random key for random placement
 
@@ -292,7 +302,9 @@ class ForagaxEnv(environment.Environment):
         # Handle permanent removal (timer_val == 0)
         def place_empty():
             return object_state.replace(
-                object_id=object_state.object_id.at[y, x].set(0)
+                object_id=object_state.object_id.at[y, x].set(0),
+                respawn_timer=object_state.respawn_timer.at[y, x].set(0),
+                respawn_object_id=object_state.respawn_object_id.at[y, x].set(0),
             )
 
         # Handle timer placement
@@ -300,16 +312,26 @@ class ForagaxEnv(environment.Environment):
             # Non-random: place at original position
             def place_at_position():
                 return object_state.replace(
-                    object_id=object_state.object_id.at[y, x].set(timer_val)
+                    object_id=object_state.object_id.at[y, x].set(0),
+                    respawn_timer=object_state.respawn_timer.at[y, x].set(timer_val),
+                    respawn_object_id=object_state.respawn_object_id.at[y, x].set(
+                        object_type
+                    ),
                 )
 
             # Random: place at random location in same biome
             def place_randomly():
+                # Clear the collected object's position
                 new_object_id = object_state.object_id.at[y, x].set(0)
+                new_respawn_timer = object_state.respawn_timer.at[y, x].set(0)
+                new_respawn_object_id = object_state.respawn_object_id.at[y, x].set(0)
+
+                # Find valid spawn locations in the same biome
                 biome_id = object_state.biome_id[y, x]
                 biome_mask = object_state.biome_id == biome_id
                 empty_mask = new_object_id == 0
-                valid_spawn_mask = biome_mask & empty_mask
+                no_timer_mask = new_respawn_timer == 0
+                valid_spawn_mask = biome_mask & empty_mask & no_timer_mask
                 num_valid_spawns = jnp.sum(valid_spawn_mask)
 
                 y_indices, x_indices = jnp.nonzero(
@@ -319,10 +341,19 @@ class ForagaxEnv(environment.Environment):
                 random_idx = jax.random.randint(rand_key, (), 0, num_valid_spawns)
                 new_spawn_pos = valid_spawn_indices[random_idx]
 
-                new_object_id = new_object_id.at[
+                # Place timer at the new random position
+                new_respawn_timer = new_respawn_timer.at[
                     new_spawn_pos[0], new_spawn_pos[1]
                 ].set(timer_val)
-                return object_state.replace(object_id=new_object_id)
+                new_respawn_object_id = new_respawn_object_id.at[
+                    new_spawn_pos[0], new_spawn_pos[1]
+                ].set(object_type)
+
+                return object_state.replace(
+                    object_id=new_object_id,
+                    respawn_timer=new_respawn_timer,
+                    respawn_object_id=new_respawn_object_id,
+                )
 
             return jax.lax.cond(random_respawn, place_randomly, place_at_position)
 
@@ -336,9 +367,7 @@ class ForagaxEnv(environment.Environment):
         params: EnvParams,
     ) -> Tuple[jax.Array, EnvState, jax.Array, jax.Array, Dict[Any, Any]]:
         """Perform single timestep state transition."""
-        num_obj_types = len(self.object_ids)
-        # Decode the object grid: positive values are objects, negative are timers (treat as empty)
-        current_objects = jnp.maximum(0, state.object_state.object_id)
+        current_objects = state.object_state.object_id
 
         # 1. UPDATE AGENT POSITION
         direction = DIRECTIONS[action]
@@ -409,17 +438,30 @@ class ForagaxEnv(environment.Environment):
         # 3. HANDLE OBJECT COLLECTION AND RESPAWNING
         key, regen_subkey, rand_key = jax.random.split(key, 3)
 
-        # Decrement timers (stored as negative values)
-        is_timer = state.object_state.object_id < 0
-        object_id = jnp.where(
-            is_timer,
-            state.object_state.object_id + num_obj_types,
+        # Decrement respawn timers
+        has_timer = state.object_state.respawn_timer > 0
+        new_respawn_timer = jnp.where(
+            has_timer,
+            state.object_state.respawn_timer - 1,
+            state.object_state.respawn_timer,
+        )
+
+        # Track which cells have timers that just reached 0
+        just_respawned = has_timer & (new_respawn_timer == 0)
+
+        # Respawn objects where timer reached 0
+        new_object_id = jnp.where(
+            just_respawned,
+            state.object_state.respawn_object_id,
             state.object_state.object_id,
         )
 
-        # Track which objects just respawned (timer -> object transition)
-        # An object respawned if it was negative and is now positive
-        just_respawned = is_timer & (object_id > 0)
+        # Clear respawn_object_id for cells that just respawned
+        new_respawn_object_id = jnp.where(
+            just_respawned,
+            0,
+            state.object_state.respawn_object_id,
+        )
 
         # Update spawn times for objects that just respawned
         spawn_time = jnp.where(
@@ -430,20 +472,22 @@ class ForagaxEnv(environment.Environment):
         regen_delay = jax.lax.switch(
             obj_at_pos, self.regen_delay_fns, state.time, regen_subkey
         )
-        encoded_timer = jax.lax.cond(
+        timer_countdown = jax.lax.cond(
             regen_delay == jnp.iinfo(jnp.int32).max,
-            lambda: 0,
-            lambda: obj_at_pos - ((regen_delay + 1) * num_obj_types),
+            lambda: 0,  # No timer (permanent removal)
+            lambda: regen_delay + 1,  # Timer countdown
         )
 
         # If collected, replace object with timer; otherwise, keep it
-        val_at_pos = object_id[pos[1], pos[0]]
+        val_at_pos = current_objects[pos[1], pos[0]]
         # Use original should_collect for consumption tracking
         should_collect_now = is_collectable & (val_at_pos > 0)
 
-        # Create updated object state with new object_id and spawn_time
+        # Create updated object state with new respawn_timer, object_id, and spawn_time
         object_state = state.object_state.replace(
-            object_id=object_id,
+            object_id=new_object_id,
+            respawn_timer=new_respawn_timer,
+            respawn_object_id=new_respawn_object_id,
             spawn_time=spawn_time,
         )
 
@@ -454,7 +498,8 @@ class ForagaxEnv(environment.Environment):
                 object_state,
                 pos[1],
                 pos[0],
-                encoded_timer,
+                obj_at_pos,  # object type
+                timer_countdown,  # timer value
                 self.object_random_respawn[obj_at_pos],
                 rand_key,
             ),
@@ -474,7 +519,7 @@ class ForagaxEnv(environment.Environment):
 
         # 3.5. HANDLE OBJECT EXPIRY
         # Only process expiry if there are objects that can expire
-        key, object_state = self.expire_objects(key, state, num_obj_types, object_state)
+        key, object_state = self.expire_objects(key, state, object_state)
 
         # 3.6. HANDLE DYNAMIC BIOME CONSUMPTION AND RESPAWNING
         if self.dynamic_biomes:
@@ -538,11 +583,11 @@ class ForagaxEnv(environment.Environment):
         )
 
     def expire_objects(
-        self, key, state, num_obj_types, object_state: ObjectState
+        self, key, state, object_state: ObjectState
     ) -> Tuple[jax.Array, ObjectState]:
         if self.has_expiring_objects:
             # Check each cell for objects that have exceeded their expiry time
-            current_objects_for_expiry = jnp.maximum(0, object_state.object_id)
+            current_objects_for_expiry = object_state.object_id
 
             # Calculate age of each object (current_time - spawn_time)
             object_ages = state.time - object_state.spawn_time
@@ -585,10 +630,10 @@ class ForagaxEnv(environment.Environment):
                         exp_delay = jax.lax.switch(
                             obj_id, self.expiry_regen_delay_fns, state.time, exp_key
                         )
-                        encoded_exp_timer = jax.lax.cond(
+                        timer_countdown = jax.lax.cond(
                             exp_delay == jnp.iinfo(jnp.int32).max,
-                            lambda: 0,
-                            lambda: obj_id - ((exp_delay + 1) * num_obj_types),
+                            lambda: 0,  # No timer (permanent removal)
+                            lambda: exp_delay + 1,  # Timer countdown
                         )
 
                         # Use unified timer placement method
@@ -597,7 +642,8 @@ class ForagaxEnv(environment.Environment):
                             obj_state,
                             y,
                             x,
-                            encoded_exp_timer,
+                            obj_id,
+                            timer_countdown,
                             self.object_random_respawn[obj_id],
                             rand_key,
                         )
@@ -732,8 +778,19 @@ class ForagaxEnv(environment.Environment):
             new_gen = jnp.where(is_new_object, new_gen_value, new_gen)
             new_spawn = jnp.where(is_new_object, current_time, new_spawn)
 
+        # Clear timers in respawning biomes
+        new_respawn_timer = object_state.respawn_timer
+        new_respawn_object_id = object_state.respawn_object_id
+        for i in range(num_biomes):
+            biome_mask = self.biome_masks_array[i]
+            should_clear = biome_mask & should_respawn[i][..., None]
+            new_respawn_timer = jnp.where(should_clear, 0, new_respawn_timer)
+            new_respawn_object_id = jnp.where(should_clear, 0, new_respawn_object_id)
+
         object_state = object_state.replace(
             object_id=new_obj_id,
+            respawn_timer=new_respawn_timer,
+            respawn_object_id=new_respawn_object_id,
             color=new_color,
             state_params=new_params,
             generation=new_gen,
@@ -1066,8 +1123,7 @@ class ForagaxEnv(environment.Environment):
 
     def get_obs(self, state: EnvState, params: EnvParams, key=None) -> jax.Array:
         """Get observation based on observation_type and full_world."""
-        # Decode grid for observation
-        obs_grid = jnp.maximum(0, state.object_state.object_id)
+        obs_grid = state.object_state.object_id
 
         if self.full_world:
             return self._get_world_obs(obs_grid, state)
@@ -1176,7 +1232,7 @@ class ForagaxEnv(environment.Environment):
             else:
                 # Use default object colors
                 img = jnp.zeros((self.size[1], self.size[0], 3))
-                render_grid = jnp.maximum(0, state.object_state.object_id)
+                render_grid = state.object_state.object_id
 
                 def update_image(i, img):
                     color = self.object_colors[i]
@@ -1218,7 +1274,7 @@ class ForagaxEnv(environment.Environment):
 
             if is_true_mode:
                 # Apply true object borders by overlaying true colors on border pixels
-                render_grid = jnp.maximum(0, state.object_state.object_id)
+                render_grid = state.object_state.object_id
                 img = apply_true_borders(
                     img, render_grid, self.size, len(self.object_ids)
                 )
@@ -1231,7 +1287,7 @@ class ForagaxEnv(environment.Environment):
             img = img.at[:, col_indices].set(grid_color)
 
         elif is_aperture_mode:
-            obs_grid = jnp.maximum(0, state.object_state.object_id)
+            obs_grid = state.object_state.object_id
             aperture = self._get_aperture(obs_grid, state.pos)
 
             if self.dynamic_biomes:
