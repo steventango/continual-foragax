@@ -713,7 +713,7 @@ def create_fourier_objects(
     """Create HOT and COLD FourierWeatherObject instances.
 
     Args:
-        num_fourier_terms: Number of Fourier terms in the reward function (default: 1000).
+        num_fourier_terms: Number of Fourier terms in the reward function (default: 10).
         base_magnitude: Base magnitude for Fourier coefficients.
         reward_delay: Number of steps before reward is delivered.
 
