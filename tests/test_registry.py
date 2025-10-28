@@ -2,7 +2,6 @@ import chex
 import jax
 import jax.numpy as jnp
 
-from foragax.env import Actions
 from foragax.objects import FourierObject
 from foragax.registry import make
 

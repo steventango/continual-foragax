@@ -2127,7 +2127,9 @@ def test_consumption_threshold_per_generation():
     assert initial_objects == 5, f"Should start with 5 objects, got {initial_objects}"
     assert state.biome_state.generation[0] == 0, "Should start at generation 0"
     assert state.biome_state.total_objects[0] == 5, "Should track 5 total objects"
-    assert state.biome_state.consumption_count[0] == 0, "Should start with 0 consumption"
+    assert state.biome_state.consumption_count[0] == 0, (
+        "Should start with 0 consumption"
+    )
 
     # Store generation 0 properties and positions
     gen0_params = {}
