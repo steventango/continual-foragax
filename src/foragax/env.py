@@ -151,6 +151,9 @@ class ForagaxEnv(environment.Environment):
             [o.expiry_time if o.expiry_time is not None else -1 for o in objects]
         )
 
+        # Check if any objects can expire
+        self.has_expiring_objects = jnp.any(self.object_expiry_time >= 0)
+
         # Compute reward steps per object (using max_reward_delay attribute)
         object_max_reward_delay = jnp.array([o.max_reward_delay for o in objects])
         self.max_reward_delay = (
@@ -427,87 +430,110 @@ class ForagaxEnv(environment.Environment):
         )
 
         # 3.5. HANDLE OBJECT EXPIRY
-        # Check each cell for objects that have exceeded their expiry time
-        current_objects_for_expiry = jnp.maximum(0, object_grid)
+        # Only process expiry if there are objects that can expire
+        if self.has_expiring_objects:
+            # Check each cell for objects that have exceeded their expiry time
+            current_objects_for_expiry = jnp.maximum(0, object_grid)
 
-        # Calculate age of each object (current_time - spawn_time)
-        object_ages = state.time - object_spawn_time_grid
+            # Calculate age of each object (current_time - spawn_time)
+            object_ages = state.time - object_spawn_time_grid
 
-        # Get expiry time for each object type in the grid
-        expiry_times = self.object_expiry_time[current_objects_for_expiry]
+            # Get expiry time for each object type in the grid
+            expiry_times = self.object_expiry_time[current_objects_for_expiry]
 
-        # Check if object should expire (age >= expiry_time and expiry_time >= 0)
-        should_expire = (
-            (object_ages >= expiry_times)
-            & (expiry_times >= 0)
-            & (current_objects_for_expiry > 0)
-        )
-
-        # For expired objects, calculate expiry regen delay
-        key, expiry_key = jax.random.split(key)
-
-        # Process expiry for all positions that need it
-        def process_expiry(y, x, grid, color_grid, spawn_grid, key):
-            obj_id = current_objects_for_expiry[y, x]
-            should_exp = should_expire[y, x]
-
-            def expire_object():
-                exp_key = jax.random.fold_in(key, y * self.size[0] + x)
-                exp_delay = jax.lax.switch(
-                    obj_id, self.expiry_regen_delay_fns, state.time, exp_key
-                )
-                encoded_exp_timer = jax.lax.cond(
-                    exp_delay == jnp.iinfo(jnp.int32).max,
-                    lambda: 0,
-                    lambda: obj_id - ((exp_delay + 1) * num_obj_types),
-                )
-
-                # Use unified timer placement method
-                rand_key = jax.random.split(exp_key)[1]
-                new_grid = self._place_timer(
-                    grid,
-                    y,
-                    x,
-                    encoded_exp_timer,
-                    self.object_random_respawn[obj_id],
-                    state.biome_grid,
-                    rand_key,
-                )
-
-                # Clear color grid when object expires
-                empty_color = jnp.full((3,), 255, dtype=jnp.uint8)
-                new_color_grid = color_grid.at[y, x].set(empty_color)
-
-                return new_grid, new_color_grid, spawn_grid
-
-            def no_expire():
-                return grid, color_grid, spawn_grid
-
-            return jax.lax.cond(should_exp, expire_object, no_expire)
-
-        # Apply expiry to all cells (vectorized)
-        def scan_expiry_row(carry, y):
-            grid, color_grid, spawn_grid, key = carry
-
-            def scan_expiry_col(carry_col, x):
-                grid_col, color_grid_col, spawn_grid_col, key_col = carry_col
-                grid_col, color_grid_col, spawn_grid_col = process_expiry(
-                    y, x, grid_col, color_grid_col, spawn_grid_col, key_col
-                )
-                return (grid_col, color_grid_col, spawn_grid_col, key_col), None
-
-            (grid, color_grid, spawn_grid, key), _ = jax.lax.scan(
-                scan_expiry_col,
-                (grid, color_grid, spawn_grid, key),
-                jnp.arange(self.size[0]),
+            # Check if object should expire (age >= expiry_time and expiry_time >= 0)
+            should_expire = (
+                (object_ages >= expiry_times)
+                & (expiry_times >= 0)
+                & (current_objects_for_expiry > 0)
             )
-            return (grid, color_grid, spawn_grid, key), None
 
-        (object_grid, object_color_grid, object_spawn_time_grid, _), _ = jax.lax.scan(
-            scan_expiry_row,
-            (object_grid, object_color_grid, object_spawn_time_grid, expiry_key),
-            jnp.arange(self.size[1]),
-        )
+            # Count how many objects actually need to expire
+            num_expiring = jnp.sum(should_expire)
+
+            # Only process expiry if there are actually objects to expire
+            def process_expiries():
+                # Get positions of objects that should expire
+                # Use nonzero with fixed size to maintain JIT compatibility
+                max_objects = self.size[0] * self.size[1]
+                y_indices, x_indices = jnp.nonzero(
+                    should_expire, size=max_objects, fill_value=-1
+                )
+
+                key_local, expiry_key = jax.random.split(key)
+
+                def process_one_expiry(carry, i):
+                    grid, color_grid, spawn_grid = carry
+                    y = y_indices[i]
+                    x = x_indices[i]
+
+                    # Skip if this is a padding index (from fill_value)
+                    is_valid = (y >= 0) & (x >= 0)
+
+                    def expire_one():
+                        obj_id = current_objects_for_expiry[y, x]
+                        exp_key = jax.random.fold_in(expiry_key, y * self.size[0] + x)
+                        exp_delay = jax.lax.switch(
+                            obj_id, self.expiry_regen_delay_fns, state.time, exp_key
+                        )
+                        encoded_exp_timer = jax.lax.cond(
+                            exp_delay == jnp.iinfo(jnp.int32).max,
+                            lambda: 0,
+                            lambda: obj_id - ((exp_delay + 1) * num_obj_types),
+                        )
+
+                        # Use unified timer placement method
+                        rand_key = jax.random.split(exp_key)[1]
+                        new_grid = self._place_timer(
+                            grid,
+                            y,
+                            x,
+                            encoded_exp_timer,
+                            self.object_random_respawn[obj_id],
+                            state.biome_grid,
+                            rand_key,
+                        )
+
+                        # Clear color grid when object expires
+                        empty_color = jnp.full((3,), 255, dtype=jnp.uint8)
+                        new_color_grid = color_grid.at[y, x].set(empty_color)
+
+                        return new_grid, new_color_grid, spawn_grid
+
+                    def no_op():
+                        return grid, color_grid, spawn_grid
+
+                    return jax.lax.cond(is_valid, expire_one, no_op), None
+
+                (
+                    (
+                        new_object_grid,
+                        new_object_color_grid,
+                        new_object_spawn_time_grid,
+                    ),
+                    _,
+                ) = jax.lax.scan(
+                    process_one_expiry,
+                    (object_grid, object_color_grid, object_spawn_time_grid),
+                    jnp.arange(max_objects),
+                )
+                return (
+                    new_object_grid,
+                    new_object_color_grid,
+                    new_object_spawn_time_grid,
+                    key_local,
+                )
+
+            def no_expiries():
+                return object_grid, object_color_grid, object_spawn_time_grid, key
+
+            (object_grid, object_color_grid, object_spawn_time_grid, key) = (
+                jax.lax.cond(
+                    num_expiring > 0,
+                    process_expiries,
+                    no_expiries,
+                )
+            )
 
         # 3.6. HANDLE DYNAMIC BIOME CONSUMPTION AND RESPAWNING
         object_generation_grid = state.object_generation_grid
