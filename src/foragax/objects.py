@@ -710,7 +710,7 @@ def create_fourier_objects(
     base_magnitude: float = 1.0,
     reward_delay: int = 0,
 ):
-    """Create HOT and COLD FourierWeatherObject instances.
+    """Create HOT and COLD FourierObject instances.
 
     Args:
         num_fourier_terms: Number of Fourier terms in the reward function (default: 10).
@@ -718,7 +718,7 @@ def create_fourier_objects(
         reward_delay: Number of steps before reward is delivered.
 
     Returns:
-        A tuple (HOT, COLD) of FourierWeatherObject instances.
+        A tuple (HOT, COLD) of FourierObject instances.
     """
     hot = FourierObject(
         name="hot_fourier",
