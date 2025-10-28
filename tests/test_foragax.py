@@ -22,6 +22,7 @@ from foragax.objects import (
     DefaultForagaxObject,
     FourierObject,
     NormalRegenForagaxObject,
+    SineObject,
     WeatherObject,
     create_fourier_objects,
 )
@@ -2661,3 +2662,65 @@ def test_fourier_reward_mathematical_properties():
         2 * (raw_quarter - (-1)) / (1 - (-1)) - 1
     ) * fourier_obj.base_magnitude
     chex.assert_trees_all_close(reward_t_quarter, expected_quarter, rtol=1e-4)
+
+
+def test_sine_object():
+    """Test the SineObject class directly."""
+    key = jax.random.key(0)
+
+    # Create a sine object with base_reward=10, amplitude=20, period=1000
+    sine_obj = SineObject(
+        name="test_sine",
+        base_reward=10.0,
+        amplitude=20.0,
+        period=1000,
+        phase=0.0,
+        regen_delay=(9, 11),
+        color=(255, 0, 0),
+    )
+
+    # Test reward at different time points
+    # At t=0: sin(0) = 0, reward = 10 + 20*0 = 10
+    r0 = sine_obj.reward(0, key, None)
+    assert jnp.allclose(r0, 10.0, atol=0.01)
+
+    # At t=250 (quarter period): sin(2π*250/1000) = sin(π/2) = 1, reward = 10 + 20*1 = 30
+    r250 = sine_obj.reward(250, key, None)
+    assert jnp.allclose(r250, 30.0, atol=0.01)
+
+    # At t=500 (half period): sin(π) = 0, reward = 10 + 20*0 = 10
+    r500 = sine_obj.reward(500, key, None)
+    assert jnp.allclose(r500, 10.0, atol=0.01)
+
+    # At t=750 (three-quarter period): sin(3π/2) = -1, reward = 10 + 20*(-1) = -10
+    r750 = sine_obj.reward(750, key, None)
+    assert jnp.allclose(r750, -10.0, atol=0.01)
+
+    # At t=1000 (full period): sin(2π) = 0, reward = 10 + 20*0 = 10
+    r1000 = sine_obj.reward(1000, key, None)
+    assert jnp.allclose(r1000, 10.0, atol=0.01)
+
+    # Test with phase shift (π radians = 180 degrees)
+    sine_obj_shifted = SineObject(
+        name="test_sine_shifted",
+        base_reward=-10.0,
+        amplitude=20.0,
+        period=1000,
+        phase=jnp.pi,
+        regen_delay=(9, 11),
+        color=(0, 255, 0),
+    )
+
+    # At t=0 with phase=π: sin(0 + π) = sin(π) = 0, reward = -10 + 20*0 = -10
+    r0_shifted = sine_obj_shifted.reward(0, key, None)
+    assert jnp.allclose(r0_shifted, -10.0, atol=0.01)
+
+    # At t=250 with phase=π: sin(π/2 + π) = sin(3π/2) = -1, reward = -10 + 20*(-1) = -30
+    r250_shifted = sine_obj_shifted.reward(250, key, None)
+    assert jnp.allclose(r250_shifted, -30.0, atol=0.01)
+
+    # Verify phase inversion: original + shifted should sum to 0
+    for t in [0, 250, 500, 750]:
+        r_orig = sine_obj.reward(t, key, None)
+        r_shift = sine_obj_shifted.reward(t, key, None)
+        assert jnp.allclose(r_orig + r_shift, 0.0, atol=0.01)

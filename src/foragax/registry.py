@@ -32,6 +32,7 @@ from foragax.objects import (
     LARGE_OYSTER,
     MEDIUM_MOREL,
     create_fourier_objects,
+    create_sine_biome_objects,
     create_weather_objects,
 )
 
@@ -380,6 +381,22 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
         ),
         "nowrap": True,
     },
+    "ForagaxSineTwoBiome-v1": {
+        "size": (15, 15),
+        "aperture_size": None,
+        "objects": None,
+        "biomes": (
+            # Biome 1 (left): Oyster +10, Death Cap -10 with sine
+            Biome(
+                start=(3, 0), stop=(5, 15), object_frequencies=(0.25, 0.25, 0.0, 0.0)
+            ),
+            # Biome 2 (right): Oyster -10, Death Cap +10 with inverted sine
+            Biome(
+                start=(10, 0), stop=(12, 15), object_frequencies=(0.0, 0.0, 0.25, 0.25)
+            ),
+        ),
+        "nowrap": False,
+    },
 }
 
 
@@ -516,6 +533,26 @@ def make(
         config["objects"] = create_fourier_objects(
             num_fourier_terms=10,
             reward_delay=reward_delay,
+        )
+
+    if env_id == "ForagaxSineTwoBiome-v1":
+        biome1_oyster, biome1_deathcap, biome2_oyster, biome2_deathcap = (
+            create_sine_biome_objects(
+                period=1000,
+                amplitude=20.0,
+                base_oyster_reward=10.0,
+                base_deathcap_reward=-10.0,
+                regen_delay=(9, 11),
+                reward_delay=reward_delay,
+                expiry_time=500,
+                expiry_regen_delay=(9, 11),
+            )
+        )
+        config["objects"] = (
+            biome1_oyster,
+            biome1_deathcap,
+            biome2_oyster,
+            biome2_deathcap,
         )
 
     if env_id == "ForagaxTwoBiome-v16":

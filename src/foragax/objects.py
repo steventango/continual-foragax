@@ -655,6 +655,56 @@ def create_weather_objects(
     return hot, cold
 
 
+class SineObject(DefaultForagaxObject):
+    """Object with reward based on sine wave with a base reward offset.
+
+    The total reward is: base_reward + amplitude * sin(2*pi * clock / period)
+    This allows for objects that have different base behaviors (positive/negative)
+    with an underlying sine wave that drives continual learning.
+
+    Uses uniform distribution for regeneration delays by default (from DefaultForagaxObject).
+    """
+
+    def __init__(
+        self,
+        name: str,
+        base_reward: float = 0.0,
+        amplitude: float = 1.0,
+        period: int = 1000,
+        phase: float = 0.0,
+        regen_delay: Tuple[int, int] = (9, 11),
+        color: Tuple[int, int, int] = (0, 0, 0),
+        random_respawn: bool = False,
+        reward_delay: int = 0,
+        max_reward_delay: Optional[int] = None,
+        expiry_time: Optional[int] = None,
+        expiry_regen_delay: Tuple[int, int] = (9, 11),
+    ):
+        super().__init__(
+            name=name,
+            reward=base_reward,
+            collectable=True,
+            regen_delay=regen_delay,
+            color=color,
+            random_respawn=random_respawn,
+            reward_delay=reward_delay,
+            max_reward_delay=max_reward_delay,
+            expiry_time=expiry_time,
+            expiry_regen_delay=expiry_regen_delay,
+        )
+        self.base_reward = base_reward
+        self.amplitude = amplitude
+        self.period = period
+        self.phase = phase
+
+    def reward(
+        self, clock: int, rng: jax.Array, params: Optional[jax.Array] = None
+    ) -> float:
+        """Reward is base_reward + amplitude * sin(2*pi * clock / period + phase)."""
+        sine_value = jnp.sin(2.0 * jnp.pi * clock / self.period + self.phase)
+        return self.base_reward + self.amplitude * sine_value
+
+
 def create_fourier_objects(
     num_fourier_terms: int = 10,
     base_magnitude: float = 1.0,
@@ -687,3 +737,97 @@ def create_fourier_objects(
     )
 
     return hot, cold
+
+
+def create_sine_biome_objects(
+    period: int = 1000,
+    amplitude: float = 20.0,
+    base_oyster_reward: float = 10.0,
+    base_deathcap_reward: float = -10.0,
+    regen_delay: Tuple[int, int] = (9, 11),
+    reward_delay: int = 0,
+    expiry_time: int = 500,
+    expiry_regen_delay: Tuple[int, int] = (9, 11),
+):
+    """Create objects for the sine-based two-biome environment.
+
+    Biome 1 (Left): Oyster (+base_reward), Death Cap (-base_reward)
+    Biome 2 (Right): Oyster (-base_reward), Death Cap (+base_reward)
+
+    Both biomes have an underlying sine curve with the specified amplitude.
+    The sine curve of biome 2 is the negative of biome 1 (180 degree phase shift).
+
+    Objects use uniform respawn and random expiry by default.
+
+    Args:
+        period: Period of the sine wave in timesteps
+        amplitude: Amplitude of the sine wave
+        base_oyster_reward: Base reward for oyster in biome 1 (will be negated in biome 2)
+        base_deathcap_reward: Base reward for death cap in biome 1 (will be negated in biome 2)
+        regen_delay: Tuple of (min, max) for uniform regeneration delay
+        reward_delay: Number of steps before reward is delivered
+        expiry_time: Time steps before object expires (None = no expiry)
+        expiry_regen_delay: Tuple of (min, max) for uniform expiry regeneration delay
+
+    Returns:
+        A tuple of (biome1_oyster, biome1_deathcap, biome2_oyster, biome2_deathcap)
+    """
+    # Biome 1 objects (phase = 0)
+    biome1_oyster = SineObject(
+        name="oyster_sine_1",
+        base_reward=base_oyster_reward,
+        amplitude=amplitude,
+        period=period,
+        phase=0.0,
+        regen_delay=regen_delay,
+        color=(124, 61, 81),  # Oyster color
+        random_respawn=True,
+        reward_delay=reward_delay,
+        expiry_time=expiry_time,
+        expiry_regen_delay=expiry_regen_delay,
+    )
+
+    biome1_deathcap = SineObject(
+        name="deathcap_sine_1",
+        base_reward=base_deathcap_reward,
+        amplitude=amplitude,
+        period=period,
+        phase=0.0,
+        regen_delay=regen_delay,
+        color=(0, 255, 0),  # Green color
+        random_respawn=True,
+        reward_delay=reward_delay,
+        expiry_time=expiry_time,
+        expiry_regen_delay=expiry_regen_delay,
+    )
+
+    # Biome 2 objects (phase = pi for 180 degree shift)
+    biome2_oyster = SineObject(
+        name="oyster_sine_2",
+        base_reward=-base_oyster_reward,  # Negated
+        amplitude=amplitude,
+        period=period,
+        phase=jnp.pi,  # 180 degree phase shift (negative of biome 1)
+        regen_delay=regen_delay,
+        color=(124, 61, 81),  # Same oyster color
+        random_respawn=True,
+        reward_delay=reward_delay,
+        expiry_time=expiry_time,
+        expiry_regen_delay=expiry_regen_delay,
+    )
+
+    biome2_deathcap = SineObject(
+        name="deathcap_sine_2",
+        base_reward=-base_deathcap_reward,  # Negated
+        amplitude=amplitude,
+        period=period,
+        phase=jnp.pi,  # 180 degree phase shift (negative of biome 1)
+        regen_delay=regen_delay,
+        color=(0, 255, 0),  # Same green color
+        random_respawn=True,
+        reward_delay=reward_delay,
+        expiry_time=expiry_time,
+        expiry_regen_delay=expiry_regen_delay,
+    )
+
+    return biome1_oyster, biome1_deathcap, biome2_oyster, biome2_deathcap
