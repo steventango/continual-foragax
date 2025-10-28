@@ -92,7 +92,7 @@ def test_add_objects():
     key = jax.random.key(0)
     obs, state = env.reset(key, params)
 
-    empirical_freq = jnp.count_nonzero(state.object_grid) / size**2
+    empirical_freq = jnp.count_nonzero(state.object_state.object_id) / size**2
     chex.assert_trees_all_close(empirical_freq, freq, rtol=0.1)
     chex.assert_shape(obs, (5, 5, 1))
 
@@ -235,7 +235,7 @@ def test_vision():
     grid = grid.at[4, 3].set(wall_id)
     grid = grid.at[5, 3].set(wall_id)
     grid = grid.at[2, 0].set(wall_id)
-    state = state.replace(object_grid=grid)
+    state = state.replace(object_state=state.object_state.replace(object_id=grid))
 
     chex.assert_trees_all_equal(state.pos, jnp.array([3, 3]))
 
@@ -280,25 +280,27 @@ def test_respawn():
     # Place a flower and move the agent to it
     grid = jnp.zeros((7, 7), dtype=int)
     grid = grid.at[4, 3].set(flower_id)
-    state = state.replace(object_grid=grid, pos=jnp.array([3, 3]))
+    state = state.replace(
+        object_state=state.object_state.replace(object_id=grid), pos=jnp.array([3, 3])
+    )
 
     # Collect the flower
     key, step_key = jax.random.split(key)
     _, state, reward, _, _ = env.step(step_key, state, Actions.DOWN, params)
     assert reward == FLOWER.reward_val
-    assert state.object_grid[4, 3] < 0
+    assert state.object_state.object_id[4, 3] < 0
 
-    steps_until_respawn = -state.object_grid[4, 3] // 2
+    steps_until_respawn = -state.object_state.object_id[4, 3] // 2
 
     # Step until it respawns
     for i in range(steps_until_respawn):
         key, step_key = jax.random.split(key)
         _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
-        assert state.object_grid[4, 3] < 0
+        assert state.object_state.object_id[4, 3] < 0
 
     key, step_key = jax.random.split(key)
     _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
-    assert state.object_grid[4, 3] == flower_id
+    assert state.object_state.object_id[4, 3] == flower_id
 
 
 def test_random_respawn():
@@ -333,7 +335,9 @@ def test_random_respawn():
     grid = grid.at[original_pos[1], original_pos[0]].set(flower_id)
     # Add a wall to make sure it doesn't spawn there
     grid = grid.at[4, 4].set(2)  # Use a fixed ID for the wall
-    state = state.replace(object_grid=grid, pos=jnp.array([2, 3]))
+    state = state.replace(
+        object_state=state.object_state.replace(object_id=grid), pos=jnp.array([2, 3])
+    )
 
     # Collect the flower
     key, step_key = jax.random.split(key)
@@ -341,11 +345,11 @@ def test_random_respawn():
 
     assert reward == flower_random.reward_val
     # Original position should be empty
-    assert new_state.object_grid[original_pos[1], original_pos[0]] == 0
+    assert new_state.object_state.object_id[original_pos[1], original_pos[0]] == 0
 
     # A timer should be placed somewhere
-    assert jnp.sum(new_state.object_grid < 0) == 1
-    timer_pos_flat = jnp.argmin(new_state.object_grid)
+    assert jnp.sum(new_state.object_state.object_id < 0) == 1
+    timer_pos_flat = jnp.argmin(new_state.object_state.object_id)
     timer_pos = jnp.array(jnp.unravel_index(timer_pos_flat, (7, 7)))
     # New position should not be the original position
     assert not jnp.array_equal(timer_pos, original_pos)
@@ -388,7 +392,9 @@ def test_random_respawn_no_empty_space():
     # Place a flower in the 1x1 biome
     grid = jnp.zeros((7, 7), dtype=int)
     grid = grid.at[original_pos[1], original_pos[0]].set(flower_id)
-    state = state.replace(object_grid=grid, pos=jnp.array([2, 3]))
+    state = state.replace(
+        object_state=state.object_state.replace(object_id=grid), pos=jnp.array([2, 3])
+    )
 
     # Collect the flower
     key, step_key = jax.random.split(key)
@@ -396,7 +402,7 @@ def test_random_respawn_no_empty_space():
 
     assert reward == flower_random.reward_val
     # The timer should be placed back at the original position
-    assert new_state.object_grid[original_pos[1], original_pos[0]] < 0
+    assert new_state.object_state.object_id[original_pos[1], original_pos[0]] < 0
 
 
 def test_wrapping_dynamics():
@@ -551,7 +557,7 @@ def test_wrapping_vision():
     # Create a predictable environment with a flower at (0, 0)
     grid = jnp.zeros((5, 5), dtype=int)
     grid = grid.at[0, 0].set(1)
-    state = state.replace(object_grid=grid)
+    state = state.replace(object_state=state.object_state.replace(object_id=grid))
 
     obs = env.get_obs(state, params)
 
@@ -604,7 +610,9 @@ def test_no_wrapping_vision():
 
     # Agent at (0,0)
     state = env_no_wrap.reset(key, params)[1]
-    state = state.replace(object_grid=grid, pos=jnp.array([0, 0]))
+    state = state.replace(
+        object_state=state.object_state.replace(object_id=grid), pos=jnp.array([0, 0])
+    )
 
     # With no wrapping, should not see the flower, see padding
     obs_no_wrap = env_no_wrap.get_obs(state, params)
@@ -649,13 +657,13 @@ def test_generate_objects_in_biome():
     thorns_id = object_types.index(THORNS) + 1
 
     # Check that morels only appear within the biome
-    morel_locations = jnp.argwhere(state.object_grid == morel_id)
+    morel_locations = jnp.argwhere(state.object_state.object_id == morel_id)
 
     assert jnp.all(morel_locations >= 2)
     assert jnp.all(morel_locations < 6)
 
     # Check that no other objects were generated
-    unique_objects = jnp.unique(state.object_grid)
+    unique_objects = jnp.unique(state.object_state.object_id)
     assert oyster_id not in unique_objects
     assert wall_id not in unique_objects
     assert thorns_id not in unique_objects
@@ -686,14 +694,14 @@ def test_deterministic_object_spawning():
     flower_id = object_types.index(FLOWER) + 1
 
     # Check exact counts: 16 * 0.1 = 1.6, rounded to 2 each
-    wall_count = jnp.sum(state.object_grid == wall_id)
-    flower_count = jnp.sum(state.object_grid == flower_id)
+    wall_count = jnp.sum(state.object_state.object_id == wall_id)
+    flower_count = jnp.sum(state.object_state.object_id == flower_id)
     assert wall_count == 2
     assert flower_count == 2
 
     # Check that objects only appear within the biome
-    wall_locations = jnp.argwhere(state.object_grid == wall_id)
-    flower_locations = jnp.argwhere(state.object_grid == flower_id)
+    wall_locations = jnp.argwhere(state.object_state.object_id == wall_id)
+    flower_locations = jnp.argwhere(state.object_state.object_id == flower_id)
 
     assert jnp.all(wall_locations >= 2)
     assert jnp.all(wall_locations < 6)
@@ -703,10 +711,12 @@ def test_deterministic_object_spawning():
     # Test different positions: different key should produce different positions but same counts
     key_1 = jax.random.key(1)
     _, state_1 = env.reset(key_1, params)
-    assert jnp.sum(state_1.object_grid == wall_id) == 2
-    assert jnp.sum(state_1.object_grid == flower_id) == 2
+    assert jnp.sum(state_1.object_state.object_id == wall_id) == 2
+    assert jnp.sum(state_1.object_state.object_id == flower_id) == 2
     # Positions may be the same due to implementation (not shuffled)
-    assert not jnp.array_equal(state.object_grid, state_1.object_grid)
+    assert not jnp.array_equal(
+        state.object_state.object_id, state_1.object_state.object_id
+    )
 
 
 def test_complex_deterministic_object_spawning():
@@ -755,16 +765,16 @@ def test_complex_deterministic_object_spawning():
 
     # Biome 1 area: (2 * 15) = 30 cells. 30 * 0.25 = 7.5 -> 8 morels. 30 * 0.5 = 15 deathcaps.
     # Biome 2 area: (2 * 15) = 30 cells. 30 * 0.25 = 7.5 -> 8 oysters. 30 * 0.5 = 15 fakes.
-    assert jnp.sum(state.object_grid == morel_id) == 8
-    assert jnp.sum(state.object_grid == oyster_id) == 8
-    assert jnp.sum(state.object_grid == deathcap_id) == 15
-    assert jnp.sum(state.object_grid == fake_id) == 15
+    assert jnp.sum(state.object_state.object_id == morel_id) == 8
+    assert jnp.sum(state.object_state.object_id == oyster_id) == 8
+    assert jnp.sum(state.object_state.object_id == deathcap_id) == 15
+    assert jnp.sum(state.object_state.object_id == fake_id) == 15
 
     # Check that objects are within their biomes
-    morel_locs = jnp.argwhere(state.object_grid == morel_id)
-    oyster_locs = jnp.argwhere(state.object_grid == oyster_id)
-    deathcap_locs = jnp.argwhere(state.object_grid == deathcap_id)
-    fake_locs = jnp.argwhere(state.object_grid == fake_id)
+    morel_locs = jnp.argwhere(state.object_state.object_id == morel_id)
+    oyster_locs = jnp.argwhere(state.object_state.object_id == oyster_id)
+    deathcap_locs = jnp.argwhere(state.object_state.object_id == deathcap_id)
+    fake_locs = jnp.argwhere(state.object_state.object_id == fake_id)
 
     # Morel biome checks
     assert jnp.all(morel_locs[:, 1] >= margin)
@@ -802,7 +812,7 @@ def test_color_based_partial_observability():
     grid = grid.at[5, 6].set(2)  # LARGE_MOREL
     grid = grid.at[5, 7].set(3)  # MEDIUM_MOREL
     grid = grid.at[6, 5].set(4)  # FLOWER
-    state = state.replace(object_grid=grid)
+    state = state.replace(object_state=state.object_state.replace(object_id=grid))
 
     obs = env.get_obs(state, params)
 
@@ -871,7 +881,7 @@ def test_same_color_objects_same_channel():
     grid = grid.at[3, 3].set(1)  # obj1
     grid = grid.at[3, 4].set(2)  # obj2 (same color as obj1)
     grid = grid.at[4, 3].set(3)  # obj3 (different color)
-    state = state.replace(object_grid=grid)
+    state = state.replace(object_state=state.object_state.replace(object_id=grid))
 
     obs = env.get_obs(state, params)
 
@@ -928,7 +938,7 @@ def test_single_color_all_objects():
     grid = grid.at[3, 2].set(1)  # obj1
     grid = grid.at[3, 3].set(2)  # obj2
     grid = grid.at[3, 4].set(3)  # obj3
-    state = state.replace(object_grid=grid)
+    state = state.replace(object_state=state.object_state.replace(object_id=grid))
 
     obs = env.get_obs(state, params)
 
@@ -1103,21 +1113,21 @@ def test_info_biome_id():
     obs, state = env.reset(key, params)
 
     # Agent starts at center (2, 2), which should be in neither biome (biome_id = -1)
-    assert state.biome_grid[2, 2] == -1
+    assert state.object_state.biome_id[2, 2] == -1
 
     # Move right to biome 0: from (2,2) to (3,2)
     key, step_key = jax.random.split(key)
     _, state, _, _, info = env.step(step_key, state, Actions.RIGHT, params)
 
     assert "biome_id" in info
-    assert state.biome_grid[2, 3] == 0  # Position (3,2) is in biome 0
+    assert state.object_state.biome_id[2, 3] == 0  # Position (3,2) is in biome 0
     assert info["biome_id"] == 0
 
     # Move right again to biome 1: from (3,2) to (4,2)
     key, step_key = jax.random.split(key)
     _, state, _, _, info = env.step(step_key, state, Actions.RIGHT, params)
 
-    assert state.biome_grid[2, 4] == 1  # Position (4,2) is in biome 1
+    assert state.object_state.biome_id[2, 4] == 1  # Position (4,2) is in biome 1
     assert info["biome_id"] == 1
 
 
@@ -1137,7 +1147,9 @@ def test_info_object_collected_id():
     # Place a flower and move the agent to it
     grid = jnp.zeros((7, 7), dtype=int)
     grid = grid.at[4, 3].set(flower_id)
-    state = state.replace(object_grid=grid, pos=jnp.array([3, 3]))
+    state = state.replace(
+        object_state=state.object_state.replace(object_id=grid), pos=jnp.array([3, 3])
+    )
 
     # Collect the flower by moving down
     key, step_key = jax.random.split(key)
@@ -1181,7 +1193,9 @@ def test_reward_delay():
     # Place the delayed flower and move the agent to it
     grid = jnp.zeros((7, 7), dtype=int)
     grid = grid.at[4, 3].set(delayed_flower_id)
-    state = state.replace(object_grid=grid, pos=jnp.array([3, 3]))
+    state = state.replace(
+        object_state=state.object_state.replace(object_id=grid), pos=jnp.array([3, 3])
+    )
 
     # Collect the flower by moving down - should get no immediate reward
     key, step_key = jax.random.split(key)
@@ -1232,8 +1246,8 @@ def test_basic_object_expiry():
     obs, state = env.reset(key_reset, env.default_params)
 
     # Initial state - all objects present
-    assert jnp.all(state.object_grid == 1)
-    assert jnp.all(state.object_spawn_time_grid == 0)
+    assert jnp.all(state.object_state.object_id == 1)
+    assert jnp.all(state.object_state.spawn_time == 0)
 
     # Step through 5 times - objects should still be present
     for _ in range(5):
@@ -1242,16 +1256,16 @@ def test_basic_object_expiry():
             key_step, state, Actions.DOWN, env.default_params
         )
 
-    assert jnp.all(state.object_grid == 1)
+    assert jnp.all(state.object_state.object_id == 1)
     assert state.time == 5
 
     # Step once more - objects should expire and become timers
     key, key_step = jax.random.split(key)
     obs, state, _, _, _ = env.step(key_step, state, Actions.DOWN, env.default_params)
 
-    assert jnp.all(state.object_grid < 0)  # All are now timers
+    assert jnp.all(state.object_state.object_id < 0)  # All are now timers
     assert jnp.all(
-        state.object_spawn_time_grid == 0
+        state.object_state.spawn_time == 0
     )  # Spawn time NOT updated yet (still at reset value)
 
     # Step through regen delay (3 more steps due to +1 in encoding)
@@ -1261,9 +1275,9 @@ def test_basic_object_expiry():
             key_step, state, Actions.DOWN, env.default_params
         )
 
-    assert jnp.all(state.object_grid == 1)  # Objects respawned
+    assert jnp.all(state.object_state.object_id == 1)  # Objects respawned
     assert jnp.all(
-        state.object_spawn_time_grid == 8
+        state.object_state.spawn_time == 8
     )  # Spawn time = time at beginning of step when respawn occurred
     assert state.time == 9  # Current time after step completes
 
@@ -1289,7 +1303,7 @@ def test_no_expiry_backwards_compatibility():
     key, key_reset = jax.random.split(key)
     obs, state = env.reset(key_reset, env.default_params)
 
-    initial_grid = state.object_grid.copy()
+    initial_grid = state.object_state.object_id.copy()
 
     # Step through many timesteps - grid should remain unchanged
     for _ in range(20):
@@ -1298,8 +1312,8 @@ def test_no_expiry_backwards_compatibility():
             key_step, state, Actions.DOWN, env.default_params
         )
 
-    assert jnp.all(state.object_grid == initial_grid)
-    assert jnp.all(state.object_grid > 0)  # No timers
+    assert jnp.all(state.object_state.object_id == initial_grid)
+    assert jnp.all(state.object_state.object_id > 0)  # No timers
 
 
 def test_expiry_with_collection():
@@ -1327,7 +1341,7 @@ def test_expiry_with_collection():
     obs, state = env.reset(key_reset, env.default_params)
 
     # Count initial objects
-    initial_object_count = jnp.sum(state.object_grid > 0)
+    initial_object_count = jnp.sum(state.object_state.object_id > 0)
     assert initial_object_count > 0
 
     # Step through and collect/expire objects
@@ -1371,7 +1385,7 @@ def test_expiry_with_normal_regen():
     obs, state = env.reset(key_reset, env.default_params)
 
     # All objects start present
-    assert jnp.all(state.object_grid == 1)
+    assert jnp.all(state.object_state.object_id == 1)
 
     # Step until expiry
     for _ in range(8):
@@ -1384,7 +1398,7 @@ def test_expiry_with_normal_regen():
     key, key_step = jax.random.split(key)
     obs, state, _, _, _ = env.step(key_step, state, Actions.LEFT, env.default_params)
 
-    assert jnp.all(state.object_grid < 0)  # All expired
+    assert jnp.all(state.object_state.object_id < 0)  # All expired
 
 
 def test_mixed_expiry_times():
@@ -1420,8 +1434,8 @@ def test_mixed_expiry_times():
     obs, state = env.reset(key_reset, env.default_params)
 
     # Count initial objects
-    fast_count = jnp.sum(state.object_grid == 1)
-    slow_count = jnp.sum(state.object_grid == 2)
+    fast_count = jnp.sum(state.object_state.object_id == 1)
+    slow_count = jnp.sum(state.object_state.object_id == 2)
 
     # Step 4 times - fast should expire, slow should not
     for _ in range(4):
@@ -1431,8 +1445,8 @@ def test_mixed_expiry_times():
         )
 
     # Fast objects should be timers, slow objects should still be present
-    fast_after = jnp.sum(state.object_grid == 1)
-    slow_after = jnp.sum(state.object_grid == 2)
+    fast_after = jnp.sum(state.object_state.object_id == 1)
+    slow_after = jnp.sum(state.object_state.object_id == 2)
 
     # Fast objects should have become timers (decreased count)
     assert fast_after < fast_count
@@ -1464,7 +1478,7 @@ def test_expiry_spawn_time_tracking():
     obs, state = env.reset(key_reset, env.default_params)
 
     # Initial spawn times should be 0
-    assert jnp.all(state.object_spawn_time_grid == 0)
+    assert jnp.all(state.object_state.spawn_time == 0)
 
     # Step until expiry
     for step in range(6):
@@ -1474,8 +1488,8 @@ def test_expiry_spawn_time_tracking():
         )
 
     # After expiry (but before respawn), spawn times should still be 0
-    assert jnp.all(state.object_spawn_time_grid == 0)
-    assert jnp.all(state.object_grid < 0)  # Objects are timers
+    assert jnp.all(state.object_state.spawn_time == 0)
+    assert jnp.all(state.object_state.object_id < 0)  # Objects are timers
 
     # Step through regen delay (3 steps)
     for step in range(3):
@@ -1486,13 +1500,13 @@ def test_expiry_spawn_time_tracking():
 
     # After respawn, spawn times should be updated to when respawn occurred
     assert jnp.all(
-        state.object_spawn_time_grid == 8
+        state.object_state.spawn_time == 8
     )  # Time at beginning of step when respawn occurred
-    assert jnp.all(state.object_grid > 0)  # Objects respawned
+    assert jnp.all(state.object_state.object_id > 0)  # Objects respawned
     assert state.time == 9  # Current time after step completes
 
     # Ages should be 1 (respawned 1 step ago: current_time=9 - spawn_time=8)
-    ages = state.time - state.object_spawn_time_grid
+    ages = state.time - state.object_state.spawn_time
     assert jnp.all(ages == 1)
 
 
@@ -1521,7 +1535,7 @@ def test_expiry_with_collectable_spawn_time_update():
     obs, state = env.reset(key_reset, env.default_params)
 
     # Initial spawn times should be 0
-    assert jnp.all(state.object_spawn_time_grid == 0)
+    assert jnp.all(state.object_state.spawn_time == 0)
 
     # Move and collect object
     total_reward = 0
@@ -1535,7 +1549,7 @@ def test_expiry_with_collectable_spawn_time_update():
         if reward > 0 and collected_time is None:
             collected_time = state.time
             # When collected, spawn time should NOT change (still 0)
-            assert jnp.all(state.object_spawn_time_grid == 0)
+            assert jnp.all(state.object_state.spawn_time == 0)
             break
 
     # Should have collected at least one object
@@ -1553,7 +1567,7 @@ def test_expiry_with_collectable_spawn_time_update():
     # Respawn happens at beginning of step (collected_time + 6 - 1)
     expected_respawn_time = collected_time + 5
     # At least one object should have respawned and had its spawn time set
-    assert jnp.any(state.object_spawn_time_grid == expected_respawn_time)
+    assert jnp.any(state.object_state.spawn_time == expected_respawn_time)
 
 
 def test_expiry_with_random_respawn():
@@ -1586,7 +1600,7 @@ def test_expiry_with_random_respawn():
     obs, state = env.reset(key_reset, env.default_params)
 
     # Record initial object positions
-    initial_object_positions = state.object_grid == 1
+    initial_object_positions = state.object_state.object_id == 1
 
     # Step until expiry (4 steps - expiry happens when age >= expiry_time)
     for _ in range(4):
@@ -1596,7 +1610,7 @@ def test_expiry_with_random_respawn():
         )
 
     # Some objects should have expired and become timers
-    has_timers = jnp.any(state.object_grid < 0)
+    has_timers = jnp.any(state.object_state.object_id < 0)
     assert has_timers, "At least some objects should have expired"
 
     # Step through regen delay (2 steps due to +1 encoding)
@@ -1607,7 +1621,7 @@ def test_expiry_with_random_respawn():
         )
 
     # Objects should have respawned
-    final_object_positions = state.object_grid == 1
+    final_object_positions = state.object_state.object_id == 1
 
     # With random respawn, objects should not all be in their original positions
     # (This is a probabilistic test - with true randomness, it's very unlikely all objects
@@ -1618,9 +1632,10 @@ def test_expiry_with_random_respawn():
     )
 
     # But they should still be within the biome
-    biome_mask = state.biome_grid == 0
+    biome_mask = state.object_state.biome_id == 0
     assert jnp.all(
-        (state.object_grid == 0) | ((state.object_grid == 1) & biome_mask)
+        (state.object_state.object_id == 0)
+        | ((state.object_state.object_id == 1) & biome_mask)
     ), "All objects should be within the biome"
 
 
@@ -1647,7 +1662,7 @@ def test_dynamic_biome_respawn_threshold():
     # Record initial state
     initial_generation = state.biome_state.generation[0]
     initial_total = state.biome_state.total_objects[0]
-    initial_params = state.object_state_grid.copy()
+    initial_params = state.object_state.state_params.copy()
 
     # Calculate how many objects need to be consumed to trigger respawn (70% of 16 = 11.2, so 12)
     threshold_count = int(jnp.ceil(initial_total * 0.7))
@@ -1680,7 +1695,7 @@ def test_dynamic_biome_respawn_threshold():
     assert current_state.biome_state.total_objects[0] > 0, "Objects should be respawned"
 
     # Reward parameters should have changed
-    current_params = current_state.object_state_grid
+    current_params = current_state.object_state.state_params
     params_changed = jnp.any(jnp.abs(current_params - initial_params) > 0.01)
     assert params_changed, "Reward parameters should change after respawn"
 
@@ -1709,7 +1724,7 @@ def test_object_no_individual_respawn():
     obs, state = env.reset(key, env.default_params)
 
     # Find an object position
-    obj_pos = jnp.argwhere(state.object_grid > 0)[0]
+    obj_pos = jnp.argwhere(state.object_state.object_id > 0)[0]
     y, x = obj_pos
 
     # Position agent above the object so moving down collects it
@@ -1723,9 +1738,9 @@ def test_object_no_individual_respawn():
     assert info["object_collected_id"] == 1, "Object should have been collected"
 
     # Check that no timer was placed (position should be 0, not negative)
-    assert state.object_grid[y, x] == 0, (
+    assert state.object_state.object_id[y, x] == 0, (
         f"No timer should be placed for objects with max regen_delay, "
-        f"but got {state.object_grid[y, x]}"
+        f"but got {state.object_state.object_id[y, x]}"
     )
 
 
@@ -1745,7 +1760,7 @@ def test_object_color_grid_cleared_on_collection():
     flower_id = 1  # 0 is EMPTY
 
     # Find a flower position
-    flower_positions = jnp.argwhere(state.object_grid == flower_id)
+    flower_positions = jnp.argwhere(state.object_state.object_id == flower_id)
     flower_pos = flower_positions[0]
     y, x = flower_pos
 
@@ -1758,16 +1773,17 @@ def test_object_color_grid_cleared_on_collection():
     assert reward == FLOWER.reward_val
 
     # Check that the color grid at the collected position is cleared (should be [255, 255, 255])
-    collected_color = state.object_color_grid[y, x]
+    collected_color = state.object_state.color[y, x]
     expected_empty_color = jnp.array([255, 255, 255], dtype=jnp.uint8)
     chex.assert_trees_all_equal(collected_color, expected_empty_color)
 
     # Check that other positions with objects still have their colors
     other_flower_positions = jnp.argwhere(
-        (state.object_grid == flower_id) & (state.object_grid != 0)
+        (state.object_state.object_id == flower_id)
+        & (state.object_state.object_id != 0)
     )
     other_pos = other_flower_positions[0]
-    other_color = state.object_color_grid[other_pos[0], other_pos[1]]
+    other_color = state.object_state.color[other_pos[0], other_pos[1]]
     # Should not be the empty color
     assert not jnp.allclose(other_color, expected_empty_color)
 
@@ -1798,7 +1814,7 @@ def test_object_color_grid_cleared_on_expiry():
     obs, state = env.reset(key_reset, env.default_params)
 
     # Find an object position
-    obj_positions = jnp.argwhere(state.object_grid == 1)
+    obj_positions = jnp.argwhere(state.object_state.object_id == 1)
     obj_pos = obj_positions[0]
     y, x = obj_pos
 
@@ -1810,7 +1826,7 @@ def test_object_color_grid_cleared_on_expiry():
         )
 
     # Object should have expired and color should be cleared
-    expired_color = state.object_color_grid[y, x]
+    expired_color = state.object_state.color[y, x]
     expected_empty_color = jnp.array([255, 255, 255], dtype=jnp.uint8)
     chex.assert_trees_all_equal(expired_color, expected_empty_color)
 
@@ -1856,8 +1872,8 @@ def test_biome_regeneration_preserves_old_objects():
     obs, state = env.reset(key_reset, env.default_params)
 
     # Store initial object grid and object state
-    initial_object_grid = state.object_grid.copy()
-    initial_object_state_grid = state.object_state_grid.copy()
+    initial_object_grid = state.object_state.object_id.copy()
+    initial_object_state_grid = state.object_state.state_params.copy()
 
     # Consume objects until biome regeneration triggers
     # Directly manipulate state to collect objects and trigger respawn
@@ -1866,8 +1882,8 @@ def test_biome_regeneration_preserves_old_objects():
     # Collect all objects to trigger regeneration
     for y in range(size[1]):
         for x in range(size[0]):
-            if current_state.object_grid[y, x] > 0:
-                obj_id = int(current_state.object_grid[y, x])
+            if current_state.object_state.object_id[y, x] > 0:
+                obj_id = int(current_state.object_state.object_id[y, x])
                 if (
                     obj_id < len(env.object_collectable)
                     and env.object_collectable[obj_id]
@@ -1889,12 +1905,12 @@ def test_biome_regeneration_preserves_old_objects():
 
     # Verify regeneration behavior:
     # 1. Object grid has changed
-    assert not jnp.array_equal(initial_object_grid, current_state.object_grid), (
-        "Object grid should have changed after respawn"
-    )
+    assert not jnp.array_equal(
+        initial_object_grid, current_state.object_state.object_id
+    ), "Object grid should have changed after respawn"
 
     # 2. At least one old object should persist (wasn't replaced by new spawn)
-    biome_0_mask = current_state.biome_grid == 0
+    biome_0_mask = current_state.object_state.biome_id == 0
     old_objects_remaining = 0
     for y in range(size[1]):
         for x in range(size[0]):
@@ -1902,13 +1918,13 @@ def test_biome_regeneration_preserves_old_objects():
                 # Check if this position had an object initially and still has the same object
                 if (
                     initial_object_grid[y, x] > 0
-                    and current_state.object_grid[y, x] > 0
+                    and current_state.object_state.object_id[y, x] > 0
                 ):
                     # For FourierObjects, check if the state parameters are identical
                     # If they are, it's the same object instance (not a new spawn)
                     if jnp.array_equal(
                         initial_object_state_grid[y, x],
-                        current_state.object_state_grid[y, x],
+                        current_state.object_state.state_params[y, x],
                     ):
                         old_objects_remaining += 1
 
@@ -1922,7 +1938,7 @@ def test_biome_regeneration_preserves_old_objects():
     )
 
     # 4. New total objects should be tracked correctly
-    actual_objects = jnp.sum((current_state.object_grid > 0) & biome_0_mask)
+    actual_objects = jnp.sum((current_state.object_state.object_id > 0) & biome_0_mask)
     new_total = current_state.biome_state.total_objects[0]
     assert new_total <= actual_objects, (
         f"New total {new_total} should be <= actual {actual_objects} "
@@ -1967,15 +1983,15 @@ def test_biome_regeneration_updates_only_new_objects():
     initial_params = {}
     for y in range(size[1]):
         for x in range(size[0]):
-            if state.object_grid[y, x] > 0:
-                initial_params[(x, y)] = state.object_state_grid[y, x].copy()
+            if state.object_state.object_id[y, x] > 0:
+                initial_params[(x, y)] = state.object_state.state_params[y, x].copy()
 
     print(f"Initial objects: {len(initial_params)}")
 
     # Force respawn by consuming objects
     current_state = state
-    biome_mask = state.biome_grid == 0
-    objects_in_biome = jnp.sum((state.object_grid > 0) & biome_mask)
+    biome_mask = state.object_state.biome_id == 0
+    objects_in_biome = jnp.sum((state.object_state.object_id > 0) & biome_mask)
     consumption_needed = int(jnp.ceil(objects_in_biome * 0.5))
 
     collections = 0
@@ -1985,7 +2001,7 @@ def test_biome_regeneration_updates_only_new_objects():
                 collections >= consumption_needed + 10
             ):  # Collect extra to ensure threshold is hit
                 break
-            if biome_mask[y, x] and current_state.object_grid[y, x] > 0:
+            if biome_mask[y, x] and current_state.object_state.object_id[y, x] > 0:
                 current_state = current_state.replace(pos=jnp.array([x, y]))
                 key_step, step_key = jax.random.split(key_step)
                 obs, current_state, reward, done, info = env.step(
@@ -2011,8 +2027,8 @@ def test_biome_regeneration_updates_only_new_objects():
 
     for y in range(size[1]):
         for x in range(size[0]):
-            if current_state.object_grid[y, x] > 0:
-                new_params = current_state.object_state_grid[y, x]
+            if current_state.object_state.object_id[y, x] > 0:
+                new_params = current_state.object_state.state_params[y, x]
 
                 # Check if this position had an object initially
                 if (x, y) in initial_params:
@@ -2077,8 +2093,8 @@ def test_consumption_threshold_per_generation():
     obs, state = env.reset(key_reset, env.default_params)
 
     # Verify initial state
-    biome_mask = state.biome_grid == 0
-    initial_objects = jnp.sum((state.object_grid > 0) & biome_mask)
+    biome_mask = state.object_state.biome_id == 0
+    initial_objects = jnp.sum((state.object_state.object_id > 0) & biome_mask)
     assert initial_objects == 5, f"Should start with 5 objects, got {initial_objects}"
     assert state.biome_state.generation[0] == 0, "Should start at generation 0"
     assert state.biome_state.total_objects[0] == 5, "Should track 5 total objects"
@@ -2088,8 +2104,8 @@ def test_consumption_threshold_per_generation():
     gen0_params = {}
     for y in range(size[1]):
         for x in range(size[0]):
-            if state.object_grid[y, x] > 0:
-                gen0_params[(x, y)] = state.object_state_grid[y, x].copy()
+            if state.object_state.object_id[y, x] > 0:
+                gen0_params[(x, y)] = state.object_state.state_params[y, x].copy()
 
     # Consume 3 objects (>= 50% of 5 = 2.5, so 3 triggers respawn)
     # We need to collect objects by moving onto them, not by teleporting
@@ -2106,7 +2122,7 @@ def test_consumption_threshold_per_generation():
         found = False
         for y in range(size[1]):
             for x in range(size[0]):
-                if current_state.object_grid[y, x] > 0:
+                if current_state.object_state.object_id[y, x] > 0:
                     # Position agent next to object (above it)
                     if y > 0:
                         current_state = current_state.replace(pos=jnp.array([x, y - 1]))
@@ -2146,7 +2162,9 @@ def test_consumption_threshold_per_generation():
     # Verify we have objects from generation 1
     # Note: total visible objects includes both gen 1 (new) and gen 0 (preserved)
     # biome_total_objects tracks only the NEW gen 1 objects spawned
-    gen1_objects_total = jnp.sum((current_state.object_grid > 0) & biome_mask)
+    gen1_objects_total = jnp.sum(
+        (current_state.object_state.object_id > 0) & biome_mask
+    )
     assert gen1_objects_total >= 5, (
         f"Should have at least 5 objects (new gen1 + preserved gen0), got {gen1_objects_total}"
     )
@@ -2158,8 +2176,10 @@ def test_consumption_threshold_per_generation():
     gen1_params = {}
     for y in range(size[1]):
         for x in range(size[0]):
-            if current_state.object_grid[y, x] > 0:
-                gen1_params[(x, y)] = current_state.object_state_grid[y, x].copy()
+            if current_state.object_state.object_id[y, x] > 0:
+                gen1_params[(x, y)] = current_state.object_state.state_params[
+                    y, x
+                ].copy()
 
     # Verify that generation 1 has DIFFERENT parameters than generation 0
     params_different = False
@@ -2178,9 +2198,9 @@ def test_consumption_threshold_per_generation():
         if pos not in gen0_collected_positions:  # Not collected
             # Check if it's still the same object by comparing params
             x, y = pos  # pos is (x, y) tuple
-            if current_state.object_grid[y, x] > 0:
+            if current_state.object_state.object_id[y, x] > 0:
                 if jnp.allclose(
-                    gen0_params[pos], current_state.object_state_grid[y, x]
+                    gen0_params[pos], current_state.object_state.state_params[y, x]
                 ):
                     gen0_remaining_positions.append(pos)
 
@@ -2260,9 +2280,9 @@ def test_biome_respawn_maintains_total_object_count_nondeterministic():
     obs, state = env.reset(key_reset, env.default_params)
 
     # Record initial object count
-    biome_mask = state.biome_grid == 0
+    biome_mask = state.object_state.biome_id == 0
     initial_total = state.biome_state.total_objects[0]
-    initial_count = jnp.sum((state.object_grid > 0) & biome_mask)
+    initial_count = jnp.sum((state.object_state.object_id > 0) & biome_mask)
 
     assert initial_total == initial_count, "Initial total should match actual count"
 
@@ -2278,7 +2298,7 @@ def test_biome_respawn_maintains_total_object_count_nondeterministic():
             if collected >= target_collections:
                 break
             # Check if there's a collectable object at this position in ORIGINAL state
-            if state.object_grid[y, x] > 0:
+            if state.object_state.object_id[y, x] > 0:
                 # Move agent to this position
                 current_state = current_state.replace(pos=jnp.array([x, y]))
                 # Step to collect
@@ -2299,7 +2319,7 @@ def test_biome_respawn_maintains_total_object_count_nondeterministic():
 
     # Check new object count
     new_total = current_state.biome_state.total_objects[0]
-    new_count_all = jnp.sum((current_state.object_grid > 0) & biome_mask)
+    new_count_all = jnp.sum((current_state.object_state.object_id > 0) & biome_mask)
 
     # The new_total should reflect only NEWLY spawned objects (from this generation)
     # NOT the total including old preserved objects
@@ -2359,9 +2379,9 @@ def test_biome_respawn_maintains_total_object_count_deterministic():
     obs, state = env.reset(key_reset, env.default_params)
 
     # Record initial object count
-    biome_mask = state.biome_grid == 0
+    biome_mask = state.object_state.biome_id == 0
     initial_total = state.biome_state.total_objects[0]
-    initial_count = jnp.sum((state.object_grid > 0) & biome_mask)
+    initial_count = jnp.sum((state.object_state.object_id > 0) & biome_mask)
 
     assert initial_total == initial_count, "Initial total should match actual count"
 
@@ -2377,7 +2397,7 @@ def test_biome_respawn_maintains_total_object_count_deterministic():
             if collected >= target_collections:
                 break
             # Check if there's a collectable object at this position in ORIGINAL state
-            if state.object_grid[y, x] > 0:
+            if state.object_state.object_id[y, x] > 0:
                 # Move agent to this position
                 current_state = current_state.replace(pos=jnp.array([x, y]))
                 # Take NOOP action to collect
@@ -2398,7 +2418,7 @@ def test_biome_respawn_maintains_total_object_count_deterministic():
 
     # Check new object count
     new_total = current_state.biome_state.total_objects[0]
-    new_count_all = jnp.sum((current_state.object_grid > 0) & biome_mask)
+    new_count_all = jnp.sum((current_state.object_state.object_id > 0) & biome_mask)
 
     assert new_total == initial_total, (
         f"New total {new_total} should equal initial total {initial_total} "
@@ -2448,8 +2468,8 @@ def test_empty_object_has_no_sampled_color():
     obs, state = env.reset(key, env.default_params)
 
     # Check that all EMPTY positions (object_grid == 0) have color [255, 255, 255]
-    empty_mask = state.object_grid == 0
-    empty_colors = state.object_color_grid[empty_mask]
+    empty_mask = state.object_state.object_id == 0
+    empty_colors = state.object_state.color[empty_mask]
 
     # All empty positions should have [255, 255, 255] color (default empty color)
     expected_empty_color = jnp.full(3, 255, dtype=jnp.uint8)
@@ -2461,8 +2481,8 @@ def test_empty_object_has_no_sampled_color():
     print(f"Found {jnp.sum(empty_mask)} empty positions, all with [0, 0, 0] color")
 
     # Additionally check that non-empty objects DO have colors
-    non_empty_mask = state.object_grid > 0
-    non_empty_colors = state.object_color_grid[non_empty_mask]
+    non_empty_mask = state.object_state.object_id > 0
+    non_empty_colors = state.object_state.color[non_empty_mask]
 
     # At least some non-empty objects should have non-zero colors
     has_color = jnp.any(non_empty_colors != 0, axis=1)

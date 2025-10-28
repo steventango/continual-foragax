@@ -51,7 +51,9 @@ def test_foragax_weather_v4_deterministic_spawn():
     _, state2 = env.reset(key, params)
 
     # Object grids should be identical (deterministic spawn)
-    chex.assert_trees_all_equal(state1.object_grid, state2.object_grid)
+    chex.assert_trees_all_equal(
+        state1.object_state.object_id, state2.object_state.object_id
+    )
 
     # But different keys should produce different placements
     key1 = jax.random.key(42)
@@ -60,13 +62,15 @@ def test_foragax_weather_v4_deterministic_spawn():
     _, state2 = env.reset(key2, params)
 
     # Should be different (shuffled deterministically)
-    assert not jnp.array_equal(state1.object_grid, state2.object_grid)
+    assert not jnp.array_equal(
+        state1.object_state.object_id, state2.object_state.object_id
+    )
 
     # Test that number of objects is the same
-    num_hot_1 = jnp.sum(state1.object_grid == 1)
-    num_cold_1 = jnp.sum(state1.object_grid == 2)
-    num_hot_2 = jnp.sum(state2.object_grid == 1)
-    num_cold_2 = jnp.sum(state2.object_grid == 2)
+    num_hot_1 = jnp.sum(state1.object_state.object_id == 1)
+    num_cold_1 = jnp.sum(state1.object_state.object_id == 2)
+    num_hot_2 = jnp.sum(state2.object_state.object_id == 1)
+    num_cold_2 = jnp.sum(state2.object_state.object_id == 2)
     assert num_hot_1 == num_hot_2
     assert num_cold_1 == num_cold_2
 
@@ -144,7 +148,9 @@ def test_foragax_weather_v5_deterministic_spawn():
     _, state2 = env.reset(key, params)
 
     # Object grids should be identical (deterministic spawn)
-    chex.assert_trees_all_equal(state1.object_grid, state2.object_grid)
+    chex.assert_trees_all_equal(
+        state1.object_state.object_id, state2.object_state.object_id
+    )
 
     # But different keys should produce different placements
     key1 = jax.random.key(42)
@@ -153,13 +159,15 @@ def test_foragax_weather_v5_deterministic_spawn():
     _, state2 = env.reset(key2, params)
 
     # Should be different (shuffled deterministically)
-    assert not jnp.array_equal(state1.object_grid, state2.object_grid)
+    assert not jnp.array_equal(
+        state1.object_state.object_id, state2.object_state.object_id
+    )
 
     # Test that number of objects is the same
-    num_hot_1 = jnp.sum(state1.object_grid == 1)
-    num_cold_1 = jnp.sum(state1.object_grid == 2)
-    num_hot_2 = jnp.sum(state2.object_grid == 1)
-    num_cold_2 = jnp.sum(state2.object_grid == 2)
+    num_hot_1 = jnp.sum(state1.object_state.object_id == 1)
+    num_cold_1 = jnp.sum(state1.object_state.object_id == 2)
+    num_hot_2 = jnp.sum(state2.object_state.object_id == 1)
+    num_cold_2 = jnp.sum(state2.object_state.object_id == 2)
     assert num_hot_1 == num_hot_2
     assert num_cold_1 == num_cold_2
 
@@ -236,7 +244,9 @@ def test_foragax_twobiome_v10_deterministic_spawn():
     _, state2 = env.reset(key, params)
 
     # Object grids should be identical (deterministic spawn)
-    chex.assert_trees_all_equal(state1.object_grid, state2.object_grid)
+    chex.assert_trees_all_equal(
+        state1.object_state.object_id, state2.object_state.object_id
+    )
 
     # But different keys should produce different placements
     key1 = jax.random.key(42)
@@ -245,17 +255,19 @@ def test_foragax_twobiome_v10_deterministic_spawn():
     _, state2 = env.reset(key2, params)
 
     # Should be different (shuffled deterministically)
-    assert not jnp.array_equal(state1.object_grid, state2.object_grid)
+    assert not jnp.array_equal(
+        state1.object_state.object_id, state2.object_state.object_id
+    )
 
     # Test that number of objects is the same
-    num_morel_1 = jnp.sum(state1.object_grid == 1)
-    num_oyster_1 = jnp.sum(state1.object_grid == 2)
-    num_deathcap_1 = jnp.sum(state1.object_grid == 3)
-    num_fake_1 = jnp.sum(state1.object_grid == 4)
-    num_morel_2 = jnp.sum(state2.object_grid == 1)
-    num_oyster_2 = jnp.sum(state2.object_grid == 2)
-    num_deathcap_2 = jnp.sum(state2.object_grid == 3)
-    num_fake_2 = jnp.sum(state2.object_grid == 4)
+    num_morel_1 = jnp.sum(state1.object_state.object_id == 1)
+    num_oyster_1 = jnp.sum(state1.object_state.object_id == 2)
+    num_deathcap_1 = jnp.sum(state1.object_state.object_id == 3)
+    num_fake_1 = jnp.sum(state1.object_state.object_id == 4)
+    num_morel_2 = jnp.sum(state2.object_state.object_id == 1)
+    num_oyster_2 = jnp.sum(state2.object_state.object_id == 2)
+    num_deathcap_2 = jnp.sum(state2.object_state.object_id == 3)
+    num_fake_2 = jnp.sum(state2.object_state.object_id == 4)
     assert num_morel_1 == num_morel_2
     assert num_oyster_1 == num_oyster_2
     assert num_deathcap_1 == num_deathcap_2
@@ -336,7 +348,9 @@ def test_foragax_twobiome_v13_deterministic_spawn():
     _, state2 = env.reset(key, params)
 
     # Object grids should be identical (deterministic spawn)
-    chex.assert_trees_all_equal(state1.object_grid, state2.object_grid)
+    chex.assert_trees_all_equal(
+        state1.object_state.object_id, state2.object_state.object_id
+    )
 
     # But different keys should produce different placements
     key1 = jax.random.key(42)
@@ -345,17 +359,19 @@ def test_foragax_twobiome_v13_deterministic_spawn():
     _, state2 = env.reset(key2, params)
 
     # Should be different (shuffled deterministically)
-    assert not jnp.array_equal(state1.object_grid, state2.object_grid)
+    assert not jnp.array_equal(
+        state1.object_state.object_id, state2.object_state.object_id
+    )
 
     # Test that number of objects is the same
-    num_morel_1 = jnp.sum(state1.object_grid == 1)
-    num_oyster_1 = jnp.sum(state1.object_grid == 2)
-    num_deathcap_1 = jnp.sum(state1.object_grid == 3)
-    num_fake_1 = jnp.sum(state1.object_grid == 4)
-    num_morel_2 = jnp.sum(state2.object_grid == 1)
-    num_oyster_2 = jnp.sum(state2.object_grid == 2)
-    num_deathcap_2 = jnp.sum(state2.object_grid == 3)
-    num_fake_2 = jnp.sum(state2.object_grid == 4)
+    num_morel_1 = jnp.sum(state1.object_state.object_id == 1)
+    num_oyster_1 = jnp.sum(state1.object_state.object_id == 2)
+    num_deathcap_1 = jnp.sum(state1.object_state.object_id == 3)
+    num_fake_1 = jnp.sum(state1.object_state.object_id == 4)
+    num_morel_2 = jnp.sum(state2.object_state.object_id == 1)
+    num_oyster_2 = jnp.sum(state2.object_state.object_id == 2)
+    num_deathcap_2 = jnp.sum(state2.object_state.object_id == 3)
+    num_fake_2 = jnp.sum(state2.object_state.object_id == 4)
     assert num_morel_1 == num_morel_2
     assert num_oyster_1 == num_oyster_2
     assert num_deathcap_1 == num_deathcap_2
@@ -544,8 +560,11 @@ def test_foragax_diwali_v1_creation():
     obs, state = env.reset(key, env.default_params)
 
     # Check state has new fields
-    assert hasattr(state, "object_color_grid"), "State should have object_color_grid"
-    assert hasattr(state, "object_state_grid"), "State should have object_state_grid"
+    assert hasattr(state, "object_state"), "State should have object_state"
+    assert hasattr(state.object_state, "color"), "ObjectState should have color"
+    assert hasattr(state.object_state, "state_params"), (
+        "ObjectState should have state_params"
+    )
     assert hasattr(state, "biome_state"), "State should have biome_state"
     assert hasattr(state.biome_state, "consumption_count"), (
         "BiomeState should have consumption_count"
@@ -556,8 +575,10 @@ def test_foragax_diwali_v1_creation():
     assert hasattr(state.biome_state, "generation"), "BiomeState should have generation"
 
     # Check shapes
-    chex.assert_shape(state.object_color_grid, (15, 15, 3))
-    chex.assert_shape(state.object_state_grid, (15, 15, 22))  # 2 + 2*10 = 22 params
+    chex.assert_shape(state.object_state.color, (15, 15, 3))
+    chex.assert_shape(
+        state.object_state.state_params, (15, 15, 22)
+    )  # 2 + 2*10 = 22 params
     chex.assert_shape(state.biome_state.consumption_count, (2,))  # 2 biomes
     chex.assert_shape(state.biome_state.total_objects, (2,))
     chex.assert_shape(state.biome_state.generation, (2,))
