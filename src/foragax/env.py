@@ -431,6 +431,91 @@ class ForagaxEnv(environment.Environment):
 
         # 3.5. HANDLE OBJECT EXPIRY
         # Only process expiry if there are objects that can expire
+        key = self.expire_objects(key, state, num_obj_types, object_grid, object_spawn_time_grid, object_color_grid)
+
+        # 3.6. HANDLE DYNAMIC BIOME CONSUMPTION AND RESPAWNING
+        object_generation_grid = state.object_generation_grid
+        # object_color_grid is already updated above
+        object_state_grid = state.object_state_grid
+
+        if self.dynamic_biomes:
+            # Update consumption count if an object was collected
+            # Only count if the object belongs to the current generation of its biome
+            collected_biome_id = state.biome_grid[pos[1], pos[0]]
+            object_gen_at_pos = state.object_generation_grid[pos[1], pos[0]]
+            current_biome_gen = state.biome_state.generation[collected_biome_id]
+            is_current_generation = object_gen_at_pos == current_biome_gen
+
+            biome_consumption_count = state.biome_state.consumption_count
+            biome_consumption_count = jax.lax.cond(
+                should_collect & is_current_generation,
+                lambda: biome_consumption_count.at[collected_biome_id].add(1),
+                lambda: biome_consumption_count,
+            )
+
+            # Check each biome for threshold crossing and respawn if needed
+            key, respawn_key = jax.random.split(key)
+            biome_state = BiomeState(
+                consumption_count=biome_consumption_count,
+                total_objects=state.biome_state.total_objects,
+                generation=state.biome_state.generation,
+            )
+            (
+                object_grid,
+                object_color_grid,
+                object_state_grid,
+                biome_state,
+                object_spawn_time_grid,
+                object_generation_grid,
+                respawn_key,
+            ) = self._check_and_respawn_biomes(
+                object_grid,
+                object_color_grid,
+                object_state_grid,
+                biome_state,
+                object_spawn_time_grid,
+                state.object_generation_grid,
+                state.time,
+                respawn_key,
+            )
+        else:
+            biome_state = state.biome_state
+
+        info = {"discount": self.discount(state, params)}
+        temperatures = jnp.zeros(len(self.objects))
+        for obj_index, obj in enumerate(self.objects):
+            if isinstance(obj, WeatherObject):
+                temperatures = temperatures.at[obj_index].set(
+                    get_temperature(obj.rewards, state.time, obj.repeat)
+                )
+        info["temperatures"] = temperatures
+        info["biome_id"] = state.biome_grid[pos[1], pos[0]]
+        info["object_collected_id"] = jax.lax.select(should_collect, obj_at_pos, -1)
+
+        # 4. UPDATE STATE
+        state = EnvState(
+            pos=pos,
+            object_grid=object_grid,
+            biome_grid=state.biome_grid,
+            time=state.time + 1,
+            digestion_buffer=digestion_buffer,
+            object_spawn_time_grid=object_spawn_time_grid,
+            object_color_grid=object_color_grid,
+            object_state_grid=object_state_grid,
+            biome_state=biome_state,
+            object_generation_grid=object_generation_grid,
+        )
+
+        done = self.is_terminal(state, params)
+        return (
+            jax.lax.stop_gradient(self.get_obs(state, params)),
+            jax.lax.stop_gradient(state),
+            reward,
+            done,
+            info,
+        )
+
+    def expire_objects(self, key, state, num_obj_types, object_grid, object_spawn_time_grid, object_color_grid):
         if self.has_expiring_objects:
             # Check each cell for objects that have exceeded their expiry time
             current_objects_for_expiry = jnp.maximum(0, object_grid)
@@ -535,87 +620,7 @@ class ForagaxEnv(environment.Environment):
                 )
             )
 
-        # 3.6. HANDLE DYNAMIC BIOME CONSUMPTION AND RESPAWNING
-        object_generation_grid = state.object_generation_grid
-        # object_color_grid is already updated above
-        object_state_grid = state.object_state_grid
-
-        if self.dynamic_biomes:
-            # Update consumption count if an object was collected
-            # Only count if the object belongs to the current generation of its biome
-            collected_biome_id = state.biome_grid[pos[1], pos[0]]
-            object_gen_at_pos = state.object_generation_grid[pos[1], pos[0]]
-            current_biome_gen = state.biome_state.generation[collected_biome_id]
-            is_current_generation = object_gen_at_pos == current_biome_gen
-
-            biome_consumption_count = state.biome_state.consumption_count
-            biome_consumption_count = jax.lax.cond(
-                should_collect & is_current_generation,
-                lambda: biome_consumption_count.at[collected_biome_id].add(1),
-                lambda: biome_consumption_count,
-            )
-
-            # Check each biome for threshold crossing and respawn if needed
-            key, respawn_key = jax.random.split(key)
-            biome_state = BiomeState(
-                consumption_count=biome_consumption_count,
-                total_objects=state.biome_state.total_objects,
-                generation=state.biome_state.generation,
-            )
-            (
-                object_grid,
-                object_color_grid,
-                object_state_grid,
-                biome_state,
-                object_spawn_time_grid,
-                object_generation_grid,
-                respawn_key,
-            ) = self._check_and_respawn_biomes(
-                object_grid,
-                object_color_grid,
-                object_state_grid,
-                biome_state,
-                object_spawn_time_grid,
-                state.object_generation_grid,
-                state.time,
-                respawn_key,
-            )
-        else:
-            biome_state = state.biome_state
-
-        info = {"discount": self.discount(state, params)}
-        temperatures = jnp.zeros(len(self.objects))
-        for obj_index, obj in enumerate(self.objects):
-            if isinstance(obj, WeatherObject):
-                temperatures = temperatures.at[obj_index].set(
-                    get_temperature(obj.rewards, state.time, obj.repeat)
-                )
-        info["temperatures"] = temperatures
-        info["biome_id"] = state.biome_grid[pos[1], pos[0]]
-        info["object_collected_id"] = jax.lax.select(should_collect, obj_at_pos, -1)
-
-        # 4. UPDATE STATE
-        state = EnvState(
-            pos=pos,
-            object_grid=object_grid,
-            biome_grid=state.biome_grid,
-            time=state.time + 1,
-            digestion_buffer=digestion_buffer,
-            object_spawn_time_grid=object_spawn_time_grid,
-            object_color_grid=object_color_grid,
-            object_state_grid=object_state_grid,
-            biome_state=biome_state,
-            object_generation_grid=object_generation_grid,
-        )
-
-        done = self.is_terminal(state, params)
-        return (
-            jax.lax.stop_gradient(self.get_obs(state, params)),
-            jax.lax.stop_gradient(state),
-            reward,
-            done,
-            info,
-        )
+        return key
 
     def _check_and_respawn_biomes(
         self,
