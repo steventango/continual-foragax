@@ -16,7 +16,7 @@ def test_benchmark_vision(benchmark):
     grid = grid.at[4, 3].set(1)
     grid = grid.at[5, 3].set(1)
     grid = grid.at[2, 0].set(1)
-    state = state.replace(object_grid=grid)
+    state = state.replace(object_state=state.object_state.replace(object_id=grid))
 
     @jax.jit
     def _run(state, key):

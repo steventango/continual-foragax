@@ -2,6 +2,7 @@ import chex
 import jax
 import jax.numpy as jnp
 
+from foragax.objects import FourierObject
 from foragax.registry import make
 
 
@@ -49,7 +50,9 @@ def test_foragax_weather_v4_deterministic_spawn():
     _, state2 = env.reset(key, params)
 
     # Object grids should be identical (deterministic spawn)
-    chex.assert_trees_all_equal(state1.object_grid, state2.object_grid)
+    chex.assert_trees_all_equal(
+        state1.object_state.object_id, state2.object_state.object_id
+    )
 
     # But different keys should produce different placements
     key1 = jax.random.key(42)
@@ -58,13 +61,15 @@ def test_foragax_weather_v4_deterministic_spawn():
     _, state2 = env.reset(key2, params)
 
     # Should be different (shuffled deterministically)
-    assert not jnp.array_equal(state1.object_grid, state2.object_grid)
+    assert not jnp.array_equal(
+        state1.object_state.object_id, state2.object_state.object_id
+    )
 
     # Test that number of objects is the same
-    num_hot_1 = jnp.sum(state1.object_grid == 1)
-    num_cold_1 = jnp.sum(state1.object_grid == 2)
-    num_hot_2 = jnp.sum(state2.object_grid == 1)
-    num_cold_2 = jnp.sum(state2.object_grid == 2)
+    num_hot_1 = jnp.sum(state1.object_state.object_id == 1)
+    num_cold_1 = jnp.sum(state1.object_state.object_id == 2)
+    num_hot_2 = jnp.sum(state2.object_state.object_id == 1)
+    num_cold_2 = jnp.sum(state2.object_state.object_id == 2)
     assert num_hot_1 == num_hot_2
     assert num_cold_1 == num_cold_2
 
@@ -142,7 +147,9 @@ def test_foragax_weather_v5_deterministic_spawn():
     _, state2 = env.reset(key, params)
 
     # Object grids should be identical (deterministic spawn)
-    chex.assert_trees_all_equal(state1.object_grid, state2.object_grid)
+    chex.assert_trees_all_equal(
+        state1.object_state.object_id, state2.object_state.object_id
+    )
 
     # But different keys should produce different placements
     key1 = jax.random.key(42)
@@ -151,13 +158,15 @@ def test_foragax_weather_v5_deterministic_spawn():
     _, state2 = env.reset(key2, params)
 
     # Should be different (shuffled deterministically)
-    assert not jnp.array_equal(state1.object_grid, state2.object_grid)
+    assert not jnp.array_equal(
+        state1.object_state.object_id, state2.object_state.object_id
+    )
 
     # Test that number of objects is the same
-    num_hot_1 = jnp.sum(state1.object_grid == 1)
-    num_cold_1 = jnp.sum(state1.object_grid == 2)
-    num_hot_2 = jnp.sum(state2.object_grid == 1)
-    num_cold_2 = jnp.sum(state2.object_grid == 2)
+    num_hot_1 = jnp.sum(state1.object_state.object_id == 1)
+    num_cold_1 = jnp.sum(state1.object_state.object_id == 2)
+    num_hot_2 = jnp.sum(state2.object_state.object_id == 1)
+    num_cold_2 = jnp.sum(state2.object_state.object_id == 2)
     assert num_hot_1 == num_hot_2
     assert num_cold_1 == num_cold_2
 
@@ -234,7 +243,9 @@ def test_foragax_twobiome_v10_deterministic_spawn():
     _, state2 = env.reset(key, params)
 
     # Object grids should be identical (deterministic spawn)
-    chex.assert_trees_all_equal(state1.object_grid, state2.object_grid)
+    chex.assert_trees_all_equal(
+        state1.object_state.object_id, state2.object_state.object_id
+    )
 
     # But different keys should produce different placements
     key1 = jax.random.key(42)
@@ -243,17 +254,19 @@ def test_foragax_twobiome_v10_deterministic_spawn():
     _, state2 = env.reset(key2, params)
 
     # Should be different (shuffled deterministically)
-    assert not jnp.array_equal(state1.object_grid, state2.object_grid)
+    assert not jnp.array_equal(
+        state1.object_state.object_id, state2.object_state.object_id
+    )
 
     # Test that number of objects is the same
-    num_morel_1 = jnp.sum(state1.object_grid == 1)
-    num_oyster_1 = jnp.sum(state1.object_grid == 2)
-    num_deathcap_1 = jnp.sum(state1.object_grid == 3)
-    num_fake_1 = jnp.sum(state1.object_grid == 4)
-    num_morel_2 = jnp.sum(state2.object_grid == 1)
-    num_oyster_2 = jnp.sum(state2.object_grid == 2)
-    num_deathcap_2 = jnp.sum(state2.object_grid == 3)
-    num_fake_2 = jnp.sum(state2.object_grid == 4)
+    num_morel_1 = jnp.sum(state1.object_state.object_id == 1)
+    num_oyster_1 = jnp.sum(state1.object_state.object_id == 2)
+    num_deathcap_1 = jnp.sum(state1.object_state.object_id == 3)
+    num_fake_1 = jnp.sum(state1.object_state.object_id == 4)
+    num_morel_2 = jnp.sum(state2.object_state.object_id == 1)
+    num_oyster_2 = jnp.sum(state2.object_state.object_id == 2)
+    num_deathcap_2 = jnp.sum(state2.object_state.object_id == 3)
+    num_fake_2 = jnp.sum(state2.object_state.object_id == 4)
     assert num_morel_1 == num_morel_2
     assert num_oyster_1 == num_oyster_2
     assert num_deathcap_1 == num_deathcap_2
@@ -334,7 +347,9 @@ def test_foragax_twobiome_v13_deterministic_spawn():
     _, state2 = env.reset(key, params)
 
     # Object grids should be identical (deterministic spawn)
-    chex.assert_trees_all_equal(state1.object_grid, state2.object_grid)
+    chex.assert_trees_all_equal(
+        state1.object_state.object_id, state2.object_state.object_id
+    )
 
     # But different keys should produce different placements
     key1 = jax.random.key(42)
@@ -343,17 +358,19 @@ def test_foragax_twobiome_v13_deterministic_spawn():
     _, state2 = env.reset(key2, params)
 
     # Should be different (shuffled deterministically)
-    assert not jnp.array_equal(state1.object_grid, state2.object_grid)
+    assert not jnp.array_equal(
+        state1.object_state.object_id, state2.object_state.object_id
+    )
 
     # Test that number of objects is the same
-    num_morel_1 = jnp.sum(state1.object_grid == 1)
-    num_oyster_1 = jnp.sum(state1.object_grid == 2)
-    num_deathcap_1 = jnp.sum(state1.object_grid == 3)
-    num_fake_1 = jnp.sum(state1.object_grid == 4)
-    num_morel_2 = jnp.sum(state2.object_grid == 1)
-    num_oyster_2 = jnp.sum(state2.object_grid == 2)
-    num_deathcap_2 = jnp.sum(state2.object_grid == 3)
-    num_fake_2 = jnp.sum(state2.object_grid == 4)
+    num_morel_1 = jnp.sum(state1.object_state.object_id == 1)
+    num_oyster_1 = jnp.sum(state1.object_state.object_id == 2)
+    num_deathcap_1 = jnp.sum(state1.object_state.object_id == 3)
+    num_fake_1 = jnp.sum(state1.object_state.object_id == 4)
+    num_morel_2 = jnp.sum(state2.object_state.object_id == 1)
+    num_oyster_2 = jnp.sum(state2.object_state.object_id == 2)
+    num_deathcap_2 = jnp.sum(state2.object_state.object_id == 3)
+    num_fake_2 = jnp.sum(state2.object_state.object_id == 4)
     assert num_morel_1 == num_morel_2
     assert num_oyster_1 == num_oyster_2
     assert num_deathcap_1 == num_deathcap_2
@@ -518,3 +535,217 @@ def test_foragax_twobiome_v17_expiry():
     assert env.object_expiry_time[2] == 500  # oyster
     assert env.object_expiry_time[3] == 500  # deathcap
     assert env.object_expiry_time[4] == 500  # fake
+
+
+def test_foragax_diwali_v1_creation():
+    """Test that ForagaxDiwali-v1 can be created and initialized."""
+    env = make("ForagaxDiwali-v1", observation_type="object", aperture_size=(5, 5))
+
+    # Check that dynamic biomes are enabled
+    assert env.dynamic_biomes, "Dynamic biomes should be enabled for ForagaxDiwali-v1"
+    assert env.biome_consumption_threshold == 0.9, "Threshold should be 0.9"
+    assert env.num_fourier_terms == 10, "Should have 10 Fourier terms"
+
+    # Check that objects are FourierObjects
+    assert isinstance(env.objects[1], FourierObject), (
+        "First object should be FourierObject"
+    )
+    assert isinstance(env.objects[2], FourierObject), (
+        "Second object should be FourierObject"
+    )
+
+    # Initialize environment
+    key = jax.random.key(0)
+    obs, state = env.reset(key, env.default_params)
+
+    # Check state has new fields
+    assert hasattr(state, "object_state"), "State should have object_state"
+    assert hasattr(state.object_state, "color"), "ObjectState should have color"
+    assert hasattr(state.object_state, "state_params"), (
+        "ObjectState should have state_params"
+    )
+    assert hasattr(state, "biome_state"), "State should have biome_state"
+    assert hasattr(state.biome_state, "consumption_count"), (
+        "BiomeState should have consumption_count"
+    )
+    assert hasattr(state.biome_state, "total_objects"), (
+        "BiomeState should have total_objects"
+    )
+    assert hasattr(state.biome_state, "generation"), "BiomeState should have generation"
+
+    # Check shapes
+    chex.assert_shape(state.object_state.color, (15, 15, 3))
+    chex.assert_shape(
+        state.object_state.state_params, (15, 15, 22)
+    )  # 2 + 2*10 = 22 params
+    chex.assert_shape(state.biome_state.consumption_count, (2,))  # 2 biomes
+    chex.assert_shape(state.biome_state.total_objects, (2,))
+    chex.assert_shape(state.biome_state.generation, (2,))
+
+    # Check initial generation is 0
+    assert jnp.all(state.biome_state.generation == 0), "Initial generation should be 0"
+
+
+def test_foragax_sine_twobiome_v1_creation():
+    """Test that ForagaxSineTwoBiome-v1 can be created and initialized."""
+    env = make("ForagaxSineTwoBiome-v1", observation_type="color", aperture_size=(5, 5))
+
+    # Check basic configuration
+    assert env.name == "ForagaxSineTwoBiome-v1"
+    assert env.size == (15, 15)
+    assert env.nowrap is False, "ForagaxSineTwoBiome-v1 should not have nowrap"
+    assert len(env.objects) == 5, "Should have 5 objects (EMPTY + 4 sine objects)"
+    assert len(env.biome_masks) == 2, "Should have 2 biomes"
+
+    # Check object names
+    object_names = [obj.name for obj in env.objects]
+    assert object_names == [
+        "empty",
+        "oyster_sine_1",
+        "deathcap_sine_1",
+        "oyster_sine_2",
+        "deathcap_sine_2",
+    ], "Should have correct object names"
+
+    # Check that all sine objects have correct base properties
+    from foragax.objects import SineObject
+
+    assert isinstance(env.objects[1], SineObject), "Object 1 should be SineObject"
+    assert isinstance(env.objects[2], SineObject), "Object 2 should be SineObject"
+    assert isinstance(env.objects[3], SineObject), "Object 3 should be SineObject"
+    assert isinstance(env.objects[4], SineObject), "Object 4 should be SineObject"
+
+    # Check sine object parameters
+    oyster1 = env.objects[1]
+    deathcap1 = env.objects[2]
+    oyster2 = env.objects[3]
+    deathcap2 = env.objects[4]
+
+    # Check base rewards
+    assert oyster1.base_reward == 10.0, "Biome 1 Oyster should have base reward +10"
+    assert deathcap1.base_reward == -10.0, (
+        "Biome 1 DeathCap should have base reward -10"
+    )
+    assert oyster2.base_reward == -10.0, "Biome 2 Oyster should have base reward -10"
+    assert deathcap2.base_reward == 10.0, "Biome 2 DeathCap should have base reward +10"
+
+    # Check amplitude and period
+    for obj in [oyster1, deathcap1, oyster2, deathcap2]:
+        assert obj.amplitude == 20.0, "All objects should have amplitude 20"
+        assert obj.period == 1000, "All objects should have period 1000"
+
+    # Check phase shift (Biome 2 should be inverted)
+    assert oyster1.phase == 0.0, "Biome 1 Oyster should have phase 0"
+    assert deathcap1.phase == 0.0, "Biome 1 DeathCap should have phase 0"
+    assert oyster2.phase == jnp.pi, "Biome 2 Oyster should have phase π"
+    assert deathcap2.phase == jnp.pi, "Biome 2 DeathCap should have phase π"
+
+    # Initialize environment
+    key = jax.random.key(0)
+    obs, state = env.reset(key, env.default_params)
+
+    # Check observation shape (2 color channels: oyster and deathcap)
+    assert obs.shape == (5, 5, 2), "Observation should have shape (5, 5, 2)"
+
+    # Check complementary rewards
+    key = jax.random.key(42)
+    for t in [0, 250, 500, 750, 1000]:
+        r1 = env.objects[1].reward(t, key, None)
+        r2 = env.objects[3].reward(t, key, None)
+        sum_reward = r1 + r2
+        assert jnp.abs(sum_reward) < 0.01, (
+            f"Complementary rewards should sum to 0 at t={t}, got {sum_reward}"
+        )
+
+    # Test stepping
+    key, step_key = jax.random.split(key)
+    action = env.action_space(env.default_params).sample(step_key)
+    obs2, state2, reward, done, info = env.step(
+        step_key, state, action, env.default_params
+    )
+    assert obs2.shape == (5, 5, 2), "Observation should maintain shape after step"
+    assert not done, "Environment should not terminate"
+
+
+def test_sine_twobiome_environment():
+    """Test the SineTwoBiome environment with dynamic sine rewards."""
+    env = make("ForagaxSineTwoBiome-v1", aperture_size=(5, 5), observation_type="color")
+
+    # Check environment configuration
+    assert env.name == "ForagaxSineTwoBiome-v1"
+    assert env.size == (15, 15)
+    assert len(env.objects) == 5  # EMPTY + 4 sine objects
+    assert len(env.biome_masks) == 2  # Two biomes
+
+    # Check object names
+    object_names = [obj.name for obj in env.objects]
+    assert object_names == [
+        "empty",
+        "oyster_sine_1",
+        "deathcap_sine_1",
+        "oyster_sine_2",
+        "deathcap_sine_2",
+    ]
+
+    # Test sine reward behavior
+    key = jax.random.key(42)
+
+    # At t=0: sine = 0
+    # Biome 1: Oyster = 10 + 20*0 = 10, DeathCap = -10 + 20*0 = -10
+    # Biome 2: Oyster = -10 + 20*0 = -10, DeathCap = 10 + 20*0 = 10
+    t0_rewards = [env.objects[i].reward(0, key, None) for i in range(1, 5)]
+    assert jnp.allclose(t0_rewards[0], 10.0, atol=0.01)  # Biome 1 Oyster
+    assert jnp.allclose(t0_rewards[1], -10.0, atol=0.01)  # Biome 1 DeathCap
+    assert jnp.allclose(t0_rewards[2], -10.0, atol=0.01)  # Biome 2 Oyster
+    assert jnp.allclose(t0_rewards[3], 10.0, atol=0.01)  # Biome 2 DeathCap
+
+    # At t=250 (quarter period): sine = 1 for biome 1, sine = -1 for biome 2
+    # Biome 1: Oyster = 10 + 20*1 = 30, DeathCap = -10 + 20*1 = 10
+    # Biome 2: Oyster = -10 + 20*(-1) = -30, DeathCap = 10 + 20*(-1) = -10
+    t250_rewards = [env.objects[i].reward(250, key, None) for i in range(1, 5)]
+    assert jnp.allclose(t250_rewards[0], 30.0, atol=0.01)  # Biome 1 Oyster
+    assert jnp.allclose(t250_rewards[1], 10.0, atol=0.01)  # Biome 1 DeathCap
+    assert jnp.allclose(t250_rewards[2], -30.0, atol=0.01)  # Biome 2 Oyster
+    assert jnp.allclose(t250_rewards[3], -10.0, atol=0.01)  # Biome 2 DeathCap
+
+    # At t=500 (half period): sine = 0 again
+    t500_rewards = [env.objects[i].reward(500, key, None) for i in range(1, 5)]
+    assert jnp.allclose(t500_rewards[0], 10.0, atol=0.01)  # Biome 1 Oyster
+    assert jnp.allclose(t500_rewards[1], -10.0, atol=0.01)  # Biome 1 DeathCap
+    assert jnp.allclose(t500_rewards[2], -10.0, atol=0.01)  # Biome 2 Oyster
+    assert jnp.allclose(t500_rewards[3], 10.0, atol=0.01)  # Biome 2 DeathCap
+
+    # At t=750 (three-quarter period): sine = -1 for biome 1, sine = 1 for biome 2
+    # Biome 1: Oyster = 10 + 20*(-1) = -10, DeathCap = -10 + 20*(-1) = -30
+    # Biome 2: Oyster = -10 + 20*1 = 10, DeathCap = 10 + 20*1 = 30
+    t750_rewards = [env.objects[i].reward(750, key, None) for i in range(1, 5)]
+    assert jnp.allclose(t750_rewards[0], -10.0, atol=0.01)  # Biome 1 Oyster
+    assert jnp.allclose(t750_rewards[1], -30.0, atol=0.01)  # Biome 1 DeathCap
+    assert jnp.allclose(t750_rewards[2], 10.0, atol=0.01)  # Biome 2 Oyster
+    assert jnp.allclose(t750_rewards[3], 30.0, atol=0.01)  # Biome 2 DeathCap
+
+    # Test complementary behavior: Biome 1 + Biome 2 = 0
+    for t in [0, 250, 500, 750, 1000]:
+        b1_oyster = env.objects[1].reward(t, key, None)
+        b2_oyster = env.objects[3].reward(t, key, None)
+        b1_deathcap = env.objects[2].reward(t, key, None)
+        b2_deathcap = env.objects[4].reward(t, key, None)
+
+        # Sum of complementary objects should be 0
+        assert jnp.allclose(b1_oyster + b2_oyster, 0.0, atol=0.01)
+        assert jnp.allclose(b1_deathcap + b2_deathcap, 0.0, atol=0.01)
+
+    # Test environment can be reset and stepped
+    key, key_reset = jax.random.split(key)
+    obs, state = env.reset(key_reset, env.default_params)
+    assert obs.shape == (5, 5, 2)  # Two color channels (oyster and deathcap)
+
+    # Take a few steps
+    for _ in range(10):
+        key, key_act, key_step = jax.random.split(key, 3)
+        action = env.action_space(env.default_params).sample(key_act)
+        obs, state, reward, done, info = env.step(
+            key_step, state, action, env.default_params
+        )
+        assert not done  # Continuing environment
+        assert obs.shape == (5, 5, 2)
