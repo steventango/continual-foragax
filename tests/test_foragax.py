@@ -2509,7 +2509,9 @@ def test_empty_object_has_no_sampled_color():
     for color in empty_colors:
         chex.assert_trees_all_equal(color, expected_empty_color)
 
-    print(f"Found {jnp.sum(empty_mask)} empty positions, all with [255, 255, 255] color")
+    print(
+        f"Found {jnp.sum(empty_mask)} empty positions, all with [255, 255, 255] color"
+    )
 
     # Additionally check that non-empty objects DO have colors
     non_empty_mask = state.object_state.object_id > 0
