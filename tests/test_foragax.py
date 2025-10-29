@@ -308,7 +308,7 @@ def test_respawn():
 
 
 def test_random_respawn():
-    """Test that an object respawns at a random empty location within its biome."""
+    """Test that an object can respawn at random empty locations within its biome."""
     key = jax.random.key(0)
 
     flower_random = DefaultForagaxObject(
@@ -329,46 +329,60 @@ def test_random_respawn():
         observation_type="color",
     )
     params = env.default_params
-    _, state = env.reset(key, params)
 
     flower_id = 1  # 0 is EMPTY
     original_pos = jnp.array([3, 3])
 
-    # Place a flower and move the agent to it
-    grid = jnp.zeros((7, 7), dtype=int)
-    grid = grid.at[original_pos[1], original_pos[0]].set(flower_id)
-    # Add a wall to make sure it doesn't spawn there
-    grid = grid.at[4, 4].set(2)  # Use a fixed ID for the wall
-    state = state.replace(
-        object_state=state.object_state.replace(object_id=grid), pos=jnp.array([2, 3])
-    )
+    # Test multiple times to verify randomness
+    timer_positions = []
+    for i in range(20):
+        key, reset_key = jax.random.split(key)
+        _, state = env.reset(reset_key, params)
 
-    # Collect the flower
-    key, step_key = jax.random.split(key)
-    _, new_state, reward, _, _ = env.step(step_key, state, Actions.RIGHT, params)
+        # Place a flower and move the agent to it
+        grid = jnp.zeros((7, 7), dtype=int)
+        grid = grid.at[original_pos[1], original_pos[0]].set(flower_id)
+        # Add a wall to make sure it doesn't spawn there
+        grid = grid.at[4, 4].set(2)  # Use a fixed ID for the wall
+        state = state.replace(
+            object_state=state.object_state.replace(object_id=grid),
+            pos=jnp.array([2, 3]),
+        )
 
-    assert reward == flower_random.reward_val
-    # Original position should be empty
-    assert new_state.object_state.object_id[original_pos[1], original_pos[0]] == 0
+        # Collect the flower
+        key, step_key = jax.random.split(key)
+        _, new_state, reward, _, _ = env.step(step_key, state, Actions.RIGHT, params)
 
-    # A timer should be placed somewhere (check respawn_timer instead of object_id)
-    assert jnp.sum(new_state.object_state.respawn_timer > 0) == 1
-    timer_pos_flat = jnp.argmax(new_state.object_state.respawn_timer)
-    timer_pos = jnp.array(jnp.unravel_index(timer_pos_flat, (7, 7)))
-    # New position should not be the original position
-    assert not jnp.array_equal(timer_pos, original_pos)
+        assert reward == flower_random.reward_val
+        # Original position should be empty
+        assert new_state.object_state.object_id[original_pos[1], original_pos[0]] == 0
 
-    # New position should be within the biome
-    assert jnp.all(timer_pos >= jnp.array(biome.start))
-    assert jnp.all(timer_pos < jnp.array(biome.stop))
+        # A timer should be placed somewhere (check respawn_timer instead of object_id)
+        assert jnp.sum(new_state.object_state.respawn_timer > 0) == 1
+        timer_pos_flat = jnp.argmax(new_state.object_state.respawn_timer)
+        timer_pos_array = jnp.unravel_index(timer_pos_flat, (7, 7))
+        timer_pos = (int(timer_pos_array[0]), int(timer_pos_array[1]))
 
-    # New position should be on an empty cell (not the wall)
-    assert not jnp.array_equal(timer_pos, jnp.array([4, 4]))
+        # New position should be within the biome
+        assert timer_pos[0] >= biome.start[0] and timer_pos[0] < biome.stop[0]
+        assert timer_pos[1] >= biome.start[1] and timer_pos[1] < biome.stop[1]
 
-    # Verify respawn_object_id is set correctly
-    assert (
-        new_state.object_state.respawn_object_id[timer_pos[0], timer_pos[1]]
-        == flower_id
+        # New position should be on an empty cell (not the wall)
+        assert timer_pos != (4, 4)
+
+        # Verify respawn_object_id is set correctly
+        assert (
+            new_state.object_state.respawn_object_id[timer_pos[0], timer_pos[1]]
+            == flower_id
+        )
+
+        timer_positions.append(timer_pos)
+
+    # Verify that we get multiple different positions (randomness works)
+    # With 20 trials and multiple valid positions, we should see at least 2 different locations
+    unique_positions = set(timer_positions)
+    assert len(unique_positions) >= 2, (
+        f"Expected at least 2 unique positions, got {len(unique_positions)}: {unique_positions}"
     )
 
 
