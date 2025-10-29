@@ -1788,7 +1788,7 @@ def test_object_no_individual_respawn():
 
 
 def test_object_color_grid_cleared_on_collection():
-    """Test that object_color_grid is cleared when objects are collected."""
+    """Test that object colors are preserved in state but masked in rendering when collected."""
     key = jax.random.key(0)
     env = ForagaxEnv(
         size=(7, 7),
@@ -1807,6 +1807,9 @@ def test_object_color_grid_cleared_on_collection():
     flower_pos = flower_positions[0]
     y, x = flower_pos
 
+    # Store original color
+    original_color = state.object_state.color[y, x].copy()
+
     # Move agent to flower and collect it
     # Position agent above the flower so moving down collects it
     state = state.replace(pos=jnp.array([x, y - 1]))
@@ -1815,10 +1818,15 @@ def test_object_color_grid_cleared_on_collection():
 
     assert reward == FLOWER.reward_val
 
-    # Check that the color grid at the collected position is cleared (should be [255, 255, 255])
+    # NEW BEHAVIOR: Color is preserved in state (not cleared to white)
     collected_color = state.object_state.color[y, x]
-    expected_empty_color = jnp.array([255, 255, 255], dtype=jnp.uint8)
-    chex.assert_trees_all_equal(collected_color, expected_empty_color)
+    chex.assert_trees_all_equal(collected_color, original_color)
+
+    # But object_id should be 0 (or timer should be set)
+    assert (
+        state.object_state.object_id[y, x] == 0
+        or state.object_state.respawn_timer[y, x] > 0
+    )
 
     # Check that other positions with objects still have their colors
     other_flower_positions = jnp.argwhere(
@@ -1828,11 +1836,31 @@ def test_object_color_grid_cleared_on_collection():
     other_pos = other_flower_positions[0]
     other_color = state.object_state.color[other_pos[0], other_pos[1]]
     # Should not be the empty color
+    expected_empty_color = jnp.array([255, 255, 255], dtype=jnp.uint8)
     assert not jnp.allclose(other_color, expected_empty_color)
+
+    # Test RGB observation: empty cells should appear white
+    # Create an RGB environment with the same setup
+    env_rgb = ForagaxEnv(
+        size=(7, 7),
+        objects=(FLOWER,),
+        biomes=(Biome(object_frequencies=(1.0,)),),
+        observation_type="rgb",
+        dynamic_biomes=True,
+        aperture_size=-1,  # Use world view to get full grid observation
+    )
+    # Use the same state to get observation
+    obs_rgb = env_rgb.get_obs(state, params)
+
+    # Check that the collected position shows white in RGB observation
+    # RGB observations are normalized to [0, 1], so white is [1.0, 1.0, 1.0]
+    collected_rgb = obs_rgb[y, x]
+    expected_white_rgb = jnp.array([1.0, 1.0, 1.0], dtype=jnp.float32)
+    chex.assert_trees_all_close(collected_rgb, expected_white_rgb, rtol=1e-5)
 
 
 def test_object_color_grid_cleared_on_expiry():
-    """Test that object_color_grid is cleared when objects expire."""
+    """Test that object colors are preserved in state but masked in rendering when expired."""
     # Create an object that expires quickly
     expiring_obj = DefaultForagaxObject(
         name="expiring",
@@ -1861,6 +1889,9 @@ def test_object_color_grid_cleared_on_expiry():
     obj_pos = obj_positions[0]
     y, x = obj_pos
 
+    # Store original color
+    original_color = state.object_state.color[y, x].copy()
+
     # Step until expiry (4 steps: expiry happens when age >= expiry_time)
     for _ in range(4):
         key, key_step = jax.random.split(key)
@@ -1868,10 +1899,34 @@ def test_object_color_grid_cleared_on_expiry():
             key_step, state, Actions.DOWN, env.default_params
         )
 
-    # Object should have expired and color should be cleared
+    # NEW BEHAVIOR: Color is preserved in state (not cleared to white)
     expired_color = state.object_state.color[y, x]
-    expected_empty_color = jnp.array([255, 255, 255], dtype=jnp.uint8)
-    chex.assert_trees_all_equal(expired_color, expected_empty_color)
+    chex.assert_trees_all_equal(expired_color, original_color)
+
+    # But object_id should be 0 (or timer should be set)
+    assert (
+        state.object_state.object_id[y, x] == 0
+        or state.object_state.respawn_timer[y, x] > 0
+    )
+
+    # Test RGB observation: empty/expired cells should appear white
+    # Create an RGB environment with the same setup
+    env_rgb = ForagaxEnv(
+        size=(5, 5),
+        aperture_size=-1,  # Use world view to get full grid observation
+        objects=(expiring_obj,),
+        biomes=(Biome(object_frequencies=(0.5,)),),
+        observation_type="rgb",
+        dynamic_biomes=True,
+    )
+    # Use the same state to get observation
+    obs_rgb = env_rgb.get_obs(state, env.default_params)
+
+    # Check that the expired position shows white in RGB observation
+    # RGB observations are normalized to [0, 1], so white is [1.0, 1.0, 1.0]
+    expired_rgb = obs_rgb[y, x]
+    expected_white_rgb = jnp.array([1.0, 1.0, 1.0], dtype=jnp.float32)
+    chex.assert_trees_all_close(expired_rgb, expected_white_rgb, rtol=1e-5)
 
 
 def test_biome_regeneration_preserves_old_objects():
