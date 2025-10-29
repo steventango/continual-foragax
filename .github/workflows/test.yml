@@ -26,6 +26,6 @@ jobs:
       with:
         activate-environment: true
         python-version: ${{ matrix.python-version }}
-    - run: uv pip install -e .[dev]
+    - run: uv sync --dev
     - name: Test with pytest
-      run: uv run --frozen pytest tests
+      run: uv run pytest tests

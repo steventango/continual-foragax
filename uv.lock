@@ -118,7 +118,7 @@ wheels = [
 
 [[package]]
 name = "continual-foragax"
-version = "0.28.1"
+version = "0.32.0"
 source = { editable = "." }
 dependencies = [
     { name = "gymnax", version = "0.0.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
@@ -126,7 +126,7 @@ dependencies = [
     { name = "six", marker = "python_full_version < '3.10'" },
 ]
 
-[package.optional-dependencies]
+[package.dev-dependencies]
 dev = [
     { name = "pre-commit" },
     { name = "pytest" },
@@ -138,13 +138,16 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "gymnax" },
-    { name = "pre-commit", marker = "extra == 'dev'" },
-    { name = "pytest", marker = "extra == 'dev'" },
-    { name = "pytest-benchmark", marker = "extra == 'dev'" },
-    { name = "ruff", marker = "extra == 'dev'" },
     { name = "six", marker = "python_full_version < '3.10'" },
 ]
-provides-extras = ["dev"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pre-commit" },
+    { name = "pytest" },
+    { name = "pytest-benchmark" },
+    { name = "ruff" },
+]
 
 [[package]]
 name = "contourpy"

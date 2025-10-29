@@ -506,17 +506,6 @@ class ForagaxEnv(environment.Environment):
             lambda: object_state,
         )
 
-        # Clear color grid when object is collected
-        object_state = jax.lax.cond(
-            should_collect_now,
-            lambda: object_state.replace(
-                color=object_state.color.at[pos[1], pos[0]].set(
-                    jnp.full((3,), 255, dtype=jnp.uint8)
-                )
-            ),
-            lambda: object_state,
-        )
-
         # 3.5. HANDLE OBJECT EXPIRY
         # Only process expiry if there are objects that can expire
         key, object_state = self.expire_objects(key, state, object_state)
@@ -646,12 +635,6 @@ class ForagaxEnv(environment.Environment):
                             timer_countdown,
                             self.object_random_respawn[obj_id],
                             rand_key,
-                        )
-
-                        # Clear color grid when object expires
-                        empty_color = jnp.full((3,), 255, dtype=jnp.uint8)
-                        new_obj_state = new_obj_state.replace(
-                            color=new_obj_state.color.at[y, x].set(empty_color)
                         )
 
                         return new_obj_state
@@ -1114,8 +1097,16 @@ class ForagaxEnv(environment.Environment):
             y_out = (y_coords < 0) | (y_coords >= self.size[1])
             x_out = (x_coords < 0) | (x_coords >= self.size[0])
             out_of_bounds = y_out | x_out
-            padding_index = self.object_ids[-1]
-            aperture = jnp.where(out_of_bounds, padding_index, values)
+
+            # Handle both object_id grids (2D) and color grids (3D)
+            if len(values.shape) == 3:
+                # Color grid: use PADDING color (0, 0, 0)
+                padding_value = jnp.array([0, 0, 0], dtype=values.dtype)
+                aperture = jnp.where(out_of_bounds[..., None], padding_value, values)
+            else:
+                # Object ID grid: use PADDING index
+                padding_index = self.object_ids[-1]
+                aperture = jnp.where(out_of_bounds, padding_index, values)
         else:
             aperture = values
 
@@ -1124,12 +1115,14 @@ class ForagaxEnv(environment.Environment):
     def get_obs(self, state: EnvState, params: EnvParams, key=None) -> jax.Array:
         """Get observation based on observation_type and full_world."""
         obs_grid = state.object_state.object_id
+        color_grid = state.object_state.color
 
         if self.full_world:
             return self._get_world_obs(obs_grid, state)
         else:
             grid = self._get_aperture(obs_grid, state.pos)
-            return self._get_aperture_obs(grid, state)
+            color_grid = self._get_aperture(color_grid, state.pos)
+            return self._get_aperture_obs(grid, color_grid, state)
 
     def _get_world_obs(self, obs_grid: jax.Array, state: EnvState) -> jax.Array:
         """Get world observation."""
@@ -1146,12 +1139,14 @@ class ForagaxEnv(environment.Environment):
             obs = obs.at[state.pos[1], state.pos[0], -1].set(1)
             return obs
         elif self.observation_type == "rgb":
-            obs = jax.nn.one_hot(obs_grid, num_obj_types)
-            # Agent position
-            obs = obs.at[state.pos[1], state.pos[0], :].set(0)
-            obs = obs.at[state.pos[1], state.pos[0], -1].set(1)
-            colors = self.object_colors / 255.0
-            obs = jnp.tensordot(obs, colors, axes=1)
+            # Use state colors directly (supports dynamic biomes)
+            colors = state.object_state.color / 255.0
+
+            # Mask empty cells (object_id == 0) to white
+            empty_mask = obs_grid == 0
+            white_color = jnp.ones((self.size[1], self.size[0], 3), dtype=jnp.float32)
+            obs = jnp.where(empty_mask[..., None], white_color, colors)
+
             return obs
         elif self.observation_type == "color":
             # Handle case with no objects (only EMPTY)
@@ -1168,17 +1163,24 @@ class ForagaxEnv(environment.Environment):
         else:
             raise ValueError(f"Unknown observation_type: {self.observation_type}")
 
-    def _get_aperture_obs(self, aperture: jax.Array, state: EnvState) -> jax.Array:
+    def _get_aperture_obs(
+        self, aperture: jax.Array, color_aperture: jax.Array, state: EnvState
+    ) -> jax.Array:
         """Get aperture observation."""
         if self.observation_type == "object":
             num_obj_types = len(self.object_ids)
             obs = jax.nn.one_hot(aperture, num_obj_types, axis=-1)
             return obs
         elif self.observation_type == "rgb":
-            num_obj_types = len(self.object_ids)
-            aperture_one_hot = jax.nn.one_hot(aperture, num_obj_types)
-            colors = self.object_colors / 255.0
-            obs = jnp.tensordot(aperture_one_hot, colors, axes=1)
+            # Use the color aperture that was passed in
+            aperture_colors = color_aperture / 255.0
+
+            # Mask empty cells (object_id == 0) to white
+            empty_mask = aperture == 0
+            white_color = jnp.ones(aperture_colors.shape, dtype=jnp.float32)
+
+            obs = jnp.where(empty_mask[..., None], white_color, aperture_colors)
+
             return obs
         elif self.observation_type == "color":
             # Handle case with no objects (only EMPTY)
@@ -1229,6 +1231,10 @@ class ForagaxEnv(environment.Environment):
             if self.dynamic_biomes:
                 # Use per-instance colors from state
                 img = state.object_state.color.copy()
+                # Mask empty cells (object_id == 0) to white
+                empty_mask = state.object_state.object_id == 0
+                white_color = jnp.array([255, 255, 255], dtype=jnp.uint8)
+                img = jnp.where(empty_mask[..., None], white_color, img)
             else:
                 # Use default object colors
                 img = jnp.zeros((self.size[1], self.size[0], 3))
@@ -1296,6 +1302,14 @@ class ForagaxEnv(environment.Environment):
                     self._compute_aperture_coordinates(state.pos)
                 )
                 img = state.object_state.color[y_coords_adj, x_coords_adj]
+
+                # Mask empty cells (object_id == 0) to white
+                aperture_object_ids = state.object_state.object_id[
+                    y_coords_adj, x_coords_adj
+                ]
+                empty_mask = aperture_object_ids == 0
+                white_color = jnp.array([255, 255, 255], dtype=jnp.uint8)
+                img = jnp.where(empty_mask[..., None], white_color, img)
 
                 if self.nowrap:
                     # For out-of-bounds, use padding object color

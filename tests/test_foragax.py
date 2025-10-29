@@ -308,7 +308,7 @@ def test_respawn():
 
 
 def test_random_respawn():
-    """Test that an object respawns at a random empty location within its biome."""
+    """Test that an object can respawn at random empty locations within its biome."""
     key = jax.random.key(0)
 
     flower_random = DefaultForagaxObject(
@@ -329,46 +329,60 @@ def test_random_respawn():
         observation_type="color",
     )
     params = env.default_params
-    _, state = env.reset(key, params)
 
     flower_id = 1  # 0 is EMPTY
     original_pos = jnp.array([3, 3])
 
-    # Place a flower and move the agent to it
-    grid = jnp.zeros((7, 7), dtype=int)
-    grid = grid.at[original_pos[1], original_pos[0]].set(flower_id)
-    # Add a wall to make sure it doesn't spawn there
-    grid = grid.at[4, 4].set(2)  # Use a fixed ID for the wall
-    state = state.replace(
-        object_state=state.object_state.replace(object_id=grid), pos=jnp.array([2, 3])
-    )
+    # Test multiple times to verify randomness
+    timer_positions = []
+    for i in range(20):
+        key, reset_key = jax.random.split(key)
+        _, state = env.reset(reset_key, params)
 
-    # Collect the flower
-    key, step_key = jax.random.split(key)
-    _, new_state, reward, _, _ = env.step(step_key, state, Actions.RIGHT, params)
+        # Place a flower and move the agent to it
+        grid = jnp.zeros((7, 7), dtype=int)
+        grid = grid.at[original_pos[1], original_pos[0]].set(flower_id)
+        # Add a wall to make sure it doesn't spawn there
+        grid = grid.at[4, 4].set(2)  # Use a fixed ID for the wall
+        state = state.replace(
+            object_state=state.object_state.replace(object_id=grid),
+            pos=jnp.array([2, 3]),
+        )
 
-    assert reward == flower_random.reward_val
-    # Original position should be empty
-    assert new_state.object_state.object_id[original_pos[1], original_pos[0]] == 0
+        # Collect the flower
+        key, step_key = jax.random.split(key)
+        _, new_state, reward, _, _ = env.step(step_key, state, Actions.RIGHT, params)
 
-    # A timer should be placed somewhere (check respawn_timer instead of object_id)
-    assert jnp.sum(new_state.object_state.respawn_timer > 0) == 1
-    timer_pos_flat = jnp.argmax(new_state.object_state.respawn_timer)
-    timer_pos = jnp.array(jnp.unravel_index(timer_pos_flat, (7, 7)))
-    # New position should not be the original position
-    assert not jnp.array_equal(timer_pos, original_pos)
+        assert reward == flower_random.reward_val
+        # Original position should be empty
+        assert new_state.object_state.object_id[original_pos[1], original_pos[0]] == 0
 
-    # New position should be within the biome
-    assert jnp.all(timer_pos >= jnp.array(biome.start))
-    assert jnp.all(timer_pos < jnp.array(biome.stop))
+        # A timer should be placed somewhere (check respawn_timer instead of object_id)
+        assert jnp.sum(new_state.object_state.respawn_timer > 0) == 1
+        timer_pos_flat = jnp.argmax(new_state.object_state.respawn_timer)
+        timer_pos_array = jnp.unravel_index(timer_pos_flat, (7, 7))
+        timer_pos = (int(timer_pos_array[0]), int(timer_pos_array[1]))
 
-    # New position should be on an empty cell (not the wall)
-    assert not jnp.array_equal(timer_pos, jnp.array([4, 4]))
+        # New position should be within the biome
+        assert timer_pos[0] >= biome.start[0] and timer_pos[0] < biome.stop[0]
+        assert timer_pos[1] >= biome.start[1] and timer_pos[1] < biome.stop[1]
 
-    # Verify respawn_object_id is set correctly
-    assert (
-        new_state.object_state.respawn_object_id[timer_pos[0], timer_pos[1]]
-        == flower_id
+        # New position should be on an empty cell (not the wall)
+        assert timer_pos != (4, 4)
+
+        # Verify respawn_object_id is set correctly
+        assert (
+            new_state.object_state.respawn_object_id[timer_pos[0], timer_pos[1]]
+            == flower_id
+        )
+
+        timer_positions.append(timer_pos)
+
+    # Verify that we get multiple different positions (randomness works)
+    # With 20 trials and multiple valid positions, we should see at least 2 different locations
+    unique_positions = set(timer_positions)
+    assert len(unique_positions) >= 2, (
+        f"Expected at least 2 unique positions, got {len(unique_positions)}: {unique_positions}"
     )
 
 
@@ -1774,7 +1788,7 @@ def test_object_no_individual_respawn():
 
 
 def test_object_color_grid_cleared_on_collection():
-    """Test that object_color_grid is cleared when objects are collected."""
+    """Test that object colors are preserved in state but masked in rendering when collected."""
     key = jax.random.key(0)
     env = ForagaxEnv(
         size=(7, 7),
@@ -1793,6 +1807,9 @@ def test_object_color_grid_cleared_on_collection():
     flower_pos = flower_positions[0]
     y, x = flower_pos
 
+    # Store original color
+    original_color = state.object_state.color[y, x].copy()
+
     # Move agent to flower and collect it
     # Position agent above the flower so moving down collects it
     state = state.replace(pos=jnp.array([x, y - 1]))
@@ -1801,10 +1818,15 @@ def test_object_color_grid_cleared_on_collection():
 
     assert reward == FLOWER.reward_val
 
-    # Check that the color grid at the collected position is cleared (should be [255, 255, 255])
+    # NEW BEHAVIOR: Color is preserved in state (not cleared to white)
     collected_color = state.object_state.color[y, x]
-    expected_empty_color = jnp.array([255, 255, 255], dtype=jnp.uint8)
-    chex.assert_trees_all_equal(collected_color, expected_empty_color)
+    chex.assert_trees_all_equal(collected_color, original_color)
+
+    # But object_id should be 0 (or timer should be set)
+    assert (
+        state.object_state.object_id[y, x] == 0
+        or state.object_state.respawn_timer[y, x] > 0
+    )
 
     # Check that other positions with objects still have their colors
     other_flower_positions = jnp.argwhere(
@@ -1814,11 +1836,31 @@ def test_object_color_grid_cleared_on_collection():
     other_pos = other_flower_positions[0]
     other_color = state.object_state.color[other_pos[0], other_pos[1]]
     # Should not be the empty color
+    expected_empty_color = jnp.array([255, 255, 255], dtype=jnp.uint8)
     assert not jnp.allclose(other_color, expected_empty_color)
+
+    # Test RGB observation: empty cells should appear white
+    # Create an RGB environment with the same setup
+    env_rgb = ForagaxEnv(
+        size=(7, 7),
+        objects=(FLOWER,),
+        biomes=(Biome(object_frequencies=(1.0,)),),
+        observation_type="rgb",
+        dynamic_biomes=True,
+        aperture_size=-1,  # Use world view to get full grid observation
+    )
+    # Use the same state to get observation
+    obs_rgb = env_rgb.get_obs(state, params)
+
+    # Check that the collected position shows white in RGB observation
+    # RGB observations are normalized to [0, 1], so white is [1.0, 1.0, 1.0]
+    collected_rgb = obs_rgb[y, x]
+    expected_white_rgb = jnp.array([1.0, 1.0, 1.0], dtype=jnp.float32)
+    chex.assert_trees_all_close(collected_rgb, expected_white_rgb, rtol=1e-5)
 
 
 def test_object_color_grid_cleared_on_expiry():
-    """Test that object_color_grid is cleared when objects expire."""
+    """Test that object colors are preserved in state but masked in rendering when expired."""
     # Create an object that expires quickly
     expiring_obj = DefaultForagaxObject(
         name="expiring",
@@ -1847,6 +1889,9 @@ def test_object_color_grid_cleared_on_expiry():
     obj_pos = obj_positions[0]
     y, x = obj_pos
 
+    # Store original color
+    original_color = state.object_state.color[y, x].copy()
+
     # Step until expiry (4 steps: expiry happens when age >= expiry_time)
     for _ in range(4):
         key, key_step = jax.random.split(key)
@@ -1854,10 +1899,34 @@ def test_object_color_grid_cleared_on_expiry():
             key_step, state, Actions.DOWN, env.default_params
         )
 
-    # Object should have expired and color should be cleared
+    # NEW BEHAVIOR: Color is preserved in state (not cleared to white)
     expired_color = state.object_state.color[y, x]
-    expected_empty_color = jnp.array([255, 255, 255], dtype=jnp.uint8)
-    chex.assert_trees_all_equal(expired_color, expected_empty_color)
+    chex.assert_trees_all_equal(expired_color, original_color)
+
+    # But object_id should be 0 (or timer should be set)
+    assert (
+        state.object_state.object_id[y, x] == 0
+        or state.object_state.respawn_timer[y, x] > 0
+    )
+
+    # Test RGB observation: empty/expired cells should appear white
+    # Create an RGB environment with the same setup
+    env_rgb = ForagaxEnv(
+        size=(5, 5),
+        aperture_size=-1,  # Use world view to get full grid observation
+        objects=(expiring_obj,),
+        biomes=(Biome(object_frequencies=(0.5,)),),
+        observation_type="rgb",
+        dynamic_biomes=True,
+    )
+    # Use the same state to get observation
+    obs_rgb = env_rgb.get_obs(state, env.default_params)
+
+    # Check that the expired position shows white in RGB observation
+    # RGB observations are normalized to [0, 1], so white is [1.0, 1.0, 1.0]
+    expired_rgb = obs_rgb[y, x]
+    expected_white_rgb = jnp.array([1.0, 1.0, 1.0], dtype=jnp.float32)
+    chex.assert_trees_all_close(expired_rgb, expected_white_rgb, rtol=1e-5)
 
 
 def test_biome_regeneration_preserves_old_objects():
