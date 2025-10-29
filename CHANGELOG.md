@@ -1,3 +1,9 @@
+## 0.32.1 (2025-10-29)
+
+### Fix
+
+- color reset handling and rgb observation
+
 ## 0.32.0 (2025-10-29)
 
 ### Feat
