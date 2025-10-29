@@ -1,3 +1,27 @@
+## 0.32.0 (2025-10-29)
+
+### Feat
+
+- ForagaxSineTwoBiome-v1
+- ForagaxDiwali-v1
+- biome regeneration and per object state
+
+### Fix
+
+- constant fourier rewards
+
+### Refactor
+
+- separate respawn state from object_id
+- ObjectState
+- extract expire_objects method
+- vmap _check_and_respawn_biomes
+- BiomeState
+
+### Perf
+
+- optimize object expiry
+
 ## 0.31.0 (2025-10-17)
 
 ### Feat
