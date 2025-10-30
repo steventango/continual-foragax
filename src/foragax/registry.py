@@ -388,11 +388,11 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
         "biomes": (
             # Biome 1 (left): Oyster +10, Death Cap -10 with sine
             Biome(
-                start=(3, 0), stop=(5, 15), object_frequencies=(0.25, 0.25, 0.0, 0.0)
+                start=(3, 0), stop=(5, 15), object_frequencies=(8/30, 8/30, 0.0, 0.0)
             ),
             # Biome 2 (right): Oyster -10, Death Cap +10 with inverted sine
             Biome(
-                start=(10, 0), stop=(12, 15), object_frequencies=(0.0, 0.0, 0.25, 0.25)
+                start=(10, 0), stop=(12, 15), object_frequencies=(0.0, 0.0, 8/30, 8/30)
             ),
         ),
         "nowrap": False,
