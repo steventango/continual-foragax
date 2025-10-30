@@ -2797,3 +2797,35 @@ def test_sine_object():
         r_orig = sine_obj.reward(t, key, None)
         r_shift = sine_obj_shifted.reward(t, key, None)
         assert jnp.allclose(r_orig + r_shift, 0.0, atol=0.01)
+
+
+def test_info_rewards():
+    """Test that info contains rewards with reward values for each grid position."""
+    key = jax.random.key(0)
+    env = ForagaxEnv(
+        size=(5, 5),
+        objects=(FLOWER,),
+        biomes=(Biome(object_frequencies=(0.5,)),),
+        observation_type="object",
+    )
+    params = env.default_params
+    obs, state = env.reset(key, params)
+
+    key, step_key = jax.random.split(key)
+    _, _, _, _, info = env.step(step_key, state, Actions.UP, params)
+
+    # Check that rewards is in info
+    assert "rewards" in info
+
+    # Check shape matches environment size
+    assert info["rewards"].shape == (5, 5)
+
+    # Check that positions with objects have non-zero rewards
+    object_mask = state.object_state.object_id > 0
+    rewards_at_objects = info["rewards"][object_mask]
+    assert jnp.all(rewards_at_objects == FLOWER.reward_val)
+
+    # Check that empty positions have zero rewards
+    empty_mask = state.object_state.object_id == 0
+    rewards_at_empty = info["rewards"][empty_mask]
+    assert jnp.all(rewards_at_empty == 0.0)
