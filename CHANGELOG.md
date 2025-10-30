@@ -1,3 +1,9 @@
+## 0.33.1 (2025-10-30)
+
+### Fix
+
+- rewards should be calculated for next state.
+
 ## 0.33.0 (2025-10-30)
 
 ### Feat
