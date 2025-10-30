@@ -553,6 +553,15 @@ class ForagaxEnv(environment.Environment):
         info["biome_id"] = object_state.biome_id[pos[1], pos[0]]
         info["object_collected_id"] = jax.lax.select(should_collect, obj_at_pos, -1)
 
+        # 4. UPDATE STATE
+        state = EnvState(
+            pos=pos,
+            time=state.time + 1,
+            digestion_buffer=digestion_buffer,
+            object_state=object_state,
+            biome_state=biome_state,
+        )
+
         # Compute reward at each grid position
         fixed_key = jax.random.key(0)  # Fixed key for deterministic reward computation
 
@@ -564,20 +573,10 @@ class ForagaxEnv(environment.Environment):
                 ),
                 lambda: 0.0,
             )
-
         reward_grid = jax.vmap(jax.vmap(compute_reward))(
             object_state.object_id, object_state.state_params
         )
         info["rewards"] = reward_grid
-
-        # 4. UPDATE STATE
-        state = EnvState(
-            pos=pos,
-            time=state.time + 1,
-            digestion_buffer=digestion_buffer,
-            object_state=object_state,
-            biome_state=biome_state,
-        )
 
         done = self.is_terminal(state, params)
         return (
