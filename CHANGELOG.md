@@ -1,3 +1,11 @@
+## 0.33.2 (2025-10-30)
+
+### Fix
+
+- ForagaxSineTwoBiome-v1 biome object frequencies
+- set deterministic_spawn=True for ForagaxSineTwoBiome
+- rewards should be calculated for next state.
+
 ## 0.33.1 (2025-10-30)
 
 ### Fix
