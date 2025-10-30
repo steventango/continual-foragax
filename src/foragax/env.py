@@ -573,6 +573,7 @@ class ForagaxEnv(environment.Environment):
                 ),
                 lambda: 0.0,
             )
+
         reward_grid = jax.vmap(jax.vmap(compute_reward))(
             object_state.object_id, object_state.state_params
         )
