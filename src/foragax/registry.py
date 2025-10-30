@@ -396,6 +396,7 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
             ),
         ),
         "nowrap": False,
+        "deterministic_spawn": True,
     },
 }
 
