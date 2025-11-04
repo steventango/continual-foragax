@@ -1313,7 +1313,11 @@ class ForagaxEnv(environment.Environment):
             render_mode: One of "world", "world_true", "world_reward", "aperture", "aperture_true", "aperture_reward"
         """
         is_world_mode = render_mode in ("world", "world_true", "world_reward")
-        is_aperture_mode = render_mode in ("aperture", "aperture_true", "aperture_reward")
+        is_aperture_mode = render_mode in (
+            "aperture",
+            "aperture_true",
+            "aperture_reward",
+        )
         is_true_mode = render_mode in ("world_true", "aperture_true")
         is_reward_mode = render_mode in ("world_reward", "aperture_reward")
 
@@ -1382,7 +1386,7 @@ class ForagaxEnv(environment.Environment):
                     # For each aperture cell, tint all 9 cells in its 3x3 block
                     # Create meshgrid to get all aperture cell coordinates
                     y_grid, x_grid = jnp.meshgrid(
-                        y_coords_adj.flatten(), x_coords_adj.flatten(), indexing='ij'
+                        y_coords_adj.flatten(), x_coords_adj.flatten(), indexing="ij"
                     )
                     y_flat = y_grid.flatten()
                     x_flat = x_grid.flatten()
@@ -1419,7 +1423,7 @@ class ForagaxEnv(environment.Environment):
                     # Tint all 9 cells in each 3x3 block for aperture cells
                     # Create meshgrid to get all aperture cell coordinates
                     y_grid, x_grid = jnp.meshgrid(
-                        y_coords_adj.flatten(), x_coords_adj.flatten(), indexing='ij'
+                        y_coords_adj.flatten(), x_coords_adj.flatten(), indexing="ij"
                     )
                     y_flat = y_grid.flatten()
                     x_flat = x_grid.flatten()
