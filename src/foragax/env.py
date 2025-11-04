@@ -59,9 +59,7 @@ class ObjectState:
     """
 
     object_id: jax.Array  # (H, W) - Object type ID (0 = empty, >0 = object type)
-    respawn_timer: (
-        jax.Array
-    )  # (H, W) - Respawn countdown (0 = no timer, >0 = countdown)
+    respawn_timer: jax.Array  # (H, W) - Respawn countdown (0 = no timer, >0 = countdown)
     respawn_object_id: jax.Array  # (H, W) - Object type to spawn when timer reaches 0
     spawn_time: jax.Array  # (H, W) - Timestep when object spawned
     color: jax.Array  # (H, W, 3) - RGB color per instance
@@ -132,6 +130,7 @@ class ForagaxEnv(environment.Environment):
         observation_type: str = "object",
         dynamic_biomes: bool = False,
         biome_consumption_threshold: float = 0.9,
+        max_expiries_per_step: int = 1,
     ):
         super().__init__()
         self._name = name
@@ -155,6 +154,9 @@ class ForagaxEnv(environment.Environment):
         self.teleport_interval = teleport_interval
         self.dynamic_biomes = dynamic_biomes
         self.biome_consumption_threshold = biome_consumption_threshold
+        if max_expiries_per_step < 1:
+            raise ValueError("max_expiries_per_step must be at least 1")
+        self.max_expiries_per_step = max_expiries_per_step
 
         objects = (EMPTY,) + objects
         if self.nowrap and not self.full_world:
@@ -608,63 +610,64 @@ class ForagaxEnv(environment.Environment):
                 & (current_objects_for_expiry > 0)
             )
 
-            # Count how many objects actually need to expire
-            num_expiring = jnp.sum(should_expire)
-
             # Only process expiry if there are actually objects to expire
-            def process_expiries():
-                # Get positions of objects that should expire
-                # Use nonzero with fixed size to maintain JIT compatibility
-                max_objects = self.size[0] * self.size[1]
-                y_indices, x_indices = jnp.nonzero(
-                    should_expire, size=max_objects, fill_value=-1
-                )
+            has_expiring = jnp.any(should_expire)
 
+            # Precompute the first expiring index in flat space so the work inside cond is minimal.
+            flat_mask = should_expire.reshape(-1)
+            overage = jnp.where(
+                should_expire,
+                object_ages - expiry_times,
+                -jnp.inf,
+            ).reshape(-1)
+            sorted_flat_indices = jnp.argsort(overage)[::-1]
+            selected_flat_indices = jnp.where(
+                overage[sorted_flat_indices] > -jnp.inf,
+                sorted_flat_indices,
+                -jnp.ones_like(sorted_flat_indices),
+            )[: self.max_expiries_per_step]
+
+            def process_expiries():
                 key_local, expiry_key = jax.random.split(key)
 
-                def process_one_expiry(carry, i):
-                    obj_state = carry
-                    y = y_indices[i]
-                    x = x_indices[i]
+                def body_fn(i, obj_state):
+                    flat_idx = selected_flat_indices[i]
 
-                    # Skip if this is a padding index (from fill_value)
-                    is_valid = (y >= 0) & (x >= 0)
-
-                    def expire_one():
+                    def expire_at(obj_state):
+                        y = flat_idx // self.size[0]
+                        x = flat_idx % self.size[0]
                         obj_id = current_objects_for_expiry[y, x]
-                        exp_key = jax.random.fold_in(expiry_key, y * self.size[0] + x)
+                        exp_key = jax.random.fold_in(expiry_key, flat_idx)
                         exp_delay = jax.lax.switch(
                             obj_id, self.expiry_regen_delay_fns, state.time, exp_key
                         )
                         timer_countdown = jax.lax.cond(
                             exp_delay == jnp.iinfo(jnp.int32).max,
-                            lambda: 0,  # No timer (permanent removal)
-                            lambda: exp_delay + 1,  # Timer countdown
+                            lambda: 0,
+                            lambda: exp_delay + 1,
                         )
 
-                        # Use unified timer placement method
-                        rand_key = jax.random.split(exp_key)[1]
-                        new_obj_state = self._place_timer(
+                        respawn_random = self.object_random_respawn[obj_id]
+                        rand_key = jax.random.fold_in(exp_key, 1)
+                        return self._place_timer(
                             obj_state,
                             y,
                             x,
                             obj_id,
                             timer_countdown,
-                            self.object_random_respawn[obj_id],
+                            respawn_random,
                             rand_key,
                         )
 
-                        return new_obj_state
+                    return jax.lax.cond(
+                        flat_idx >= 0,
+                        expire_at,
+                        lambda obj_state: obj_state,
+                        obj_state,
+                    )
 
-                    def no_op():
-                        return obj_state
-
-                    return jax.lax.cond(is_valid, expire_one, no_op), None
-
-                new_object_state, _ = jax.lax.scan(
-                    process_one_expiry,
-                    object_state,
-                    jnp.arange(max_objects),
+                new_object_state = jax.lax.fori_loop(
+                    0, self.max_expiries_per_step, body_fn, object_state
                 )
                 return key_local, new_object_state
 
@@ -672,7 +675,7 @@ class ForagaxEnv(environment.Environment):
                 return key, object_state
 
             key, object_state = jax.lax.cond(
-                num_expiring > 0,
+                has_expiring,
                 process_expiries,
                 no_expiries,
             )
