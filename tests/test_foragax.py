@@ -2800,7 +2800,7 @@ def test_sine_object():
 
 
 def test_info_rewards():
-    """Test that info contains rewards with reward values for each grid position."""
+    """Test that info contains rewards with next reward values for each grid position."""
     key = jax.random.key(0)
     env = ForagaxEnv(
         size=(5, 5),
@@ -2812,7 +2812,7 @@ def test_info_rewards():
     obs, state = env.reset(key, params)
 
     key, step_key = jax.random.split(key)
-    _, _, _, _, info = env.step(step_key, state, Actions.UP, params)
+    _, state, _, _, info = env.step(step_key, state, Actions.UP, params)
 
     # Check that rewards is in info
     assert "rewards" in info
