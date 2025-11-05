@@ -240,6 +240,7 @@ class FourierObject(BaseForagaxObject):
         color: Tuple[int, int, int] = (0, 0, 0),
         reward_delay: int = 0,
         max_reward_delay: Optional[int] = None,
+        regen_delay: Optional[Tuple[int, int]] = None,
     ):
         if max_reward_delay is None:
             max_reward_delay = reward_delay
@@ -248,13 +249,14 @@ class FourierObject(BaseForagaxObject):
             blocking=False,
             collectable=True,
             color=color,
-            random_respawn=False,  # Objects don't respawn individually
+            random_respawn=True,
             max_reward_delay=max_reward_delay,
             expiry_time=None,
         )
         self.num_fourier_terms = num_fourier_terms
         self.base_magnitude = base_magnitude
         self.reward_delay_val = reward_delay
+        self.regen_delay_range = regen_delay
 
     def get_state(self, key: jax.Array) -> jax.Array:
         """Generate random Fourier series parameters.
@@ -353,6 +355,9 @@ class FourierObject(BaseForagaxObject):
 
     def regen_delay(self, clock: int, rng: jax.Array) -> int:
         """No individual regeneration - returns infinity."""
+        if self.regen_delay_range is not None:
+            min_delay, max_delay = self.regen_delay_range
+            return jax.random.randint(rng, (), min_delay, max_delay)
         return jnp.iinfo(jnp.int32).max
 
     def expiry_regen_delay(self, clock: int, rng: jax.Array) -> int:
@@ -709,6 +714,7 @@ def create_fourier_objects(
     num_fourier_terms: int = 10,
     base_magnitude: float = 1.0,
     reward_delay: int = 0,
+    regen_delay: Optional[Tuple[int, int]] = None,
 ):
     """Create HOT and COLD FourierObject instances.
 
@@ -726,6 +732,7 @@ def create_fourier_objects(
         base_magnitude=base_magnitude,
         color=(0, 0, 0),
         reward_delay=reward_delay,
+        regen_delay=regen_delay,
     )
 
     cold = FourierObject(
@@ -734,6 +741,7 @@ def create_fourier_objects(
         base_magnitude=base_magnitude,
         color=(0, 0, 0),
         reward_delay=reward_delay,
+        regen_delay=regen_delay,
     )
 
     return hot, cold
