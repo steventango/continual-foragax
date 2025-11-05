@@ -690,11 +690,14 @@ class ForagaxEnv(environment.Environment):
 
         num_biomes = self.biome_object_frequencies.shape[0]
 
-        # Compute consumption rates for all biomes
-        consumption_rates = biome_state.consumption_count / jnp.maximum(
-            1.0, biome_state.total_objects.astype(float)
-        )
-        should_respawn = consumption_rates >= self.biome_consumption_threshold
+        if isinstance(self.biome_consumption_threshold, float):
+            # Compute consumption rates for all biomes
+            consumption_rates = biome_state.consumption_count / jnp.maximum(
+                1.0, biome_state.total_objects.astype(float)
+            )
+            should_respawn = consumption_rates >= self.biome_consumption_threshold
+        else:
+            should_respawn = biome_state.consumption_count >= self.biome_consumption_threshold
 
         # Split key for all biomes in parallel
         key, subkey = jax.random.split(key)
