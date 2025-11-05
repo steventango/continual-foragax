@@ -586,6 +586,63 @@ def test_foragax_diwali_v1_creation():
     assert jnp.all(state.biome_state.generation == 0), "Initial generation should be 0"
 
 
+def test_foragax_diwali_v2_creation():
+    """Test that ForagaxDiwali-v2 can be created and initialized."""
+    env = make("ForagaxDiwali-v2", observation_type="object", aperture_size=(5, 5))
+
+    # Check that dynamic biomes are enabled
+    assert env.dynamic_biomes, "Dynamic biomes should be enabled for ForagaxDiwali-v2"
+    assert env.biome_consumption_threshold == 200, "Threshold should be 200"
+    assert env.num_fourier_terms == 10, "Should have 10 Fourier terms"
+
+    # Check that objects are FourierObjects
+    assert isinstance(env.objects[1], FourierObject), (
+        "First object should be FourierObject"
+    )
+    assert isinstance(env.objects[2], FourierObject), (
+        "Second object should be FourierObject"
+    )
+
+    # Check regen_delay for objects
+    assert env.objects[1].regen_delay_range == (9, 11), (
+        "Object 1 should have regen_delay_range (9, 11)"
+    )
+    assert env.objects[2].regen_delay_range == (9, 11), (
+        "Object 2 should have regen_delay_range (9, 11)"
+    )
+
+    # Initialize environment
+    key = jax.random.key(0)
+    obs, state = env.reset(key, env.default_params)
+
+    # Check state has new fields
+    assert hasattr(state, "object_state"), "State should have object_state"
+    assert hasattr(state.object_state, "color"), "ObjectState should have color"
+    assert hasattr(state.object_state, "state_params"), (
+        "ObjectState should have state_params"
+    )
+    assert hasattr(state, "biome_state"), "State should have biome_state"
+    assert hasattr(state.biome_state, "consumption_count"), (
+        "BiomeState should have consumption_count"
+    )
+    assert hasattr(state.biome_state, "total_objects"), (
+        "BiomeState should have total_objects"
+    )
+    assert hasattr(state.biome_state, "generation"), "BiomeState should have generation"
+
+    # Check shapes
+    chex.assert_shape(state.object_state.color, (15, 15, 3))
+    chex.assert_shape(
+        state.object_state.state_params, (15, 15, 22)
+    )  # 2 + 2*10 = 22 params
+    chex.assert_shape(state.biome_state.consumption_count, (2,))  # 2 biomes
+    chex.assert_shape(state.biome_state.total_objects, (2,))
+    chex.assert_shape(state.biome_state.generation, (2,))
+
+    # Check initial generation is 0
+    assert jnp.all(state.biome_state.generation == 0), "Initial generation should be 0"
+
+
 def test_foragax_sine_twobiome_v1_creation():
     """Test that ForagaxSineTwoBiome-v1 can be created and initialized."""
     env = make("ForagaxSineTwoBiome-v1", observation_type="color", aperture_size=(5, 5))
