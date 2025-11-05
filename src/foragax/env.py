@@ -697,7 +697,9 @@ class ForagaxEnv(environment.Environment):
             )
             should_respawn = consumption_rates >= self.biome_consumption_threshold
         else:
-            should_respawn = biome_state.consumption_count >= self.biome_consumption_threshold
+            should_respawn = (
+                biome_state.consumption_count >= self.biome_consumption_threshold
+            )
 
         # Split key for all biomes in parallel
         key, subkey = jax.random.split(key)
