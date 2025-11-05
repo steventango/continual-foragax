@@ -1,3 +1,11 @@
+## 0.35.0 (2025-11-05)
+
+### Feat
+
+- ForagaxTwoBiome-v2
+- add optional respawning to fourier objects
+- support respawning biomes based on raw count
+
 ## 0.34.0 (2025-11-05)
 
 ### Feat
