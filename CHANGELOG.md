@@ -1,3 +1,9 @@
+## 0.36.1 (2025-11-06)
+
+### Fix
+
+- performance issue in expiring
+
 ## 0.36.0 (2025-11-06)
 
 ### Feat
