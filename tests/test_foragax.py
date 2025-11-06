@@ -1268,6 +1268,7 @@ def test_basic_object_expiry():
         objects=(expiring_object,),
         biomes=(Biome(object_frequencies=(1.0,)),),
         observation_type="object",
+        max_expiries_per_step=10,  # Ensure all expiries processed each step
     )
 
     key = jax.random.key(0)
@@ -1314,6 +1315,112 @@ def test_basic_object_expiry():
         state.object_state.spawn_time == 8
     )  # Spawn time = time at beginning of step when respawn occurred
     assert state.time == 9  # Current time after step completes
+
+
+def test_basic_object_expiry_one():
+    """Test that objects expire and respawn after expiry_time steps."""
+    # Create an object that expires after 5 steps with expiry_regen_delay=(2, 2)
+    # Note: Due to timer encoding, delay=2 actually takes 3 steps (consistent with regen_delay)
+    expiring_object = DefaultForagaxObject(
+        name="expiring",
+        reward=1.0,
+        collectable=False,  # Not collectable, so it won't be removed by collection
+        color=(255, 0, 0),
+        expiry_time=10,
+        expiry_regen_delay=(8, 8),  # Takes 9 steps due to +1 in timer encoding
+    )
+
+    env = ForagaxEnv(
+        size=(3, 3),
+        aperture_size=(3, 3),
+        objects=(expiring_object,),
+        biomes=(Biome(object_frequencies=(1.0,)),),
+        observation_type="object",
+    )
+
+    key = jax.random.key(0)
+    key, key_reset = jax.random.split(key)
+    obs, state = env.reset(key_reset, env.default_params)
+
+    # Initial state - all objects present
+    assert jnp.all(state.object_state.object_id == 1)
+    assert jnp.all(state.object_state.spawn_time == 0)
+
+    # Step through 10 times - objects should still be present
+    for _ in range(10):
+        key, key_step = jax.random.split(key)
+        obs, state, _, _, _ = env.step(
+            key_step, state, Actions.DOWN, env.default_params
+        )
+
+    assert jnp.all(state.object_state.object_id == 1)
+    assert state.time == 10
+
+    # Step once more - objects should expire and become timers
+    key, key_step = jax.random.split(key)
+    obs, state, _, _, _ = env.step(key_step, state, Actions.DOWN, env.default_params)
+
+    assert (
+        jnp.count_nonzero(state.object_state.object_id == 0) == 1
+    )  # One objects removed
+    assert (
+        jnp.count_nonzero(state.object_state.respawn_timer > 0) == 1
+    )  # One have timers
+    assert (
+        jnp.count_nonzero(state.object_state.respawn_object_id == 1) == 1
+    )  # Will respawn as object 1
+    assert jnp.all(
+        state.object_state.spawn_time == 0
+    )  # Spawn time NOT updated yet (still at reset value)
+
+    # Step through all removals and they all become timers (8 more steps)
+    for _ in range(8):
+        key, key_step = jax.random.split(key)
+        obs, state, _, _, _ = env.step(
+            key_step, state, Actions.DOWN, env.default_params
+        )
+
+    assert jnp.all(state.object_state.object_id == 0)  # All objects removed
+    assert jnp.all(state.object_state.respawn_timer > 0)  # All have timers
+    assert jnp.all(
+        state.object_state.respawn_object_id == 1
+    )  # Will respawn as object 1
+    assert jnp.all(
+        state.object_state.spawn_time == 0
+    )  # Spawn time NOT updated yet (still at reset value)
+
+    # Step once more - one object should respawn
+    key, key_step = jax.random.split(key)
+    obs, state, _, _, _ = env.step(key_step, state, Actions.DOWN, env.default_params)
+
+    assert (
+        jnp.count_nonzero(state.object_state.object_id == 0) == 8
+    )  # One objects present
+    assert (
+        jnp.count_nonzero(state.object_state.respawn_timer > 0) == 8
+    )  # One don't have timers
+    assert (
+        jnp.count_nonzero(state.object_state.respawn_object_id == 1) == 8
+    )  # Remaining will respawn as object 1
+    assert (
+        jnp.count_nonzero(state.object_state.spawn_time == 19) == 1
+    )  # One with updated spawn time
+
+    # Step through regen delay for remaining (8 more objects)
+    for _ in range(8):
+        key, key_step = jax.random.split(key)
+        obs, state, _, _, _ = env.step(
+            key_step, state, Actions.DOWN, env.default_params
+        )
+
+    assert jnp.all(state.object_state.object_id == 1)  # Objects respawned
+    assert jnp.all(state.object_state.respawn_timer == 0)  # Timers cleared
+    print(state.object_state.spawn_time)
+    assert jnp.all(
+        jnp.sort(state.object_state.spawn_time.flatten())
+        == jnp.sort(jnp.arange(19, 28))
+    )  # Spawn time = time at beginning of step when respawn occurred
+    assert state.time == 28  # Current time after step completes
 
 
 def test_no_expiry_backwards_compatibility():
@@ -1412,6 +1519,7 @@ def test_expiry_with_normal_regen():
         objects=(normal_expiring,),
         biomes=(Biome(object_frequencies=(1.0,)),),
         observation_type="object",
+        max_expiries_per_step=16,  # Ensure all expiries processed each step
     )
 
     key = jax.random.key(456)
@@ -1506,6 +1614,7 @@ def test_expiry_spawn_time_tracking():
         objects=(expiring_obj,),
         biomes=(Biome(object_frequencies=(1.0,)),),
         observation_type="object",
+        max_expiries_per_step=4,  # Ensure all expiries processed each step
     )
 
     key = jax.random.key(111)
@@ -1878,6 +1987,7 @@ def test_object_color_grid_cleared_on_expiry():
         biomes=(Biome(object_frequencies=(0.5,)),),
         observation_type="color",
         dynamic_biomes=True,  # Enable dynamic biomes to test color grid
+        max_expiries_per_step=25,  # Ensure all expiries processed each step
     )
 
     key = jax.random.key(42)
