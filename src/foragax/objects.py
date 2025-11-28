@@ -241,6 +241,7 @@ class FourierObject(BaseForagaxObject):
         reward_delay: int = 0,
         max_reward_delay: Optional[int] = None,
         regen_delay: Optional[Tuple[int, int]] = None,
+        reward_repeat: int = 1,
     ):
         if max_reward_delay is None:
             max_reward_delay = reward_delay
@@ -257,6 +258,7 @@ class FourierObject(BaseForagaxObject):
         self.base_magnitude = base_magnitude
         self.reward_delay_val = reward_delay
         self.regen_delay_range = regen_delay
+        self.reward_repeat = reward_repeat
 
     def get_state(self, key: jax.Array) -> jax.Array:
         """Generate random Fourier series parameters.
@@ -321,7 +323,7 @@ class FourierObject(BaseForagaxObject):
         y_max = params[2]
 
         # Normalize time to [0, 2π] using the object's period
-        t = 2.0 * jnp.pi * (clock % period) / period
+        t = 2.0 * jnp.pi * ((clock // self.reward_repeat) % period) / period
 
         # Extract interleaved coefficients: [a1, b1, a2, b2, ...]
         ab_coeffs = params[3:]
@@ -715,6 +717,7 @@ def create_fourier_objects(
     base_magnitude: float = 1.0,
     reward_delay: int = 0,
     regen_delay: Optional[Tuple[int, int]] = None,
+    reward_repeat: int = 1,
 ):
     """Create HOT and COLD FourierObject instances.
 
@@ -733,6 +736,7 @@ def create_fourier_objects(
         color=(0, 0, 0),
         reward_delay=reward_delay,
         regen_delay=regen_delay,
+        reward_repeat=reward_repeat,
     )
 
     cold = FourierObject(
@@ -742,6 +746,7 @@ def create_fourier_objects(
         color=(0, 0, 0),
         reward_delay=reward_delay,
         regen_delay=regen_delay,
+        reward_repeat=reward_repeat,
     )
 
     return hot, cold
