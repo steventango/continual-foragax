@@ -2811,13 +2811,14 @@ def test_fourier_reward_mathematical_properties():
     key = jax.random.key(42)
 
     # Create a simple single-term Fourier series: a1*cos(t) + b1*sin(t)
+    # We use period=8.0 so that clock=1 corresponds to phase 2π/8 = π/4
     simple_params = jnp.array(
         [
-            2 * jnp.pi,
+            8.0,  # period
             -1.0,
-            1.0,  # period=2π, min=-1, max=1
+            1.0,  # min=-1, max=1
             0.5,
-            0.5,  # a1=0.5, b1=0.5 (should give 0.5*(cos(t) + sin(t)))
+            0.5,  # a1=0.5, b1=0.5
             0.0,
             0.0,
             0.0,
@@ -2828,7 +2829,8 @@ def test_fourier_reward_mathematical_properties():
         dtype=jnp.float32,
     )
 
-    # At t=0: 0.5*(cos(0) + sin(0)) = 0.5*(1 + 0) = 0.5
+    # At t=0 (clock=0): phase=0
+    # 0.5*(cos(0) + sin(0)) = 0.5*(1 + 0) = 0.5
     reward_t0_simple = fourier_obj.reward(0, key, simple_params)
     # The actual reward is normalized: 2*(raw - min)/(max - min) - 1, then * base_magnitude
     # raw = 0.5, min=-1, max=1, so: 2*(0.5 - (-1))/(1 - (-1)) - 1 = 2*(1.5)/2 - 1 = 1.5 - 1 = 0.5
@@ -2837,9 +2839,10 @@ def test_fourier_reward_mathematical_properties():
         f"Expected ~1.0, got {reward_t0_simple}"
     )
 
-    # At t=π/4: 0.5*(cos(π/4) + sin(π/4)) = 0.5*(0.707 + 0.707) = 0.5*1.414 ≈ 0.707
+    # At t=1 (clock=1): phase = 2π * 1/8 = π/4
+    # 0.5*(cos(π/4) + sin(π/4)) = 0.5*(0.707 + 0.707) = 0.5*1.414 ≈ 0.707
+    reward_t_quarter = fourier_obj.reward(1, key, simple_params)
     t_quarter = jnp.pi / 4
-    reward_t_quarter = fourier_obj.reward(t_quarter, key, simple_params)
     raw_quarter = 0.5 * (jnp.cos(t_quarter) + jnp.sin(t_quarter))
     expected_quarter = (
         2 * (raw_quarter - (-1)) / (1 - (-1)) - 1

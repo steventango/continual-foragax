@@ -143,6 +143,17 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
         "dynamic_biomes": True,
         "biome_consumption_threshold": 1000,
     },
+    "ForagaxDiwali-v5": {
+        "size": (15, 15),
+        "aperture_size": None,
+        "objects": None,
+        "biomes": (Biome(start=(0, 0), stop=(15, 15), object_frequencies=(0.2,)),),
+        "nowrap": False,
+        "deterministic_spawn": True,
+        "dynamic_biomes": True,
+        "biome_consumption_threshold": 1000,
+        "dynamic_biome_spawn_empty": 0.1,
+    },
     "ForagaxTwoBiome-v1": {
         "size": (15, 15),
         "aperture_size": None,
@@ -597,6 +608,13 @@ def make(
             regen_delay=(9, 11),
             reward_repeat=100,
         )
+    if env_id == "ForagaxDiwali-v5":
+        config["objects"] = create_fourier_objects(
+            num_fourier_terms=10,
+            reward_delay=reward_delay,
+            regen_delay=(9, 11),
+            reward_repeat=100,
+        )[:1]
 
     if env_id == "ForagaxSineTwoBiome-v1":
         biome1_oyster, biome1_deathcap, biome2_oyster, biome2_deathcap = (
