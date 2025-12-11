@@ -132,6 +132,7 @@ class ForagaxEnv(environment.Environment):
         observation_type: str = "object",
         dynamic_biomes: bool = False,
         biome_consumption_threshold: float = 0.9,
+        dynamic_biome_spawn_empty: float = 0.0,
     ):
         super().__init__()
         self._name = name
@@ -155,6 +156,7 @@ class ForagaxEnv(environment.Environment):
         self.teleport_interval = teleport_interval
         self.dynamic_biomes = dynamic_biomes
         self.biome_consumption_threshold = biome_consumption_threshold
+        self.dynamic_biome_spawn_empty = dynamic_biome_spawn_empty
 
         objects = (EMPTY,) + objects
         if self.nowrap and not self.full_world:
@@ -884,7 +886,7 @@ class ForagaxEnv(environment.Environment):
         biome_freqs = self.biome_object_frequencies[biome_idx]
         biome_mask = self.biome_masks_array[biome_idx]
 
-        key, spawn_key, color_key, params_key = jax.random.split(key, 4)
+        key, spawn_key, color_key, params_key, dropout_key = jax.random.split(key, 5)
 
         # Generate object IDs using deterministic or random spawn
         if deterministic:
@@ -922,6 +924,13 @@ class ForagaxEnv(environment.Environment):
             object_grid = (
                 jnp.searchsorted(cumulative_freqs, grid_rand, side="right") - 1
             )
+
+        # Apply random dropout if configured
+        if self.dynamic_biome_spawn_empty > 0:
+            dropout_mask = jax.random.bernoulli(
+                dropout_key, 1.0 - self.dynamic_biome_spawn_empty, object_grid.shape
+            )
+            object_grid = jnp.where(dropout_mask, object_grid, 0)
 
         # Initialize color grid
         color_grid = jnp.full((self.size[1], self.size[0], 3), 255, dtype=jnp.uint8)
