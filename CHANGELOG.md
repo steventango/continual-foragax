@@ -1,3 +1,10 @@
+## 0.37.0 (2025-11-28)
+
+### Feat
+
+- ForagaxDiwali-v4
+- add reward_repeat to FourierObject
+
 ## 0.36.1 (2025-11-06)
 
 ### Fix
