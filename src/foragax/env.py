@@ -796,12 +796,13 @@ class ForagaxEnv(environment.Environment):
             # 2. Apply dropout to the MERGED result (only where we are allowed to update)
             if self.dynamic_biome_spawn_empty > 0:
                 key, dropout_key = jax.random.split(key)
-                # Dropout applies to everything in the biome update region
+                # Dropout applies only to cells that are both in the biome AND need updating
                 keep_mask = jax.random.bernoulli(
                     dropout_key, 1.0 - self.dynamic_biome_spawn_empty, merged_objs.shape
                 )
-                # Apply dropout only to the merged result
-                final_objs = jnp.where(keep_mask, merged_objs, 0)
+                # Only apply dropout where should_update is true; elsewhere, keep merged_objs
+                dropout_mask = should_update & keep_mask
+                final_objs = jnp.where(dropout_mask, merged_objs, jnp.where(should_update, 0, merged_objs))
             else:
                 final_objs = merged_objs
 
