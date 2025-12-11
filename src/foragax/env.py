@@ -802,17 +802,25 @@ class ForagaxEnv(environment.Environment):
                 )
                 # Only apply dropout where should_update is true; elsewhere, keep merged_objs
                 dropout_mask = should_update & keep_mask
-                final_objs = jnp.where(dropout_mask, merged_objs, jnp.where(should_update, 0, merged_objs))
+                # Apply dropout only to the merged result and associated metadata
+                final_objs = jnp.where(dropout_mask, merged_objs, 0)
+                final_colors = jnp.where(dropout_mask[..., None], merged_colors, 0)
+                final_params = jnp.where(dropout_mask[..., None], merged_params, 0)
+                final_gen = jnp.where(dropout_mask, merged_gen, 0)
+                final_spawn = jnp.where(dropout_mask, merged_spawn, 0)
             else:
                 final_objs = merged_objs
+                final_colors = merged_colors
+                final_params = merged_params
+                final_gen = merged_gen
+                final_spawn = merged_spawn
 
             # 3. Write back: Only update where should_update is true
             new_obj_id = jnp.where(should_update, final_objs, new_obj_id)
-
-            new_color = jnp.where(should_update[..., None], merged_colors, new_color)
-            new_params = jnp.where(should_update[..., None], merged_params, new_params)
-            new_gen = jnp.where(should_update, merged_gen, new_gen)
-            new_spawn = jnp.where(should_update, merged_spawn, new_spawn)
+            new_color = jnp.where(should_update[..., None], final_colors, new_color)
+            new_params = jnp.where(should_update[..., None], final_params, new_params)
+            new_gen = jnp.where(should_update, final_gen, new_gen)
+            new_spawn = jnp.where(should_update, final_spawn, new_spawn)
 
         # Clear timers in respawning biomes
         new_respawn_timer = object_state.respawn_timer
