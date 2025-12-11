@@ -1,3 +1,15 @@
+## 0.38.0 (2025-12-11)
+
+### Feat
+
+- ForagaxDiwali-v5
+- dynamic_biome_spawn_empty for respawning empty spaces
+
+### Fix
+
+- only keep first object for v5
+- test_fourier_reward_mathematical_properties, clock is integer not float
+
 ## 0.37.0 (2025-11-28)
 
 ### Feat
