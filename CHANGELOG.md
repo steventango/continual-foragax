@@ -1,3 +1,14 @@
+## 0.39.0 (2025-12-11)
+
+### Feat
+
+- update to save video fragments
+
+### Fix
+
+- dropout on metadata
+- adjust dynamic biome spawn empty
+
 ## 0.38.0 (2025-12-11)
 
 ### Feat
