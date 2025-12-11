@@ -614,7 +614,7 @@ def make(
             reward_delay=reward_delay,
             regen_delay=(9, 11),
             reward_repeat=100,
-        )
+        )[:1]
 
     if env_id == "ForagaxSineTwoBiome-v1":
         biome1_oyster, biome1_deathcap, biome2_oyster, biome2_deathcap = (
