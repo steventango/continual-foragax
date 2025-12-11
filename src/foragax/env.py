@@ -774,20 +774,53 @@ class ForagaxEnv(environment.Environment):
             biome_mask = self.biome_masks_array[i]
             new_gen_value = new_biome_state.generation[i]
 
-            # Only update where new spawn has objects and biome should respawn
-            is_new_object = (
-                (all_new_objects[i] > 0) & biome_mask & should_respawn[i][..., None]
+            # Update mask: biome area AND needs respawn
+            should_update = biome_mask & should_respawn[i][..., None]
+
+            # 1. Merge: Overwrite with new objects if present, otherwise keep existing
+            # If the new spawn has an object, we take it. If it's empty, we keep whatever was there.
+            new_spawn_valid = all_new_objects[i] > 0
+
+            merged_objs = jnp.where(new_spawn_valid, all_new_objects[i], new_obj_id)
+            merged_colors = jnp.where(
+                new_spawn_valid[..., None], all_new_colors[i], new_color
+            )
+            merged_params = jnp.where(
+                new_spawn_valid[..., None], all_new_params[i], new_params
             )
 
-            new_obj_id = jnp.where(is_new_object, all_new_objects[i], new_obj_id)
-            new_color = jnp.where(
-                is_new_object[..., None], all_new_colors[i], new_color
-            )
-            new_params = jnp.where(
-                is_new_object[..., None], all_new_params[i], new_params
-            )
-            new_gen = jnp.where(is_new_object, new_gen_value, new_gen)
-            new_spawn = jnp.where(is_new_object, current_time, new_spawn)
+            # For generation/spawn time, update only if we took the NEW object
+            merged_gen = jnp.where(new_spawn_valid, new_gen_value, new_gen)
+            merged_spawn = jnp.where(new_spawn_valid, current_time, new_spawn)
+
+            # 2. Apply dropout to the MERGED result (only where we are allowed to update)
+            if self.dynamic_biome_spawn_empty > 0:
+                key, dropout_key = jax.random.split(key)
+                # Dropout applies only to cells that are both in the biome AND need updating
+                keep_mask = jax.random.bernoulli(
+                    dropout_key, 1.0 - self.dynamic_biome_spawn_empty, merged_objs.shape
+                )
+                # Only apply dropout where should_update is true; elsewhere, keep merged_objs
+                dropout_mask = should_update & keep_mask
+                # Apply dropout only to the merged result and associated metadata
+                final_objs = jnp.where(dropout_mask, merged_objs, 0)
+                final_colors = jnp.where(dropout_mask[..., None], merged_colors, 0)
+                final_params = jnp.where(dropout_mask[..., None], merged_params, 0)
+                final_gen = jnp.where(dropout_mask, merged_gen, 0)
+                final_spawn = jnp.where(dropout_mask, merged_spawn, 0)
+            else:
+                final_objs = merged_objs
+                final_colors = merged_colors
+                final_params = merged_params
+                final_gen = merged_gen
+                final_spawn = merged_spawn
+
+            # 3. Write back: Only update where should_update is true
+            new_obj_id = jnp.where(should_update, final_objs, new_obj_id)
+            new_color = jnp.where(should_update[..., None], final_colors, new_color)
+            new_params = jnp.where(should_update[..., None], final_params, new_params)
+            new_gen = jnp.where(should_update, final_gen, new_gen)
+            new_spawn = jnp.where(should_update, final_spawn, new_spawn)
 
         # Clear timers in respawning biomes
         new_respawn_timer = object_state.respawn_timer
@@ -890,7 +923,7 @@ class ForagaxEnv(environment.Environment):
         biome_freqs = self.biome_object_frequencies[biome_idx]
         biome_mask = self.biome_masks_array[biome_idx]
 
-        key, spawn_key, color_key, params_key, dropout_key = jax.random.split(key, 5)
+        key, spawn_key, color_key, params_key = jax.random.split(key, 4)
 
         # Generate object IDs using deterministic or random spawn
         if deterministic:
@@ -928,13 +961,6 @@ class ForagaxEnv(environment.Environment):
             object_grid = (
                 jnp.searchsorted(cumulative_freqs, grid_rand, side="right") - 1
             )
-
-        # Apply random dropout if configured
-        if self.dynamic_biome_spawn_empty > 0:
-            dropout_mask = jax.random.bernoulli(
-                dropout_key, 1.0 - self.dynamic_biome_spawn_empty, object_grid.shape
-            )
-            object_grid = jnp.where(dropout_mask, object_grid, 0)
 
         # Initialize color grid
         color_grid = jnp.full((self.size[1], self.size[0], 3), 255, dtype=jnp.uint8)
