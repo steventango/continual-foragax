@@ -636,9 +636,6 @@ def make(
             biome2_deathcap,
         )
 
-    if env_id == "ForagaxTwoBiome-v16":
-        config["teleport_interval"] = 10000
-
     # Backward compatibility: map "world" to "object" with full world
     if observation_type == "world":
         # add deprecation warning
