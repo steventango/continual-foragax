@@ -233,6 +233,8 @@ if __name__ == "__main__":
     if not os.path.exists(args.trace_dir):
         os.makedirs(args.trace_dir, exist_ok=True)
 
+    os.environ["TF_PROFILER_TRACE_VIEWER_MAX_EVENTS"] = "10000000"
+
     profile_environment(
         args.env, args.num_envs, args.steps, args.trace_dir, fast=args.fast
     )
