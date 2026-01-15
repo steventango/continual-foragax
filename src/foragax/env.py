@@ -282,6 +282,11 @@ class ForagaxEnv(environment.Environment):
         # color_indices maps from object_id-1 to color_channel_index
         self.object_to_color_map = color_indices
 
+        # Rendering constants
+        self.agent_color_jax = jnp.array(AGENT.color, dtype=jnp.uint8)
+        self.white_color_jax = jnp.array([255, 255, 255], dtype=jnp.uint8)
+        self.grid_color_jax = jnp.zeros(3, dtype=jnp.uint8)
+
     @property
     def default_params(self) -> EnvParams:
         return EnvParams(
@@ -1461,12 +1466,15 @@ class ForagaxEnv(environment.Environment):
 
         return spaces.Box(0, 1, obs_shape, float)
 
-    def _compute_reward_grid(self, state: EnvState) -> jax.Array:
-        """Compute rewards for all grid positions.
+    def _compute_reward_grid(
+        self, state: EnvState, object_id=None, state_params=None
+    ) -> jax.Array:
+        """Compute rewards for given positions. If no grid provided, uses full world."""
+        if object_id is None:
+            object_id = state.object_state.object_id
+        if state_params is None:
+            state_params = state.object_state.state_params
 
-        Returns:
-            Array of shape (H, W) with reward values for each cell
-        """
         fixed_key = jax.random.key(0)  # Fixed key for deterministic reward computation
 
         def compute_reward(obj_id, params):
@@ -1478,9 +1486,7 @@ class ForagaxEnv(environment.Environment):
                 lambda: 0.0,
             )
 
-        reward_grid = jax.vmap(jax.vmap(compute_reward))(
-            state.object_state.object_id, state.object_state.state_params
-        )
+        reward_grid = jax.vmap(jax.vmap(compute_reward))(object_id, state_params)
         return reward_grid
 
     def _reward_to_color(self, reward: jax.Array) -> jax.Array:
@@ -1570,172 +1576,87 @@ class ForagaxEnv(environment.Environment):
 
                 img = jax.lax.fori_loop(0, len(self.object_ids), update_image, img)
 
-            if is_reward_mode:
-                # Scale image by 3 to create space for reward visualization
-                img = jax.image.resize(
-                    img,
-                    (self.size[1] * 3, self.size[0] * 3, 3),
-                    jax.image.ResizeMethod.NEAREST,
-                )
-
-                # Compute rewards for all cells
-                reward_grid = self._compute_reward_grid(state)
-
-                # Convert rewards to colors
-                reward_colors = self._reward_to_color(reward_grid)
-
-                # Resize reward colors to match 3x scale and place in middle cells
-                # We need to place reward colors at positions (i*3+1, j*3+1) for each (i,j)
-                # Create index arrays for middle cells
-                i_indices = jnp.arange(self.size[1])[:, None] * 3 + 1
-                j_indices = jnp.arange(self.size[0])[None, :] * 3 + 1
-
-                # Broadcast and set middle cells
-                img = img.at[i_indices, j_indices].set(reward_colors)
-
-            # Tint the agent's aperture
+            # Define constants for all world modes
+            alpha = 0.2
             y_coords, x_coords, y_coords_adj, x_coords_adj = (
                 self._compute_aperture_coordinates(state.pos)
             )
 
-            alpha = 0.2
-            agent_color = jnp.array(AGENT.color)
-
             if is_reward_mode:
-                # For reward mode, we need to adjust coordinates for 3x scaled image
-                if self.nowrap:
-                    # Create tint mask for 3x scaled image
-                    tint_mask = jnp.zeros(
-                        (self.size[1] * 3, self.size[0] * 3), dtype=bool
-                    )
+                # Construct 3x intermediate image
+                # Each cell is 3x3, with reward color in center
+                reward_grid = self._compute_reward_grid(state)
+                reward_colors = self._reward_to_color(reward_grid)
 
-                    # For each aperture cell, tint all 9 cells in its 3x3 block
-                    # Create meshgrid to get all aperture cell coordinates
-                    y_grid, x_grid = jnp.meshgrid(
-                        y_coords_adj.flatten(), x_coords_adj.flatten(), indexing="ij"
-                    )
-                    y_flat = y_grid.flatten()
-                    x_flat = x_grid.flatten()
-
-                    # Create offset arrays for 3x3 blocks
-                    offsets = jnp.array(
-                        [[dy, dx] for dy in range(3) for dx in range(3)]
-                    )
-
-                    # For each aperture cell, expand to 9 cells
-                    # We need to repeat each cell coordinate 9 times, then add offsets
-                    num_aperture_cells = y_flat.size
-                    y_base = jnp.repeat(
-                        y_flat * 3, 9
-                    )  # Repeat each y coord 9 times and scale by 3
-                    x_base = jnp.repeat(
-                        x_flat * 3, 9
-                    )  # Repeat each x coord 9 times and scale by 3
-                    y_offsets = jnp.tile(
-                        offsets[:, 0], num_aperture_cells
-                    )  # Tile all 9 offsets
-                    x_offsets = jnp.tile(
-                        offsets[:, 1], num_aperture_cells
-                    )  # Tile all 9 offsets
-                    y_expanded = y_base + y_offsets
-                    x_expanded = x_base + x_offsets
-
-                    tint_mask = tint_mask.at[y_expanded, x_expanded].set(True)
-
-                    original_colors = img
-                    tinted_colors = (1 - alpha) * original_colors + alpha * agent_color
-                    img = jnp.where(tint_mask[..., None], tinted_colors, img)
-                else:
-                    # Tint all 9 cells in each 3x3 block for aperture cells
-                    # Create meshgrid to get all aperture cell coordinates
-                    y_grid, x_grid = jnp.meshgrid(
-                        y_coords_adj.flatten(), x_coords_adj.flatten(), indexing="ij"
-                    )
-                    y_flat = y_grid.flatten()
-                    x_flat = x_grid.flatten()
-
-                    # Create offset arrays for 3x3 blocks
-                    offsets = jnp.array(
-                        [[dy, dx] for dy in range(3) for dx in range(3)]
-                    )
-
-                    # For each aperture cell, expand to 9 cells
-                    # We need to repeat each cell coordinate 9 times, then add offsets
-                    num_aperture_cells = y_flat.size
-                    y_base = jnp.repeat(
-                        y_flat * 3, 9
-                    )  # Repeat each y coord 9 times and scale by 3
-                    x_base = jnp.repeat(
-                        x_flat * 3, 9
-                    )  # Repeat each x coord 9 times and scale by 3
-                    y_offsets = jnp.tile(
-                        offsets[:, 0], num_aperture_cells
-                    )  # Tile all 9 offsets
-                    x_offsets = jnp.tile(
-                        offsets[:, 1], num_aperture_cells
-                    )  # Tile all 9 offsets
-                    y_expanded = y_base + y_offsets
-                    x_expanded = x_base + x_offsets
-
-                    # Get original colors and tint them
-                    original_colors = img[y_expanded, x_expanded]
-                    tinted_colors = (1 - alpha) * original_colors + alpha * agent_color
-                    img = img.at[y_expanded, x_expanded].set(tinted_colors)
-
-                # Agent color - set all 9 cells of the agent's 3x3 block
-                agent_y, agent_x = state.pos[1], state.pos[0]
-                agent_offsets = jnp.array(
-                    [[dy, dx] for dy in range(3) for dx in range(3)]
+                # Each cell has its base color in 8 pixels and reward color in 1 (center)
+                # Create a 3x3 pattern mask for center pixels
+                cell_mask = jnp.array(
+                    [[False, False, False], [False, True, False], [False, False, False]]
                 )
-                agent_y_cells = agent_y * 3 + agent_offsets[:, 0]
-                agent_x_cells = agent_x * 3 + agent_offsets[:, 1]
-                img = img.at[agent_y_cells, agent_x_cells].set(
-                    jnp.array(AGENT.color, dtype=jnp.uint8)
+                grid_reward_mask = jnp.tile(cell_mask, (self.size[1], self.size[0]))
+
+                # Repeat base colors and rewards to 3x3
+                base_img_x3 = jnp.repeat(jnp.repeat(img, 3, axis=0), 3, axis=1)
+                reward_colors_x3 = jnp.repeat(
+                    jnp.repeat(reward_colors, 3, axis=0), 3, axis=1
                 )
 
-                # Scale by 8 to final size
-                img = jax.image.resize(
-                    img,
-                    (self.size[1] * 24, self.size[0] * 24, 3),
-                    jax.image.ResizeMethod.NEAREST,
+                # Composite base and reward colors
+                img = jnp.where(
+                    grid_reward_mask[..., None], reward_colors_x3, base_img_x3
                 )
+
+                # Tint the aperture region at 3x scale
+                aperture_mask = jnp.zeros((self.size[1], self.size[0]), dtype=bool)
+                aperture_mask = aperture_mask.at[y_coords_adj, x_coords_adj].set(True)
+                aperture_mask_x3 = jnp.repeat(
+                    jnp.repeat(aperture_mask, 3, axis=0), 3, axis=1
+                )
+
+                tinted_img = (
+                    (1.0 - alpha) * img.astype(jnp.float32)
+                    + alpha * self.agent_color_jax.astype(jnp.float32)
+                ).astype(jnp.uint8)
+                img = jnp.where(aperture_mask_x3[..., None], tinted_img, img)
+
+                # Set agent center block
+                agent_mask = jnp.zeros((self.size[1], self.size[0]), dtype=bool)
+                agent_mask = agent_mask.at[state.pos[1], state.pos[0]].set(True)
+                agent_mask_x3 = jnp.repeat(jnp.repeat(agent_mask, 3, axis=0), 3, axis=1)
+                img = jnp.where(agent_mask_x3[..., None], self.agent_color_jax, img)
+
+                # Final scale by 8 to get 24x
+                img = jnp.repeat(jnp.repeat(img, 8, axis=0), 8, axis=1)
             else:
                 # Standard rendering without reward visualization
-                if self.nowrap:
-                    # Create tint mask: any in-bounds original position maps to a cell makes it tinted
-                    tint_mask = jnp.zeros((self.size[1], self.size[0]), dtype=int)
-                    tint_mask = tint_mask.at[y_coords_adj, x_coords_adj].set(1)
-                    # Apply tint to masked positions
-                    original_colors = img
-                    tinted_colors = (1 - alpha) * original_colors + alpha * agent_color
-                    img = jnp.where(tint_mask[..., None], tinted_colors, img)
-                else:
-                    original_colors = img[y_coords_adj, x_coords_adj]
-                    tinted_colors = (1 - alpha) * original_colors + alpha * agent_color
-                    img = img.at[y_coords_adj, x_coords_adj].set(tinted_colors)
+                aperture_mask = jnp.zeros((self.size[1], self.size[0]), dtype=bool)
+                aperture_mask = aperture_mask.at[y_coords_adj, x_coords_adj].set(True)
 
-                # Agent color
-                img = img.at[state.pos[1], state.pos[0]].set(jnp.array(AGENT.color))
+                tinted_img = (
+                    (1.0 - alpha) * img.astype(jnp.float32)
+                    + alpha * self.agent_color_jax.astype(jnp.float32)
+                ).astype(jnp.uint8)
+                img = jnp.where(aperture_mask[..., None], tinted_img, img)
 
-                img = jax.image.resize(
-                    img,
-                    (self.size[1] * 24, self.size[0] * 24, 3),
-                    jax.image.ResizeMethod.NEAREST,
-                )
+                # Set agent
+                img = img.at[state.pos[1], state.pos[0]].set(self.agent_color_jax)
+                # Scale by 24
+                img = jnp.repeat(jnp.repeat(img, 24, axis=0), 24, axis=1)
 
             if is_true_mode:
-                # Apply true object borders by overlaying true colors on border pixels
-                render_grid = state.object_state.object_id
+                # Apply true object borders
                 img = apply_true_borders(
-                    img, render_grid, self.size, len(self.object_ids)
+                    img, state.object_state.object_id, self.size, len(self.object_ids)
                 )
 
-            # Add grid lines for world mode
-            grid_color = jnp.zeros(3, dtype=jnp.uint8)
-            row_indices = jnp.arange(1, self.size[1]) * 24
-            col_indices = jnp.arange(1, self.size[0]) * 24
-            img = img.at[row_indices, :].set(grid_color)
-            img = img.at[:, col_indices].set(grid_color)
+            # Add grid lines using masking instead of slice-setting
+            row_grid = (jnp.arange(self.size[1] * 24) % 24) == 0
+            col_grid = (jnp.arange(self.size[0] * 24) % 24) == 0
+            # skip first rows/cols as they are borders or managed by caller
+            row_grid = row_grid.at[0].set(False)
+            col_grid = col_grid.at[0].set(False)
+            grid_mask = row_grid[:, None] | col_grid[None, :]
+            img = jnp.where(grid_mask[..., None], self.grid_color_jax, img)
 
         elif is_aperture_mode:
             obs_grid = state.object_state.object_id
@@ -1782,11 +1703,16 @@ class ForagaxEnv(environment.Environment):
                     self._compute_aperture_coordinates(state.pos)
                 )
 
-                # Get reward grid for the full world
-                full_reward_grid = self._compute_reward_grid(state)
-
-                # Extract aperture rewards
-                aperture_rewards = full_reward_grid[y_coords_adj, x_coords_adj]
+                # Get reward grid only for aperture region
+                aperture_object_ids = state.object_state.object_id[
+                    y_coords_adj, x_coords_adj
+                ]
+                aperture_params = state.object_state.state_params[
+                    y_coords_adj, x_coords_adj
+                ]
+                aperture_rewards = self._compute_reward_grid(
+                    state, aperture_object_ids, aperture_params
+                )
 
                 # Convert rewards to colors
                 reward_colors = self._reward_to_color(aperture_rewards)
