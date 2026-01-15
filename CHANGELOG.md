@@ -1,3 +1,22 @@
+## 0.41.0 (2026-01-15)
+
+### Feat
+
+- smaller JAX dtypes for environment state and refactor step logic into named sub-functions #48
+- cond respawn
+- profiling and benchmark script
+- vectorize Fourier series reward calculation
+
+### Fix
+
+- JAX random key splitting for dynamic biome spawn dropout
+- slow mode only warm up  _step_fn
+- increase TF_PROFILER_TRACE_VIEWER_MAX_EVENTS
+
+### Refactor
+
+- optimize border masking, generalize reward grid computation, vectorize composition
+
 ## 0.40.0 (2026-01-15)
 
 ### Feat
