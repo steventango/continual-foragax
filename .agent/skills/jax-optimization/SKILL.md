@@ -11,7 +11,7 @@ This skill guides you through the process of profiling and optimizing JAX-based 
 
 - Use this skill when you are tasked with improving the performance, speed, or throughput (OPS) of the codebase.
 - Use this when you are investigating performance bottlenecks in JAX functions.
-- Use this when working on tasks related to `profile_benchmark.py` or `test_benchmark.py`.
+- Use this when working on tasks related to `profile_benchmark.py` or `test_optimize.py`.
 
 ## How to use it
 
@@ -20,13 +20,13 @@ Follow these six steps strictly. Do not skip establishing a baseline or profilin
 ### 1. Establish Baseline (Do not skip)
 
 Before changing any code, you must measure the current performance to have a valid reference.
-**Constraint**: Do not edit `test_benchmark.py` to make numbers look better; that is cheating!
+**Constraint**: Do not edit `test_optimize.py` to make numbers look better; that is cheating!
 
 - **Action**: Run existing benchmark.
 - **Output**: OPS (Operations Per Second)
 
 ```bash
-uv run python -m pytest tests/test_benchmark.py --benchmark-only
+uv run python -m pytest tests/test_optimize.py --benchmark-only
 ```
 
 ### 2. Profile with Data (No guessing)
