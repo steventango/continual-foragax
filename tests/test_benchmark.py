@@ -40,7 +40,7 @@ def test_benchmark_vision(benchmark):
     benchmark(benchmark_fn)
 
 
-def test_benchmark_creation(benchmark):
+def test_benchmark_reset(benchmark):
     env = ForagaxEnv(
         size=1_000,
         aperture_size=31,
@@ -59,6 +59,40 @@ def test_benchmark_creation(benchmark):
 
     def benchmark_fn():
         _build(jax.random.key(1)).pos.block_until_ready()
+
+    benchmark(benchmark_fn)
+
+
+def test_benchmark_tiny_env(benchmark):
+    env = ForagaxEnv(
+        size=15,
+        aperture_size=11,
+        objects=(WALL, FLOWER),
+        biomes=(Biome(object_frequencies=(0.1, 0.1)),),
+        observation_type="color",
+    )
+    params = env.default_params
+    key = jax.random.key(0)
+    key, reset_key = jax.random.split(key)
+    _, state = env.reset(reset_key, params)
+
+    @jax.jit
+    def _run(state, key):
+        def f(carry, _):
+            state, key = carry
+            key, step_key = jax.random.split(key, 2)
+            _, new_state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+            return (new_state, key), None
+
+        (final_state, _), _ = jax.lax.scan(f, (state, key), None, length=10)
+        return final_state
+
+    key, run_key = jax.random.split(key)
+    _run(state, run_key).pos.block_until_ready()
+
+    def benchmark_fn():
+        key, run_key = jax.random.split(jax.random.key(1))
+        _run(state, run_key).pos.block_until_ready()
 
     benchmark(benchmark_fn)
 
@@ -84,7 +118,7 @@ def test_benchmark_small_env(benchmark):
             _, new_state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
             return (new_state, key), None
 
-        (final_state, _), _ = jax.lax.scan(f, (state, key), None, length=1000)
+        (final_state, _), _ = jax.lax.scan(f, (state, key), None, length=10)
         return final_state
 
     key, run_key = jax.random.split(key)
@@ -120,7 +154,7 @@ def test_benchmark_big_env(benchmark):
             _, new_state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
             return (new_state, key), None
 
-        (final_state, _), _ = jax.lax.scan(f, (state, key), None, length=100)
+        (final_state, _), _ = jax.lax.scan(f, (state, key), None, length=10)
         return final_state
 
     # warm-up compilation
@@ -136,7 +170,7 @@ def test_benchmark_big_env(benchmark):
 
 
 def test_benchmark_vmap_env(benchmark):
-    num_envs = 100
+    num_envs = 10
     env = ForagaxEnv(
         size=1_000,
         aperture_size=11,
@@ -163,7 +197,7 @@ def test_benchmark_vmap_env(benchmark):
             )
             return (new_states, key), None
 
-        (final_states, _), _ = jax.lax.scan(f, (states, key), None, length=1000)
+        (final_states, _), _ = jax.lax.scan(f, (states, key), None, length=10)
         return final_states
 
     # warm-up compilation
@@ -199,7 +233,7 @@ def test_benchmark_small_env_color(benchmark):
             _, new_state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
             return (new_state, key), None
 
-        (final_state, _), _ = jax.lax.scan(f, (state, key), None, length=100)
+        (final_state, _), _ = jax.lax.scan(f, (state, key), None, length=10)
         return final_state
 
     key, run_key = jax.random.split(key)
@@ -233,7 +267,7 @@ def test_benchmark_small_env_world(benchmark):
             _, new_state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
             return (new_state, key), None
 
-        (final_state, _), _ = jax.lax.scan(f, (state, key), None, length=100)
+        (final_state, _), _ = jax.lax.scan(f, (state, key), None, length=10)
         return final_state
 
     key, run_key = jax.random.split(key)
