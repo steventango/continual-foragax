@@ -562,7 +562,7 @@ class ForagaxEnv(environment.Environment):
             )
 
         reward_grid = jax.vmap(jax.vmap(compute_reward))(
-            object_state.object_id, object_state.state_params
+                object_state.object_id, object_state.state_params
         )
         info["rewards"] = reward_grid
 
@@ -688,141 +688,165 @@ class ForagaxEnv(environment.Environment):
                 biome_state.consumption_count >= self.biome_consumption_threshold
             )
 
-        # Split key for all biomes in parallel
-        key, subkey = jax.random.split(key)
-        biome_keys = jax.random.split(subkey, num_biomes)
+        any_respawn = jnp.any(should_respawn)
 
-        # Compute all new spawns in parallel using vmap for random, switch for deterministic
-        if self.deterministic_spawn:
-            # Use switch to dispatch to concrete biome spawns for deterministic
-            def make_spawn_fn(biome_idx):
-                def spawn_fn(key):
-                    return self._spawn_biome_objects(biome_idx, key, deterministic=True)
+        def do_respawn(args):
+            (
+                object_state,
+                biome_state,
+                should_respawn,
+                key,
+            ) = args
+            # Split key for all biomes in parallel
+            key, subkey = jax.random.split(key)
+            biome_keys = jax.random.split(subkey, num_biomes)
 
-                return spawn_fn
+            # Compute all new spawns in parallel using vmap for random, switch for deterministic
+            if self.deterministic_spawn:
+                # Use switch to dispatch to concrete biome spawns for deterministic
+                def make_spawn_fn(biome_idx):
+                    def spawn_fn(key):
+                        return self._spawn_biome_objects(
+                            biome_idx, key, deterministic=True
+                        )
 
-            spawn_fns = [make_spawn_fn(idx) for idx in range(num_biomes)]
+                    return spawn_fn
 
-            # Apply switch for each biome
-            all_new_objects_list = []
-            all_new_colors_list = []
-            all_new_params_list = []
-            for i in range(num_biomes):
-                obj, col, par = jax.lax.switch(i, spawn_fns, biome_keys[i])
-                all_new_objects_list.append(obj)
-                all_new_colors_list.append(col)
-                all_new_params_list.append(par)
+                spawn_fns = [make_spawn_fn(idx) for idx in range(num_biomes)]
 
-            all_new_objects = jnp.stack(all_new_objects_list)
-            all_new_colors = jnp.stack(all_new_colors_list)
-            all_new_params = jnp.stack(all_new_params_list)
-        else:
-            # Random spawn works with vmap
-            all_new_objects, all_new_colors, all_new_params = jax.vmap(
-                lambda i, k: self._spawn_biome_objects(i, k, deterministic=False)
-            )(jnp.arange(num_biomes), biome_keys)
+                # Apply switch for each biome
+                all_new_objects_list = []
+                all_new_colors_list = []
+                all_new_params_list = []
+                for i in range(num_biomes):
+                    obj, col, par = jax.lax.switch(i, spawn_fns, biome_keys[i])
+                    all_new_objects_list.append(obj)
+                    all_new_colors_list.append(col)
+                    all_new_params_list.append(par)
 
-        # Initialize updated grids
-        new_obj_id = object_state.object_id
-        new_color = object_state.color
-        new_params = object_state.state_params
-        new_spawn = object_state.spawn_time
-        new_gen = object_state.generation
-
-        # Update biome state
-        new_consumption_count = jnp.where(
-            should_respawn, 0, biome_state.consumption_count
-        )
-        new_generation = biome_state.generation + should_respawn.astype(int)
-
-        # Compute new total objects for respawning biomes
-        def count_objects(i):
-            return jnp.sum((all_new_objects[i] > 0) & self.biome_masks_array[i])
-
-        new_object_counts = jax.vmap(count_objects)(jnp.arange(num_biomes))
-        new_total_objects = jnp.where(
-            should_respawn, new_object_counts, biome_state.total_objects
-        )
-
-        new_biome_state = BiomeState(
-            consumption_count=new_consumption_count,
-            total_objects=new_total_objects,
-            generation=new_generation,
-        )
-
-        # Update grids for respawning biomes
-        for i in range(num_biomes):
-            biome_mask = self.biome_masks_array[i]
-            new_gen_value = new_biome_state.generation[i]
-
-            # Update mask: biome area AND needs respawn
-            should_update = biome_mask & should_respawn[i][..., None]
-
-            # 1. Merge: Overwrite with new objects if present, otherwise keep existing
-            # If the new spawn has an object, we take it. If it's empty, we keep whatever was there.
-            new_spawn_valid = all_new_objects[i] > 0
-
-            merged_objs = jnp.where(new_spawn_valid, all_new_objects[i], new_obj_id)
-            merged_colors = jnp.where(
-                new_spawn_valid[..., None], all_new_colors[i], new_color
-            )
-            merged_params = jnp.where(
-                new_spawn_valid[..., None], all_new_params[i], new_params
-            )
-
-            # For generation/spawn time, update only if we took the NEW object
-            merged_gen = jnp.where(new_spawn_valid, new_gen_value, new_gen)
-            merged_spawn = jnp.where(new_spawn_valid, current_time, new_spawn)
-
-            # 2. Apply dropout to the MERGED result (only where we are allowed to update)
-            if self.dynamic_biome_spawn_empty > 0:
-                key, dropout_key = jax.random.split(key)
-                # Dropout applies only to cells that are both in the biome AND need updating
-                keep_mask = jax.random.bernoulli(
-                    dropout_key, 1.0 - self.dynamic_biome_spawn_empty, merged_objs.shape
-                )
-                # Only apply dropout where should_update is true; elsewhere, keep merged_objs
-                dropout_mask = should_update & keep_mask
-                # Apply dropout only to the merged result and associated metadata
-                final_objs = jnp.where(dropout_mask, merged_objs, 0)
-                final_colors = jnp.where(dropout_mask[..., None], merged_colors, 0)
-                final_params = jnp.where(dropout_mask[..., None], merged_params, 0)
-                final_gen = jnp.where(dropout_mask, merged_gen, 0)
-                final_spawn = jnp.where(dropout_mask, merged_spawn, 0)
+                all_new_objects = jnp.stack(all_new_objects_list)
+                all_new_colors = jnp.stack(all_new_colors_list)
+                all_new_params = jnp.stack(all_new_params_list)
             else:
-                final_objs = merged_objs
-                final_colors = merged_colors
-                final_params = merged_params
-                final_gen = merged_gen
-                final_spawn = merged_spawn
+                # Random spawn works with vmap
+                all_new_objects, all_new_colors, all_new_params = jax.vmap(
+                    lambda i, k: self._spawn_biome_objects(i, k, deterministic=False)
+                )(jnp.arange(num_biomes), biome_keys)
 
-            # 3. Write back: Only update where should_update is true
-            new_obj_id = jnp.where(should_update, final_objs, new_obj_id)
-            new_color = jnp.where(should_update[..., None], final_colors, new_color)
-            new_params = jnp.where(should_update[..., None], final_params, new_params)
-            new_gen = jnp.where(should_update, final_gen, new_gen)
-            new_spawn = jnp.where(should_update, final_spawn, new_spawn)
+            # Initialize updated grids
+            new_obj_id = object_state.object_id
+            new_color = object_state.color
+            new_params = object_state.state_params
+            new_spawn = object_state.spawn_time
+            new_gen = object_state.generation
 
-        # Clear timers in respawning biomes
-        new_respawn_timer = object_state.respawn_timer
-        new_respawn_object_id = object_state.respawn_object_id
-        for i in range(num_biomes):
-            biome_mask = self.biome_masks_array[i]
-            should_clear = biome_mask & should_respawn[i][..., None]
-            new_respawn_timer = jnp.where(should_clear, 0, new_respawn_timer)
-            new_respawn_object_id = jnp.where(should_clear, 0, new_respawn_object_id)
+            # Update biome state
+            new_consumption_count = jnp.where(
+                should_respawn, 0, biome_state.consumption_count
+            )
+            new_generation = biome_state.generation + should_respawn.astype(int)
 
-        object_state = object_state.replace(
-            object_id=new_obj_id,
-            respawn_timer=new_respawn_timer,
-            respawn_object_id=new_respawn_object_id,
-            color=new_color,
-            state_params=new_params,
-            generation=new_gen,
-            spawn_time=new_spawn,
+            # Compute new total objects for respawning biomes
+            def count_objects(i):
+                return jnp.sum((all_new_objects[i] > 0) & self.biome_masks_array[i])
+
+            new_object_counts = jax.vmap(count_objects)(jnp.arange(num_biomes))
+            new_total_objects = jnp.where(
+                should_respawn, new_object_counts, biome_state.total_objects
+            )
+
+            new_biome_state = BiomeState(
+                consumption_count=new_consumption_count,
+                total_objects=new_total_objects,
+                generation=new_generation,
+            )
+
+            # Update grids for respawning biomes
+            for i in range(num_biomes):
+                biome_mask = self.biome_masks_array[i]
+                new_gen_value = new_biome_state.generation[i]
+
+                # Update mask: biome area AND needs respawn
+                should_update = biome_mask & should_respawn[i][..., None]
+
+                # 1. Merge: Overwrite with new objects if present, otherwise keep existing
+                new_spawn_valid = all_new_objects[i] > 0
+
+                merged_objs = jnp.where(new_spawn_valid, all_new_objects[i], new_obj_id)
+                merged_colors = jnp.where(
+                    new_spawn_valid[..., None], all_new_colors[i], new_color
+                )
+                merged_params = jnp.where(
+                    new_spawn_valid[..., None], all_new_params[i], new_params
+                )
+
+                merged_gen = jnp.where(new_spawn_valid, new_gen_value, new_gen)
+                merged_spawn = jnp.where(new_spawn_valid, current_time, new_spawn)
+
+                if self.dynamic_biome_spawn_empty > 0:
+                    key_dropout, dropout_key = jax.random.split(key)
+                    # Use unique key for each biome's dropout
+                    dropout_key = jax.random.fold_in(dropout_key, i)
+                    keep_mask = jax.random.bernoulli(
+                        dropout_key,
+                        1.0 - self.dynamic_biome_spawn_empty,
+                        merged_objs.shape,
+                    )
+                    dropout_mask = should_update & keep_mask
+                    final_objs = jnp.where(dropout_mask, merged_objs, 0)
+                    final_colors = jnp.where(dropout_mask[..., None], merged_colors, 0)
+                    final_params = jnp.where(dropout_mask[..., None], merged_params, 0)
+                    final_gen = jnp.where(dropout_mask, merged_gen, 0)
+                    final_spawn = jnp.where(dropout_mask, merged_spawn, 0)
+                else:
+                    final_objs = merged_objs
+                    final_colors = merged_colors
+                    final_params = merged_params
+                    final_gen = merged_gen
+                    final_spawn = merged_spawn
+
+                new_obj_id = jnp.where(should_update, final_objs, new_obj_id)
+                new_color = jnp.where(should_update[..., None], final_colors, new_color)
+                new_params = jnp.where(
+                    should_update[..., None], final_params, new_params
+                )
+                new_gen = jnp.where(should_update, final_gen, new_gen)
+                new_spawn = jnp.where(should_update, final_spawn, new_spawn)
+
+            # Clear timers in respawning biomes
+            new_respawn_timer = object_state.respawn_timer
+            new_respawn_object_id = object_state.respawn_object_id
+            for i in range(num_biomes):
+                biome_mask = self.biome_masks_array[i]
+                should_clear = biome_mask & should_respawn[i][..., None]
+                new_respawn_timer = jnp.where(should_clear, 0, new_respawn_timer)
+                new_respawn_object_id = jnp.where(
+                    should_clear, 0, new_respawn_object_id
+                )
+
+            new_object_state = object_state.replace(
+                object_id=new_obj_id,
+                respawn_timer=new_respawn_timer,
+                respawn_object_id=new_respawn_object_id,
+                color=new_color,
+                state_params=new_params,
+                generation=new_gen,
+                spawn_time=new_spawn,
+            )
+            return new_object_state, new_biome_state, key
+
+        def no_respawn(args):
+            object_state, biome_state, _, key = args
+            return object_state, biome_state, key
+
+        object_state, biome_state, key = jax.lax.cond(
+            any_respawn,
+            do_respawn,
+            no_respawn,
+            (object_state, biome_state, should_respawn, key),
         )
 
-        return object_state, new_biome_state, key
+        return object_state, biome_state, key
 
     def reset_env(
         self, key: jax.Array, params: EnvParams
