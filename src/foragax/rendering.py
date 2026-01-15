@@ -38,39 +38,15 @@ def apply_true_borders(
         jax.image.ResizeMethod.NEAREST,
     )
 
-    # Create border mask (2-pixel thick borders) - vectorized like grid lines
-    height, width = grid_size
-    img_height, img_width = height * 24, width * 24
+    # Create border mask (2-pixel thick borders) using vectorized modulo operations
+    img_height, img_width = grid_size[0] * 24, grid_size[1] * 24
+    y_idx = jnp.arange(img_height) % 24
+    x_idx = jnp.arange(img_width) % 24
 
-    border_mask = jnp.zeros((img_height, img_width), dtype=bool)
-
-    # Create border row and column indices for all cells at once
-    cell_rows = jnp.arange(height)
-    cell_cols = jnp.arange(width)
-
-    # Top border rows: 2 rows per cell
-    top_border_rows = cell_rows[:, None] * 24 + jnp.arange(2)[None, :]
-    top_border_rows_flat = top_border_rows.flatten()
-
-    # Bottom border rows: 2 rows per cell
-    bottom_border_rows = cell_rows[:, None] * 24 + 22 + jnp.arange(2)[None, :]
-    bottom_border_rows_flat = bottom_border_rows.flatten()
-
-    # Left border columns: 2 columns per cell
-    left_border_cols = cell_cols[:, None] * 24 + jnp.arange(2)[None, :]
-    left_border_cols_flat = left_border_cols.flatten()
-
-    # Right border columns: 2 columns per cell
-    right_border_cols = cell_cols[:, None] * 24 + 22 + jnp.arange(2)[None, :]
-    right_border_cols_flat = right_border_cols.flatten()
-
-    # Set top and bottom borders (full width rectangles)
-    all_border_rows = jnp.concatenate([top_border_rows_flat, bottom_border_rows_flat])
-    border_mask = border_mask.at[all_border_rows, :].set(True)
-
-    # Set left and right borders (full height rectangles)
-    all_border_cols = jnp.concatenate([left_border_cols_flat, right_border_cols_flat])
-    border_mask = border_mask.at[:, all_border_cols].set(True)
+    # Border pixels are those with offset 0, 1, 22, or 23 within each 24x24 cell
+    is_border_row = (y_idx < 2) | (y_idx >= 22)
+    is_border_col = (x_idx < 2) | (x_idx >= 22)
+    border_mask = is_border_row[:, None] | is_border_col[None, :]
 
     # Apply border mask: use HSV border colors for border pixels, base colors elsewhere
     result_img = jnp.where(border_mask[..., None], border_img, base_img)

@@ -327,15 +327,18 @@ class FourierObject(BaseForagaxObject):
 
         # Extract interleaved coefficients: [a1, b1, a2, b2, ...]
         ab_coeffs = params[3:]
+        # Reuse existing arrays via reshaping/slices for vectorization
+        # Reshape ab_coeffs to (num_terms, 2) where col 0 is a_n, col 1 is b_n
         n_terms = len(ab_coeffs) // 2
+        coeffs = ab_coeffs.reshape((n_terms, 2))
+        a_coeffs = coeffs[:, 0]
+        b_coeffs = coeffs[:, 1]
 
-        # Compute Fourier series: sum(a_n*cos(n*t) + b_n*sin(n*t))
-        reward = 0.0
-        for i in range(n_terms):
-            freq = i + 1
-            a_i = ab_coeffs[2 * i]  # a coefficient at index 2i
-            b_i = ab_coeffs[2 * i + 1]  # b coefficient at index 2i+1
-            reward += a_i * jnp.cos(freq * t) + b_i * jnp.sin(freq * t)
+        freqs = jnp.arange(1, n_terms + 1, dtype=jnp.float32)
+        terms = freqs * t
+
+        # Calculate sum(a_n * cos(n*t) + b_n * sin(n*t))
+        reward = jnp.sum(a_coeffs * jnp.cos(terms) + b_coeffs * jnp.sin(terms))
 
         # Apply min-max normalization to [-1, 1], then scale by base_magnitude
         # Formula: 2 * (x - min) / (max - min) - 1

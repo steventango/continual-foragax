@@ -576,8 +576,8 @@ def test_foragax_diwali_v1_creation():
     # Check shapes
     chex.assert_shape(state.object_state.color, (15, 15, 3))
     chex.assert_shape(
-        state.object_state.state_params, (15, 15, 22)
-    )  # 2 + 2*10 = 22 params
+        state.object_state.state_params, (15, 15, 23)
+    )  # 3 + 2*10 = 23 params
     chex.assert_shape(state.biome_state.consumption_count, (2,))  # 2 biomes
     chex.assert_shape(state.biome_state.total_objects, (2,))
     chex.assert_shape(state.biome_state.generation, (2,))
@@ -633,8 +633,8 @@ def test_foragax_diwali_v2_creation():
     # Check shapes
     chex.assert_shape(state.object_state.color, (15, 15, 3))
     chex.assert_shape(
-        state.object_state.state_params, (15, 15, 22)
-    )  # 2 + 2*10 = 22 params
+        state.object_state.state_params, (15, 15, 23)
+    )  # 3 + 2*10 = 23 params
     chex.assert_shape(state.biome_state.consumption_count, (2,))  # 2 biomes
     chex.assert_shape(state.biome_state.total_objects, (2,))
     chex.assert_shape(state.biome_state.generation, (2,))

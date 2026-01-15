@@ -335,3 +335,19 @@ def test_benchmark_sine_two_biome_v1(benchmark):
         _run(state, run_key).pos.block_until_ready()
 
     benchmark(benchmark_fn)
+
+
+def test_benchmark_render(benchmark):
+    env = registry.make("ForagaxDiwali-v5")
+    params = env.default_params
+    key = jax.random.key(0)
+    key, reset_key = jax.random.split(key)
+    _, state = env.reset(reset_key, params)
+
+    # warm-up
+    env.render(state, params, render_mode="world_reward").block_until_ready()
+
+    def benchmark_fn():
+        env.render(state, params, render_mode="world_reward").block_until_ready()
+
+    benchmark(benchmark_fn)
