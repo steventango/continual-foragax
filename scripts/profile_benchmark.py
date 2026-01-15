@@ -15,7 +15,7 @@ from foragax.env import Actions
 def profile_environment(
     env_name, num_envs=128, steps=1000, trace_dir="/tmp/jax_trace", fast=True
 ):
-    print(f"Structuring benchmark for {env_name}...")
+    print(f"Setting up benchmark for {env_name}...")
     env = registry.make(env_name)
     params = env.default_params
 
