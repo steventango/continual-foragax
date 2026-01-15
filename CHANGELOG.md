@@ -1,3 +1,9 @@
+## 0.40.0 (2026-01-15)
+
+### Feat
+
+- remove teleport functionality
+
 ## 0.39.0 (2025-12-11)
 
 ### Feat
