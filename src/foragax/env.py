@@ -930,9 +930,7 @@ class ForagaxEnv(environment.Environment):
                 merged_spawn = jnp.where(new_spawn_valid, current_time, new_spawn)
 
                 if self.dynamic_biome_spawn_empty > 0:
-                    key_dropout, dropout_key = jax.random.split(key)
-                    # Use unique key for each biome's dropout
-                    dropout_key = jax.random.fold_in(dropout_key, i)
+                    key, dropout_key = jax.random.split(key)
                     keep_mask = jax.random.bernoulli(
                         dropout_key,
                         1.0 - self.dynamic_biome_spawn_empty,
