@@ -62,7 +62,7 @@ def profile_environment(
         # Warmup
         print("Warming up...")
         key, run_key = jax.random.split(key)
-        _step_fn(states, run_key).pos.block_until_ready()
+        _step_fn(states, run_key)[0].pos.block_until_ready()
         print("Warmup done.")
 
         def _run(states, key):
@@ -178,6 +178,9 @@ def parse_trace(trace_dir):
 
     df = pd.DataFrame(df_data)
     if not df.empty:
+        max_total_ms = df["Total (ms)"].max()
+        df["% Total"] = (df["Total (ms)"] / max_total_ms) * 100
+
         df = df.sort_values(by="Total (ms)", ascending=False)
         print("\n=== Profiling Results (Top 20 Scopes) ===")
         print(df.head(20).to_string(index=False))
@@ -185,14 +188,14 @@ def parse_trace(trace_dir):
         # Check for our specific named scopes
         # Since JAX names might be mangled/nested, we search for partial matches
         target_scopes = [
-            "move_agent",
-            "compute_reward",
-            "respawn_logic",
+            "_move_agent",
+            "_compute_reward",
+            "_respawn_logic",
             "expire_objects",
-            "dynamic_biomes",
-            "observation",
+            "_dynamic_biomes",
+            "get_obs",
             "update_state",
-            "reward_grid",
+            "_reward_grid",
         ]
         print("\n=== Target Environment Scopes ===")
 
@@ -202,9 +205,6 @@ def parse_trace(trace_dir):
             mask = df["Scope Name"].str.contains(target)
             if mask.any():
                 subset = df[mask]
-                # Summing might be double counting if there are multiple events per call (e.g. across batch)
-                # or separate XLA ops. But usually named_scope wraps the whole block.
-                # Let's show the matched rows.
                 found_targets.append(subset)
 
         if found_targets:
