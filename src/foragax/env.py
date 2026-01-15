@@ -828,7 +828,7 @@ class ForagaxEnv(environment.Environment):
         self, key: jax.Array, params: EnvParams
     ) -> Tuple[jax.Array, EnvState]:
         """Reset environment state."""
-        num_object_params = 2 + 2 * self.num_fourier_terms
+        num_object_params = 3 + 2 * self.num_fourier_terms
         object_state = ObjectState.create_empty(self.size, num_object_params)
 
         key, iter_key = jax.random.split(key)
@@ -970,7 +970,7 @@ class ForagaxEnv(environment.Environment):
                 color_grid = jnp.where(obj_mask[..., None], obj_color, color_grid)
 
         # Initialize parameters grid
-        num_object_params = 2 + 2 * self.num_fourier_terms
+        num_object_params = 3 + 2 * self.num_fourier_terms
         params_grid = jnp.zeros(
             (self.size[1], self.size[0], num_object_params), dtype=jnp.float32
         )
@@ -1024,7 +1024,7 @@ class ForagaxEnv(environment.Environment):
 
     def state_space(self, params: EnvParams) -> spaces.Dict:
         """State space of the environment."""
-        num_object_params = 2 + 2 * self.num_fourier_terms
+        num_object_params = 3 + 2 * self.num_fourier_terms
         return spaces.Dict(
             {
                 "pos": spaces.Box(0, max(self.size), (2,), int),
