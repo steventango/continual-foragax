@@ -6,7 +6,7 @@ Source: https://github.com/andnp/Forager
 from dataclasses import dataclass
 from enum import IntEnum
 from functools import partial
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, Tuple, Union
 
 import jax
 import jax.numpy as jnp
@@ -128,7 +128,6 @@ class ForagaxEnv(environment.Environment):
         biomes: Tuple[Biome, ...] = (Biome(object_frequencies=()),),
         nowrap: bool = False,
         deterministic_spawn: bool = False,
-        teleport_interval: Optional[int] = None,
         observation_type: str = "object",
         dynamic_biomes: bool = False,
         biome_consumption_threshold: float = 0.9,
@@ -154,7 +153,6 @@ class ForagaxEnv(environment.Environment):
         self.observation_type = observation_type
         self.nowrap = nowrap
         self.deterministic_spawn = deterministic_spawn
-        self.teleport_interval = teleport_interval
         self.dynamic_biomes = dynamic_biomes
         self.biome_consumption_threshold = biome_consumption_threshold
         self.dynamic_biome_spawn_empty = dynamic_biome_spawn_empty
@@ -390,23 +388,6 @@ class ForagaxEnv(environment.Environment):
         obj_at_new_pos = current_objects[new_pos[1], new_pos[0]]
         is_blocking = self.object_blocking[obj_at_new_pos]
         pos = jax.lax.select(is_blocking, state.pos, new_pos)
-
-        # Check for automatic teleport
-        if self.teleport_interval is not None:
-            should_teleport = jnp.mod(state.time + 1, self.teleport_interval) == 0
-        else:
-            should_teleport = False
-
-        def teleport_fn():
-            # Calculate squared distances from current position to each biome center
-            diffs = self.biome_centers_jax - pos
-            distances = jnp.sum(diffs**2, axis=1)
-            # Find the index of the furthest biome center
-            furthest_idx = jnp.argmax(distances)
-            new_pos = self.biome_centers_jax[furthest_idx]
-            return new_pos
-
-        pos = jax.lax.cond(should_teleport, teleport_fn, lambda: pos)
 
         # 2. HANDLE COLLISIONS AND REWARDS
         obj_at_pos = current_objects[pos[1], pos[0]]

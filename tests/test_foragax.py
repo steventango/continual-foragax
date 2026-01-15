@@ -977,66 +977,6 @@ def test_single_color_all_objects():
         chex.assert_trees_all_equal(obj_obs, jnp.array([1.0]))
 
 
-def test_teleporting():
-    """Test automatic teleporting to the furthest biome center from current position."""
-    key = jax.random.key(0)
-
-    # Create environment with two biomes and teleport every 5 steps
-    env = ForagaxEnv(
-        size=(10, 10),
-        aperture_size=(3, 3),
-        objects=(WALL,),
-        biomes=(
-            Biome(
-                start=(1, 1), stop=(5, 5), object_frequencies=(0.0,)
-            ),  # Biome 0 center at (2,2)
-            Biome(
-                start=(6, 6), stop=(10, 10), object_frequencies=(0.0,)
-            ),  # Biome 1 center at (7,7)
-        ),
-        teleport_interval=5,
-        nowrap=True,
-        observation_type="color",
-    )
-    params = env.default_params
-
-    # Reset and get initial state
-    obs, state = env.reset_env(key, params)
-
-    # Agent should start at center (5, 5), which is not in either biome initially
-    # But let's manually place it in biome 0 for testing
-    state = state.replace(pos=jnp.array([2, 2]))  # In biome 0
-
-    # Step 4 times (time will be 0,1,2,3,4 after these steps)
-    for i in range(4):
-        key, step_key = jax.random.split(key)
-        obs, state, _, _, _ = env.step_env(step_key, state, Actions.LEFT, params)
-
-    # After 4 steps, time=4, next step should teleport (4+1) % 5 == 0
-    key, step_key = jax.random.split(key)
-    obs, state, _, _, _ = env.step_env(step_key, state, Actions.LEFT, params)
-
-    # Should have teleported to the furthest biome center (biome 1 center)
-    # From (2,2), (7,7) is further than (2,2)
-    expected_pos = jnp.array([7, 7])
-    chex.assert_trees_all_equal(state.pos, expected_pos)
-
-    # Step another 4 times to reach time=9, then teleport back
-    # From [7,7], move right to stay in biome: [8,7], [9,7], then stay
-    for i in range(4):
-        key, step_key = jax.random.split(key)
-        obs, state, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
-
-    # After another 4 steps, time=9, next step should teleport (9+1) % 5 == 0
-    key, step_key = jax.random.split(key)
-    obs, state, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
-
-    # Should teleport to the furthest biome center (biome 0 center)
-    # From (7,7), (2,2) is further than (7,7)
-    expected_pos = jnp.array([2, 2])
-    chex.assert_trees_all_equal(state.pos, expected_pos)
-
-
 def test_info_discount():
     """Test that info contains discount."""
     key = jax.random.key(0)
