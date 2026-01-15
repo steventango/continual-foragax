@@ -2,6 +2,7 @@ import chex
 import jax
 import jax.numpy as jnp
 
+from foragax import registry
 from foragax.env import Actions, Biome, ForagaxEnv
 from foragax.objects import FLOWER, WALL
 
@@ -254,6 +255,62 @@ def test_benchmark_small_env_world(benchmark):
         observation_type="object",
         aperture_size=-1,
     )
+    params = env.default_params
+    key = jax.random.key(0)
+    key, reset_key = jax.random.split(key)
+    _, state = env.reset(reset_key, params)
+
+    @jax.jit
+    def _run(state, key):
+        def f(carry, _):
+            state, key = carry
+            key, step_key = jax.random.split(key, 2)
+            _, new_state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+            return (new_state, key), None
+
+        (final_state, _), _ = jax.lax.scan(f, (state, key), None, length=10)
+        return final_state
+
+    key, run_key = jax.random.split(key)
+    _run(state, run_key).pos.block_until_ready()
+
+    def benchmark_fn():
+        key, run_key = jax.random.split(jax.random.key(1))
+        _run(state, run_key).pos.block_until_ready()
+
+    benchmark(benchmark_fn)
+
+
+def test_benchmark_diwali_v5(benchmark):
+    env = registry.make("ForagaxDiwali-v5")
+    params = env.default_params
+    key = jax.random.key(0)
+    key, reset_key = jax.random.split(key)
+    _, state = env.reset(reset_key, params)
+
+    @jax.jit
+    def _run(state, key):
+        def f(carry, _):
+            state, key = carry
+            key, step_key = jax.random.split(key, 2)
+            _, new_state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+            return (new_state, key), None
+
+        (final_state, _), _ = jax.lax.scan(f, (state, key), None, length=10)
+        return final_state
+
+    key, run_key = jax.random.split(key)
+    _run(state, run_key).pos.block_until_ready()
+
+    def benchmark_fn():
+        key, run_key = jax.random.split(jax.random.key(1))
+        _run(state, run_key).pos.block_until_ready()
+
+    benchmark(benchmark_fn)
+
+
+def test_benchmark_sine_two_biome_v1(benchmark):
+    env = registry.make("ForagaxSineTwoBiome-v1")
     params = env.default_params
     key = jax.random.key(0)
     key, reset_key = jax.random.split(key)
