@@ -47,7 +47,7 @@ def _move_agent(pos, current_objects, action):
 
 Example command:
 ```bash
-uv run python scripts/profile_benchmark.py --env ForagaxDiwali-v5 --steps 100 --trace_dir /tmp/jax_trace
+uv run python scripts/profile_benchmark.py --env ForagaxDiwali-v5
 ```
 
 ### 3. Formulate Hypothesis & Plan

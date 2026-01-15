@@ -221,7 +221,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--env", type=str, default="ForagaxDiwali-v5")
     parser.add_argument("--num_envs", type=int, default=128)
-    parser.add_argument("--steps", type=int, default=1000)
+    parser.add_argument("--steps", type=int, default=10)
     parser.add_argument("--trace_dir", type=str, default="/tmp/jax_trace")
     parser.add_argument(
         "--fast",
