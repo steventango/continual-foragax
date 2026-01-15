@@ -1,0 +1,1917 @@
+EUROPEAN CLIMATE ASSESSMENT & DATASET (ECA&D), file created on 27-02-2025
+THESE DATA CAN BE USED FREELY PROVIDED THAT THE FOLLOWING SOURCE IS ACKNOWLEDGED:
+
+Klein Tank, A.M.G. and Coauthors, 2002. Daily dataset of 20th-century surface
+air temperature and precipitation series for the European Climate Assessment.
+Int. J. of Climatol., 22, 1441-1453.
+Data and metadata available at http://www.ecad.eu
+
+
+----------------------------------------------------------------
+257,CET CENTRAL ENGLAND,UNITED KINGDOM,+52:25:12,-001:49:48,78 m 
+----------------------------------------------------------------
+* Land use:
+Composite site
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+271,ARMAGH OBSERVATORY,UNITED KINGDOM,+54:21:00,-006:39:00,62 m 
+----------------------------------------------------------------
+* Land use:
+Observatory approximately 1 km northeast of the centre of the ancient city of Armagh. It is situated at the top of a small drumlin (hill) in an estate of natural woodland and parkland of circa 7 ha. To the north and east the observatory estate is bounded 
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+Manual weather readings at Armagh Observatory<br>rainfall: Square 1 raingauge. Exceptions: 12 Nov 1840, 14 May 1849, 6 Apr 1847 from Round gauge.<br>sunshine duration: Campbell-Stokes sunshine recorder<br>More details:<br>Butler, C. J. et al. (2005) Int. J. of  Climatol. 25:1055-1079. <br>Butler, C.J. and Garcia-Suarez, A.M. (2012) DOI:10.1002/joc.2302
+
+----------------------------------------------------------------
+272,ESKDALEMUIR,UNITED KINGDOM,+55:19:00,-003:12:00,242 m 
+----------------------------------------------------------------
+* Land use:
+Garden in rural upland area, observatory
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+273,HULL,UNITED KINGDOM,+53:45:21,-000:21:23,2 m 
+----------------------------------------------------------------
+* Land use:
+Garden in urban area
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+274,RADCLIFFE METEOROLOGICAL STATION OXFORD,UNITED KINGDOM,+51:45:40,-001:15:50,63 m 
+----------------------------------------------------------------
+* Land use:
+College garden within urban area
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+Temperature:<br>Daily maximum and minimum temperatures are available from April 1815; estimates have been made to cover minor periods of missing data.<br>Until 1849, the thermometers were exposed on a north wall; since August 1849, they have been exposed in a thermometer screen, of the Stevenson type since December 1878..<br>Records prior to 1972 have been converted to degrees Celsius (rounded to one decimal place) from degrees Fahrenheit: some original values are given only to 1 degF resolution.<br><br>Precipitation:<br>Daily records are available from 1827, although some caution needs to be exercised with regard to these until 1853, as some may represent multi-day accumulations. Estimates have been made to cover minor periods of missing data.<br>Records prior to 1972 have been converted to millimetres (rounded to one decimal place) from inches.<br><br>Sunshine:<br>Records are given in hours and tenths (rounded where necessary to one decimal place).<br><br>Full details on the source and derivation of the records, thermometer, raingauge and sunshine recorder exposure, times of observations etc are given in Oxford Weather and Climate since 1767, Appendix 1.<br><br>Please cite: Oxford Weather and Climate since 1767 by Stephen Burt and Tim Burt, published by Oxford University Press, 2019.
+
+----------------------------------------------------------------
+275,WICK,UNITED KINGDOM,+58:27:00,-003:05:00,36 m 
+----------------------------------------------------------------
+* Land use:
+Open airfield, coastal 
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+348,LERWICK,UNITED KINGDOM,+60:08:00,-001:11:00,82 m 
+----------------------------------------------------------------
+* Land use:
+Observatory in general moorland, coastal. 
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+BSRN Station 51<br>cite: Hodgetts, Grant; Fishwick, Patrick; Tamlyn, Jonathan (2022): Basic measurements of radiation at station Lerwick (2001-01 et seq). Met Office, Exeter, Devon, PANGAEA, https://doi.org/10.1594/PANGAEA.945264
+
+----------------------------------------------------------------
+349,STORNOWAY AIRPORT,UNITED KINGDOM,+58:12:49,-006:19:03,15 m 
+----------------------------------------------------------------
+* Land use:
+Open airfield, coastal 
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+350,VALLEY,UNITED KINGDOM,+53:15:00,-004:32:00,11 m 
+----------------------------------------------------------------
+* Land use:
+Open airfield, coastal 
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+351,WADDINGTON,UNITED KINGDOM,+53:09:58,-000:31:26,68 m 
+----------------------------------------------------------------
+* Land use:
+Open airfield
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+352,CAMBORNE,UNITED KINGDOM,+50:13:00,-005:19:00,88 m 
+----------------------------------------------------------------
+* Land use:
+Grassland on edge of village, near small town
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+BSRN station 50<br>cite: Hodgetts, Grant; Fishwick, Patrick; Tamlyn, Jonathan (2022): Basic measurements of radiation at station Camborne (2001-01 et seq). Met Office, Exeter, Devon, PANGAEA, https://doi.org/10.1594/PANGAEA.945262
+
+----------------------------------------------------------------
+427,STORNOWAY,UNITED KINGDOM,+58:13:12,-006:19:12,21 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+461,DURHAM,UNITED KINGDOM,+54:46:04,-001:35:04,102 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+1627,KIRKWALL,UNITED KINGDOM,+58:57:00,-002:54:00,26 m 
+----------------------------------------------------------------
+* Land use:
+Open airfield, coastal 
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1628,KINLOSS,UNITED KINGDOM,+57:39:00,-003:34:12,5 m 
+----------------------------------------------------------------
+* Land use:
+Open airfield, coastal 
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1629,CRAIBSTONE,UNITED KINGDOM,+57:10:48,-002:12:00,102 m 
+----------------------------------------------------------------
+* Land use:
+Garden in Agricultural College near airfield and urban area
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1630,MYLNEFIELD,UNITED KINGDOM,+56:27:00,-003:04:12,31 m 
+----------------------------------------------------------------
+* Land use:
+Horticultural nursery near estuary
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1631,RINGWAY,UNITED KINGDOM,+53:21:00,-002:16:48,69 m 
+----------------------------------------------------------------
+* Land use:
+General airfield, south of large urban area
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1632,ASKHAM BRYAN,UNITED KINGDOM,+53:55:12,-001:10:12,32 m 
+----------------------------------------------------------------
+* Land use:
+Garden on arable farm near to towns
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1633,SHAWBURY,UNITED KINGDOM,+52:48:00,-002:40:12,72 m 
+----------------------------------------------------------------
+* Land use:
+Open airfield
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1634,GOUDHURST,UNITED KINGDOM,+51:04:48,+000:27:36,85 m 
+----------------------------------------------------------------
+* Land use:
+Garden of country house in wooded area
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1635,DALE FORT,UNITED KINGDOM,+51:42:00,-005:09:00,33 m 
+----------------------------------------------------------------
+* Land use:
+Open, coastal
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+1636,PAISLEY,UNITED KINGDOM,+55:50:43,-004:25:46,32 m 
+----------------------------------------------------------------
+* Land use:
+Dense residential
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1637,CWMYSTWYTH,UNITED KINGDOM,+52:21:00,-003:49:12,301 m 
+----------------------------------------------------------------
+* Land use:
+Mixed agriculture
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1638,LONG ASHTON,UNITED KINGDOM,+51:25:48,-002:40:12,51 m 
+----------------------------------------------------------------
+* Land use:
+Parkland on edge of urban area
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1639,CAMBRIDGE (B. GDNS),UNITED KINGDOM,+52:11:35,+000:07:55,13 m 
+----------------------------------------------------------------
+* Land use:
+Large garden in urban area
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1640,ALDERGROVE,UNITED KINGDOM,+54:39:00,-006:13:12,81 m 
+----------------------------------------------------------------
+* Land use:
+Open airfield
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1800,AUCHINCRUIVE,UNITED KINGDOM,+55:28:37,-004:33:58,48 m 
+----------------------------------------------------------------
+* Land use:
+Edge of village in arable area
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1801,GLENLEE,UNITED KINGDOM,+55:05:56,-004:11:10,55 m 
+----------------------------------------------------------------
+* Land use:
+Garden of country house in partly wooded area
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1802,THREAVE,UNITED KINGDOM,+54:55:30,-003:57:00,73 m 
+----------------------------------------------------------------
+* Land use:
+Agriculture in parkland
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1803,RONALDSWAY,UNITED KINGDOM,+54:05:06,-004:37:59,16 m 
+----------------------------------------------------------------
+* Land use:
+Open airfield, coastal 
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1804,NEWTON RIGG,UNITED KINGDOM,+54:40:11,-002:47:11,169 m 
+----------------------------------------------------------------
+* Land use:
+Partly wooded garden site in arable area near town
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1805,GRIZEDALE,UNITED KINGDOM,+54:20:17,-003:01:12,91 m 
+----------------------------------------------------------------
+* Land use:
+Garden of country house in partly wooded area
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1806,PRESTON: MOOR PARK,UNITED KINGDOM,+53:46:26,-002:42:11,33 m 
+----------------------------------------------------------------
+* Land use:
+Garden  in urban parkland
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1807,HAWARDEN BRIDGE,UNITED KINGDOM,+53:13:00,-003:01:38,5 m 
+----------------------------------------------------------------
+* Land use:
+Agricultural parkland
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1808,LOGGERHEADS: COLOMENDY CENTRE,UNITED KINGDOM,+53:09:00,-003:11:46,210 m 
+----------------------------------------------------------------
+* Land use:
+Agricultural grassland
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1809,INVERNESS,UNITED KINGDOM,+57:29:13,-004:13:23,4 m 
+----------------------------------------------------------------
+* Land use:
+Commercial area of coastal town
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1810,ABERPORTH,UNITED KINGDOM,+52:08:20,-004:34:19,133 m 
+----------------------------------------------------------------
+* Land use:
+Built-up airfield on coast with cliffs and few sandy bays
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1811,GOGERDDAN,UNITED KINGDOM,+52:25:55,-004:01:12,31 m 
+----------------------------------------------------------------
+* Land use:
+Garden of Agricultural College in rural area fairly near coast
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1812,YEOVILTON,UNITED KINGDOM,+51:00:22,-002:38:24,20 m 
+----------------------------------------------------------------
+* Land use:
+Open airfield
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1813,SWANAGE,UNITED KINGDOM,+50:36:50,-001:57:29,10 m 
+----------------------------------------------------------------
+* Land use:
+Garden  near sea in coastal town
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1814,PLYMOUTH: MOUNTBATTEN,UNITED KINGDOM,+50:21:14,-004:07:16,50 m 
+----------------------------------------------------------------
+* Land use:
+Grassland, coastal clifftop on edge of urban area
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1815,SLAPTON,UNITED KINGDOM,+50:17:31,-003:39:04,32 m 
+----------------------------------------------------------------
+* Land use:
+Garden  between sea and village
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1816,ST MAWGAN,UNITED KINGDOM,+50:26:13,-004:59:56,103 m 
+----------------------------------------------------------------
+* Land use:
+Built-up airfield, coastal
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1817,BUDE,UNITED KINGDOM,+50:49:41,-004:32:46,15 m 
+----------------------------------------------------------------
+* Land use:
+Open residential, coastal
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1818,BRAEMAR,UNITED KINGDOM,+57:00:22,-003:23:49,339 m 
+----------------------------------------------------------------
+* Land use:
+Agriculture in upland grassland
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+Change of site May 2005
+
+----------------------------------------------------------------
+1819,BALMORAL,UNITED KINGDOM,+57:02:13,-003:13:12,283 m 
+----------------------------------------------------------------
+* Land use:
+Golf course in partly wooded valley,in moorland area
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1820,HILLSBOROUGH,UNITED KINGDOM,+54:27:07,-006:04:12,116 m 
+----------------------------------------------------------------
+* Land use:
+Agricultural grassland
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1821,STORMONT CASTLE,UNITED KINGDOM,+54:36:11,-005:49:44,56 m 
+----------------------------------------------------------------
+* Land use:
+Garden  in parkland on edge of urban area
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1822,LOUGH NAVAR FOREST,UNITED KINGDOM,+54:26:20,-007:54:11,126 m 
+----------------------------------------------------------------
+* Land use:
+Agriculture in woodland
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1823,GUERNSEY: AIRPORT,UNITED KINGDOM,+49:25:59,-002:36:00,101 m 
+----------------------------------------------------------------
+* Land use:
+Open airfield, coastal
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1824,JERSEY: AIRPORT,UNITED KINGDOM,+49:13:01,-002:12:00,84 m 
+----------------------------------------------------------------
+* Land use:
+Open airfield, coastal 
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1825,DYCE,UNITED KINGDOM,+57:12:18,-002:12:14,65 m 
+----------------------------------------------------------------
+* Land use:
+Commercial airfield north of urban area
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1826,ALWEN,UNITED KINGDOM,+53:03:40,-003:33:14,345 m 
+----------------------------------------------------------------
+* Land use:
+Light industrial area surrounded by mixed woodland and arable 
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1827,TIREE,UNITED KINGDOM,+56:29:49,-006:53:13,9 m 
+----------------------------------------------------------------
+* Land use:
+Open airfield, coastal 
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1828,ARDTALNAIG,UNITED KINGDOM,+56:31:44,-004:06:40,130 m 
+----------------------------------------------------------------
+* Land use:
+Open residential in arable area near edge of lake in valley base, upper slopes grass/moor land.
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1829,FASKALLY,UNITED KINGDOM,+56:43:05,-003:46:08,94 m 
+----------------------------------------------------------------
+* Land use:
+Agricultural parkland
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1830,LEUCHARS,UNITED KINGDOM,+56:22:37,-002:51:43,10 m 
+----------------------------------------------------------------
+* Land use:
+General airfield, coastal 
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1831,PENICUIK,UNITED KINGDOM,+55:49:26,-003:13:34,185 m 
+----------------------------------------------------------------
+* Land use:
+Garden  in partly-wooded area on edge of town
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1832,EDINBURGH: ROYAL BOTANIC GARDEN,UNITED KINGDOM,+55:58:01,-003:12:36,26 m 
+----------------------------------------------------------------
+* Land use:
+Agricultural parkland in urban area
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1833,DUNBAR,UNITED KINGDOM,+56:00:14,-002:31:34,23 m 
+----------------------------------------------------------------
+* Land use:
+Garden near sea in small coastal town
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1834,BLYTH BRIDGE,UNITED KINGDOM,+55:42:11,-003:22:01,253 m 
+----------------------------------------------------------------
+* Land use:
+Agriculture in grassland
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1835,BOWHILL,UNITED KINGDOM,+55:32:28,-002:54:18,168 m 
+----------------------------------------------------------------
+* Land use:
+Agriculture in parkland
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1836,KIELDER CASTLE,UNITED KINGDOM,+55:14:02,-002:34:44,201 m 
+----------------------------------------------------------------
+* Land use:
+Garden in village in partly forested area
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1837,MORPETH: COCKLE PARK,UNITED KINGDOM,+55:12:54,-001:41:10,95 m 
+----------------------------------------------------------------
+* Land use:
+Agricultural grassland
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1838,HIGH MOWTHORPE,UNITED KINGDOM,+54:06:18,-000:38:31,175 m 
+----------------------------------------------------------------
+* Land use:
+Farm in arable area
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+Data for 20070929 to 20090324 not available
+
+----------------------------------------------------------------
+1839,SKEGNESS,UNITED KINGDOM,+53:08:51,+000:20:52,6 m 
+----------------------------------------------------------------
+* Land use:
+Garden near sea in coastal town
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1840,TERRINGTON ST CLEMENT,UNITED KINGDOM,+52:44:42,+000:17:24,2 m 
+----------------------------------------------------------------
+* Land use:
+Arable agriculture
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1841,EAST BERGHOLT,UNITED KINGDOM,+51:57:32,+001:01:37,7 m 
+----------------------------------------------------------------
+* Land use:
+Agricultural grassland near estuary 
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1842,WATTISHAM,UNITED KINGDOM,+52:07:23,+000:57:43,89 m 
+----------------------------------------------------------------
+* Land use:
+Open airfield
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1843,LOWESTOFT,UNITED KINGDOM,+52:29:22,+001:44:46,25 m 
+----------------------------------------------------------------
+* Land use:
+Garden in coastal town 
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1844,ROTHAMSTED,UNITED KINGDOM,+51:48:22,-000:21:30,128 m 
+----------------------------------------------------------------
+* Land use:
+Arable agriculture
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1845,WRITTLE,UNITED KINGDOM,+51:43:55,+000:25:52,32 m 
+----------------------------------------------------------------
+* Land use:
+Horticultural college garden 
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1846,MALHAM TARN,UNITED KINGDOM,+54:06:00,-002:09:43,381 m 
+----------------------------------------------------------------
+* Land use:
+Site  in wooded garden on edge of lake in upland area
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1847,BRADFORD,UNITED KINGDOM,+53:48:48,-001:46:20,134 m 
+----------------------------------------------------------------
+* Land use:
+Garden in urban area
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1848,SHEFFIELD,UNITED KINGDOM,+53:22:51,-001:29:23,131 m 
+----------------------------------------------------------------
+* Land use:
+Garden  in urban parkland
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1849,BUXTON,UNITED KINGDOM,+53:15:27,-001:54:44,307 m 
+----------------------------------------------------------------
+* Land use:
+Garden in urban area
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1850,NOTTINGHAM: WATNALL,UNITED KINGDOM,+53:00:18,-001:15:00,117 m 
+----------------------------------------------------------------
+* Land use:
+Garden site on edge of village near urban area
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1851,WARSOP,UNITED KINGDOM,+53:13:23,-001:06:54,46 m 
+----------------------------------------------------------------
+* Land use:
+Arable agriculture
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1852,NEWTOWN LINFORD,UNITED KINGDOM,+52:40:48,-001:12:58,119 m 
+----------------------------------------------------------------
+* Land use:
+Garden in small village
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1853,WELLESBOURNE,UNITED KINGDOM,+52:12:22,-001:36:11,47 m 
+----------------------------------------------------------------
+* Land use:
+Arable agriculture, research station
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1854,KEELE,UNITED KINGDOM,+52:59:53,-002:16:12,179 m 
+----------------------------------------------------------------
+* Land use:
+Garden in partly wooded university site west of urban area
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1855,MALVERN,UNITED KINGDOM,+52:06:45,-002:18:25,62 m 
+----------------------------------------------------------------
+* Land use:
+Garden in town
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1856,HALESOWEN,UNITED KINGDOM,+52:26:13,-002:04:30,153 m 
+----------------------------------------------------------------
+* Land use:
+Garden on edge of urban area
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1857,KINLOCHEWE,UNITED KINGDOM,+57:36:47,-005:18:36,25 m 
+----------------------------------------------------------------
+* Land use:
+Garden in partly wooded rural valley
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1858,LYONSHALL,UNITED KINGDOM,+52:12:43,-002:58:05,155 m 
+----------------------------------------------------------------
+* Land use:
+Farm in partly wooded arable area
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1859,HAMPSTEAD,UNITED KINGDOM,+51:33:40,-000:10:44,137 m 
+----------------------------------------------------------------
+* Land use:
+Parkland in urban area
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1860,HEATHROW,UNITED KINGDOM,+51:28:44,-000:26:56,25 m 
+----------------------------------------------------------------
+* Land use:
+Commercial airfield on western edge of large urban area
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1861,WYE,UNITED KINGDOM,+51:11:06,+000:56:53,56 m 
+----------------------------------------------------------------
+* Land use:
+Arable agriculture, agricultural college
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1862,MANSTON,UNITED KINGDOM,+51:20:46,+001:20:24,49 m 
+----------------------------------------------------------------
+* Land use:
+Open airfield, coastal 
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1863,BOGNOR REGIS,UNITED KINGDOM,+50:46:52,-000:40:34,7 m 
+----------------------------------------------------------------
+* Land use:
+Open residential, coastal
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1864,EASTBOURNE,UNITED KINGDOM,+50:45:42,+000:17:07,7 m 
+----------------------------------------------------------------
+* Land use:
+Dense residential, coastal
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1865,HASTINGS,UNITED KINGDOM,+50:51:18,+000:34:19,45 m 
+----------------------------------------------------------------
+* Land use:
+Parkland in coastal town
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1866,WALLINGFORD,UNITED KINGDOM,+51:36:11,-001:06:29,48 m 
+----------------------------------------------------------------
+* Land use:
+Agricultural grassland, research station
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1867,HURN,UNITED KINGDOM,+50:46:44,-001:50:02,10 m 
+----------------------------------------------------------------
+* Land use:
+Open airfield, coastal 
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1868,EVERTON,UNITED KINGDOM,+50:44:31,-001:34:26,16 m 
+----------------------------------------------------------------
+* Land use:
+Horticultural nursery
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1869,LECKFORD,UNITED KINGDOM,+51:07:23,-001:26:17,117 m 
+----------------------------------------------------------------
+* Land use:
+Arable agriculture
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1870,HAYLING ISLAND,UNITED KINGDOM,+50:47:02,-000:59:02,4 m 
+----------------------------------------------------------------
+* Land use:
+Garden on sea edge of coastal town
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1871,ALICE HOLT LODGE,UNITED KINGDOM,+51:10:37,-000:50:53,115 m 
+----------------------------------------------------------------
+* Land use:
+Parkland in mixed woodland
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1872,LYNEHAM,UNITED KINGDOM,+51:30:07,-001:59:28,145 m 
+----------------------------------------------------------------
+* Land use:
+Open airfield
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1873,RHUM: KINLOCH,UNITED KINGDOM,+57:00:50,-006:17:13,5 m 
+----------------------------------------------------------------
+* Land use:
+Coastal, agriculture in grassland
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1874,BENMORE: YOUNGER BOTANIC GARDEN,UNITED KINGDOM,+56:01:41,-004:59:10,12 m 
+----------------------------------------------------------------
+* Land use:
+Garden  in wooded valley, in moorland area
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1875,BUTE: ROTHESAY,UNITED KINGDOM,+55:50:20,-005:03:50,43 m 
+----------------------------------------------------------------
+* Land use:
+Garden on edge of large coastal village
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1876,LEADHILLS,UNITED KINGDOM,+55:25:01,-003:45:32,393 m 
+----------------------------------------------------------------
+* Land use:
+Farm in upland rural area
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+1877,CARNWATH,UNITED KINGDOM,+55:42:00,-003:37:59,208 m 
+----------------------------------------------------------------
+* Land use:
+Garden on edge of village near to golf course
+* Soil type:
+
+* Surface coverage:
+grass
+* History:
+
+
+----------------------------------------------------------------
+2112,CAPE WRATH,UNITED KINGDOM,+58:37:48,-005:00:00,112 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+2113,PRESTWICK,UNITED KINGDOM,+55:30:00,-004:34:48,20 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+2115,CARLISLE,UNITED KINGDOM,+54:56:03,-002:57:44,28 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+2116,LEEMING,UNITED KINGDOM,+54:18:00,-001:31:48,40 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+2117,BLACKPOOL,UNITED KINGDOM,+53:46:12,-003:01:48,10 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+2118,NOTTINGHAM WEATHER CENTRE,UNITED KINGDOM,+53:00:00,-001:15:00,117 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+2119,FINNINGLEY,UNITED KINGDOM,+53:28:48,-001:00:00,17 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+2121,BIRMINGHAM,UNITED KINGDOM,+52:27:00,-001:43:48,99 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+2122,WYTON,UNITED KINGDOM,+52:21:26,-000:06:28,41 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+2124,BRIZE NORTON,UNITED KINGDOM,+51:45:00,-001:34:48,88 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+2125,STANSTED,UNITED KINGDOM,+51:52:48,+000:13:48,106 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+2126,CARDIFF-WALES,UNITED KINGDOM,+51:24:00,-003:21:00,67 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+2127,BOSCOMBE DOWN,UNITED KINGDOM,+51:09:41,-001:45:11,126 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+2128,LONDON/GATWICK,UNITED KINGDOM,+51:09:00,-000:10:48,62 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+2130,ST.MAWGAN,UNITED KINGDOM,+50:25:48,-005:00:00,119 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+2132,EXETER,UNITED KINGDOM,+50:43:48,-003:25:12,30 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+2133,BOURNEMOUTH,UNITED KINGDOM,+50:43:33,-001:53:01,40 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+2282,COLTISHALL,UNITED KINGDOM,+52:46:12,+001:21:00,20 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+3507,BRAEMAR-1,UNITED KINGDOM,+57:00:40,-003:23:46,327 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+3508,LOWESTOFT MONKTON AVENUE,UNITED KINGDOM,+52:28:59,+001:43:52,18 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+11102,BLACKPOOL SQUIRES GATE,UNITED KINGDOM,+53:46:27,-003:02:17,10 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+11103,CAWOOD,UNITED KINGDOM,+53:49:39,-001:08:48,6 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+11104,CRANWELL,UNITED KINGDOM,+53:01:51,-000:30:07,63 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+11105,LACOCK,UNITED KINGDOM,+51:25:51,-002:06:48,49 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+11106,LOSSIEMOUTH,UNITED KINGDOM,+57:42:42,-003:19:19,7 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+11107,MONKS WOOD,UNITED KINGDOM,+52:24:04,-000:14:07,41 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+11108,MORECAMBE NO 2,UNITED KINGDOM,+54:04:34,-002:51:30,7 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+11109,PERSHORE COLLEGE,UNITED KINGDOM,+52:05:59,-002:03:31,37 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+11110,SUTTON BONINGTON,UNITED KINGDOM,+52:50:10,-001:14:59,43 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+11111,WIGHT ST CATHERINES POINT,UNITED KINGDOM,+50:34:30,-001:17:44,20 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+11112,WISLEY,UNITED KINGDOM,+51:18:36,-000:28:29,38 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+11113,WOBURN,UNITED KINGDOM,+52:00:51,-000:35:40,89 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+17469,BALTASOUND,UNITED KINGDOM,+60:45:33,-000:53:09,24 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+17470,FORT AUGUSTUS,UNITED KINGDOM,+57:08:39,-004:40:34,21 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+17471,GORDON CASTLE,UNITED KINGDOM,+57:37:15,-003:05:17,32 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+17472,ARBROATH,UNITED KINGDOM,+56:33:38,-002:34:16,29 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+17473,EDINBURGH BLACKFORD HILL,UNITED KINGDOM,+55:55:23,-003:11:22,134 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+17474,AMPLEFORTH,UNITED KINGDOM,+54:12:07,-001:04:59,95 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+17475,CHELTENHAM,UNITED KINGDOM,+51:53:39,-002:04:42,65 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+17476,LONDON ST JAMES'S PARK,UNITED KINGDOM,+51:30:15,-000:07:46,5 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+17477,SOUTHAMPTON EAST PARK,UNITED KINGDOM,+50:54:16,-001:24:14,20 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+17478,MARLBOROUGH,UNITED KINGDOM,+51:24:56,-001:44:02,129 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+17479,DOUGLAS,UNITED KINGDOM,+54:10:04,-004:28:48,85 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+17480,BOLTON,UNITED KINGDOM,+53:36:00,-002:25:01,107 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+17481,BIDSTON,UNITED KINGDOM,+53:23:59,-003:04:26,60 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+17482,MACCLESFIELD,UNITED KINGDOM,+53:15:51,-002:08:05,143 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+17483,CARDIFF,UNITED KINGDOM,+51:30:23,-003:09:36,62 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+17484,LONG ASHTON,UNITED KINGDOM,+51:25:29,-002:40:02,51 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+17485,BATH,UNITED KINGDOM,+51:23:08,-002:21:12,20 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+17486,PLYMOUTH HOE,UNITED KINGDOM,+50:21:46,-004:08:24,36 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+17487,NEWQUAY,UNITED KINGDOM,+50:24:39,-005:04:47,53 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+17488,COVENTRY CITY HOSPITAL,UNITED KINGDOM,+52:24:49,-001:30:16,85 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+17489,ROSS-ON-WYE CRAIG,UNITED KINGDOM,+51:54:58,-002:34:59,65 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+
+----------------------------------------------------------------
+17490,ABERYSTWYTH CORPORATION YARD,UNITED KINGDOM,+52:24:42,-004:04:55,4 m 
+----------------------------------------------------------------
+* Land use:
+
+* Soil type:
+
+* Surface coverage:
+
+* History:
+
+

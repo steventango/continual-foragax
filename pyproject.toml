@@ -1,0 +1,41 @@
+[project]
+name = "continual-foragax"
+version = "0.39.0"
+description = "A continual reinforcement learning benchmark"
+readme = "README.md"
+authors = [
+    { name = "Steven Tang", email = "stang5@ualberta.ca" }
+]
+requires-python = ">=3.8"
+dependencies = [
+    "gymnax",
+    "six; python_version < '3.10'",
+]
+
+[dependency-groups]
+dev = [
+    "pre-commit",
+    "pytest",
+    "pytest-benchmark",
+    "ruff",
+]
+
+[project.scripts]
+foragax = "foragax:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool]
+[tool.commitizen]
+name = "cz_conventional_commits"
+version = "0.39.0"
+tag_format = "$version"
+version_files = ["pyproject.toml"]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.package-data]
+"foragax" = ["data/**/*"]

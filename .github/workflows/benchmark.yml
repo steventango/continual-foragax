@@ -1,0 +1,35 @@
+name: Benchmark
+on:
+  push:
+    branches: [ main ]
+    paths: [ "**.py", ".github/workflows/benchmark.yml" ]
+
+permissions:
+  contents: write
+  deployments: write
+
+jobs:
+  benchmark:
+    name: Run pytest-benchmark
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: astral-sh/setup-uv@v6
+      with:
+        activate-environment: true
+        python-version: "3.11"
+    - run: uv sync --dev
+    - name: Test with pytest
+      run: uv run pytest --benchmark-json output.json
+    - name: Store benchmark result
+      uses: benchmark-action/github-action-benchmark@v1
+      with:
+        name: Python Benchmark with pytest-benchmark
+        tool: 'pytest'
+        output-file-path: output.json
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        auto-push: true
+        alert-threshold: '200%'
+        comment-on-alert: true
+        summary-always: true
+        fail-on-alert: true
