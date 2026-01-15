@@ -41,6 +41,12 @@ def profile_environment(
 
             (final_state, _), _ = jax.lax.scan(f, (states, key), None, length=steps)
             return final_state
+
+        # Warmup
+        print("Warming up...")
+        key, run_key = jax.random.split(key)
+        _run(states, run_key).pos.block_until_ready()
+        print("Warmup done.")
     else:
         print("Using Python loop (slower, detailed logic trace)")
 
@@ -53,17 +59,17 @@ def profile_environment(
             )
             return new_states, key
 
+        # Warmup
+        print("Warming up...")
+        key, run_key = jax.random.split(key)
+        _step_fn(states, run_key).pos.block_until_ready()
+        print("Warmup done.")
+
         def _run(states, key):
             # Manual loop
             for _ in range(steps):
                 states, key = _step_fn(states, key)
             return states
-
-    # Warmup
-    print("Warming up...")
-    key, run_key = jax.random.split(key)
-    _run(states, run_key).pos.block_until_ready()
-    print("Warmup done.")
 
     # Profiling
     print(f"Starting JAX trace. Output dir: {trace_dir}")
