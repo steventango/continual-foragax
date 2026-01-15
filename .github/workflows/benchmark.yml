@@ -20,7 +20,7 @@ jobs:
         python-version: "3.11"
     - run: uv sync --dev
     - name: Test with pytest
-      run: uv run pytest --benchmark-json output.json
+      run: uv run pytest --benchmark-json output.json --benchmark-only
     - name: Store benchmark result
       uses: benchmark-action/github-action-benchmark@v1
       with:
