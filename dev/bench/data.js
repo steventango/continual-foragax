@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1768452961447,
+  "lastUpdate": 1768453382715,
   "repoUrl": "https://github.com/steventango/continual-foragax",
   "entries": {
     "Python Benchmark with pytest-benchmark": [
@@ -174,6 +174,100 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00003424806179678473",
             "extra": "mean: 795.2180227685327 usec\nrounds: 1098"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "18170455+steventango@users.noreply.github.com",
+            "name": "Steven Tang",
+            "username": "steventango"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "282f2c74a4c3eba17e01b60ba1147abac192d76f",
+          "message": "Merge pull request #61 from steventango/perf\n\nfeat: remove teleport functionality",
+          "timestamp": "2026-01-14T22:01:46-07:00",
+          "tree_id": "5ceecdc72f4050db4ea6f6579865ca59055f4a37",
+          "url": "https://github.com/steventango/continual-foragax/commit/282f2c74a4c3eba17e01b60ba1147abac192d76f"
+        },
+        "date": 1768453382368,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_vision",
+            "value": 6988.7807836359225,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010448728519975473",
+            "extra": "mean: 143.08647401582238 usec\nrounds: 1424"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_reset",
+            "value": 91.7666957298559,
+            "unit": "iter/sec",
+            "range": "stddev: 0.001944861561555327",
+            "extra": "mean: 10.897199599992291 msec\nrounds: 5"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_tiny_env",
+            "value": 2204.9789269413964,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00002448867039615401",
+            "extra": "mean: 453.5190734848133 usec\nrounds: 1633"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_small_env",
+            "value": 67.35524049301586,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0005952395881843813",
+            "extra": "mean: 14.846654732139086 msec\nrounds: 56"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_big_env",
+            "value": 0.44233960751698725,
+            "unit": "iter/sec",
+            "range": "stddev: 0.04663072696629913",
+            "extra": "mean: 2.2607064413999978 sec\nrounds: 5"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_vmap_env",
+            "value": 0.7795253830364022,
+            "unit": "iter/sec",
+            "range": "stddev: 0.027152522997142752",
+            "extra": "mean: 1.2828318638000042 sec\nrounds: 5"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_small_env_color",
+            "value": 79.77545577743817,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000878360240822412",
+            "extra": "mean: 12.535183788731379 msec\nrounds: 71"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_small_env_world",
+            "value": 77.2166044034175,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0011075643611732427",
+            "extra": "mean: 12.950582426229316 msec\nrounds: 61"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_diwali_v5",
+            "value": 676.7196034162508,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00009647907187920156",
+            "extra": "mean: 1.4777169080838626 msec\nrounds: 631"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_sine_two_biome_v1",
+            "value": 1243.5592495862004,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000032074159472827235",
+            "extra": "mean: 804.1434297020863 usec\nrounds: 1010"
           }
         ]
       }
