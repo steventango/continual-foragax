@@ -1,3 +1,9 @@
+## 0.42.0 (2026-01-21)
+
+### Feat
+
+- ForagaxDiwali-v6, increase biome_consumption_threshold and reward_repeat
+
 ## 0.41.0 (2026-01-15)
 
 ### Feat
