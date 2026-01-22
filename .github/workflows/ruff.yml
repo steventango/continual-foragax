@@ -3,10 +3,10 @@ name: Ruff
 on:
   push:
     branches: [ main ]
-    paths: [ "**.py", ".github/workflows/ruff.yml" ]
+    paths: [ "**.py", ".github/workflows/ruff.yml", 'pyproject.toml' ]
   pull_request:
     branches: [ main ]
-    paths: [ "**.py", ".github/workflows/ruff.yml" ]
+    paths: [ "**.py", ".github/workflows/ruff.yml", 'pyproject.toml' ]
 
 jobs:
   ruff:
