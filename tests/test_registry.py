@@ -688,8 +688,8 @@ def test_foragax_sine_twobiome_v1_creation():
 
     # Check amplitude and period
     for obj in [oyster1, deathcap1, oyster2, deathcap2]:
-        assert obj.amplitude == 20.0, "All objects should have amplitude 20"
-        assert obj.period == 1000, "All objects should have period 1000"
+        assert obj.amplitude == 10.0, "All objects should have amplitude 10"
+        assert obj.period == 1000000, "All objects should have period 1000000"
 
     # Check phase shift (Biome 2 should be inverted)
     assert oyster1.phase == 0.0, "Biome 1 Oyster should have phase 0"
@@ -748,41 +748,41 @@ def test_sine_twobiome_environment():
     key = jax.random.key(42)
 
     # At t=0: sine = 0
-    # Biome 1: Oyster = 10 + 20*0 = 10, DeathCap = -10 + 20*0 = -10
-    # Biome 2: Oyster = -10 + 20*0 = -10, DeathCap = 10 + 20*0 = 10
+    # Biome 1: Oyster = 10 + 10*0 = 10, DeathCap = -10 + 10*0 = -10
+    # Biome 2: Oyster = -10 + 10*0 = -10, DeathCap = 10 + 10*0 = 10
     t0_rewards = [env.objects[i].reward(0, key, None) for i in range(1, 5)]
     assert jnp.allclose(t0_rewards[0], 10.0, atol=0.01)  # Biome 1 Oyster
     assert jnp.allclose(t0_rewards[1], -10.0, atol=0.01)  # Biome 1 DeathCap
     assert jnp.allclose(t0_rewards[2], -10.0, atol=0.01)  # Biome 2 Oyster
     assert jnp.allclose(t0_rewards[3], 10.0, atol=0.01)  # Biome 2 DeathCap
 
-    # At t=250 (quarter period): sine = 1 for biome 1, sine = -1 for biome 2
-    # Biome 1: Oyster = 10 + 20*1 = 30, DeathCap = -10 + 20*1 = 10
-    # Biome 2: Oyster = -10 + 20*(-1) = -30, DeathCap = 10 + 20*(-1) = -10
-    t250_rewards = [env.objects[i].reward(250, key, None) for i in range(1, 5)]
-    assert jnp.allclose(t250_rewards[0], 30.0, atol=0.01)  # Biome 1 Oyster
-    assert jnp.allclose(t250_rewards[1], 10.0, atol=0.01)  # Biome 1 DeathCap
-    assert jnp.allclose(t250_rewards[2], -30.0, atol=0.01)  # Biome 2 Oyster
-    assert jnp.allclose(t250_rewards[3], -10.0, atol=0.01)  # Biome 2 DeathCap
+    # At t=250000 (quarter period): sine = 1 for biome 1, sine = -1 for biome 2
+    # Biome 1: Oyster = 10 + 10*1 = 20, DeathCap = -10 + 10*1 = 0
+    # Biome 2: Oyster = -10 + 10*(-1) = -20, DeathCap = 10 + 10*(-1) = 0
+    t250_rewards = [env.objects[i].reward(250000, key, None) for i in range(1, 5)]
+    assert jnp.allclose(t250_rewards[0], 20.0, atol=0.01)  # Biome 1 Oyster
+    assert jnp.allclose(t250_rewards[1], 0.0, atol=0.01)  # Biome 1 DeathCap
+    assert jnp.allclose(t250_rewards[2], -20.0, atol=0.01)  # Biome 2 Oyster
+    assert jnp.allclose(t250_rewards[3], 0.0, atol=0.01)  # Biome 2 DeathCap
 
-    # At t=500 (half period): sine = 0 again
-    t500_rewards = [env.objects[i].reward(500, key, None) for i in range(1, 5)]
+    # At t=500000 (half period): sine = 0 again
+    t500_rewards = [env.objects[i].reward(500000, key, None) for i in range(1, 5)]
     assert jnp.allclose(t500_rewards[0], 10.0, atol=0.01)  # Biome 1 Oyster
     assert jnp.allclose(t500_rewards[1], -10.0, atol=0.01)  # Biome 1 DeathCap
     assert jnp.allclose(t500_rewards[2], -10.0, atol=0.01)  # Biome 2 Oyster
     assert jnp.allclose(t500_rewards[3], 10.0, atol=0.01)  # Biome 2 DeathCap
 
-    # At t=750 (three-quarter period): sine = -1 for biome 1, sine = 1 for biome 2
-    # Biome 1: Oyster = 10 + 20*(-1) = -10, DeathCap = -10 + 20*(-1) = -30
-    # Biome 2: Oyster = -10 + 20*1 = 10, DeathCap = 10 + 20*1 = 30
-    t750_rewards = [env.objects[i].reward(750, key, None) for i in range(1, 5)]
-    assert jnp.allclose(t750_rewards[0], -10.0, atol=0.01)  # Biome 1 Oyster
-    assert jnp.allclose(t750_rewards[1], -30.0, atol=0.01)  # Biome 1 DeathCap
-    assert jnp.allclose(t750_rewards[2], 10.0, atol=0.01)  # Biome 2 Oyster
-    assert jnp.allclose(t750_rewards[3], 30.0, atol=0.01)  # Biome 2 DeathCap
+    # At t=750000 (three-quarter period): sine = -1 for biome 1, sine = 1 for biome 2
+    # Biome 1: Oyster = 10 + 10*(-1) = 0, DeathCap = -10 + 10*(-1) = -20
+    # Biome 2: Oyster = -10 + 10*1 = 0, DeathCap = 10 + 10*1 = 20
+    t750_rewards = [env.objects[i].reward(750000, key, None) for i in range(1, 5)]
+    assert jnp.allclose(t750_rewards[0], 0.0, atol=0.01)  # Biome 1 Oyster
+    assert jnp.allclose(t750_rewards[1], -20.0, atol=0.01)  # Biome 1 DeathCap
+    assert jnp.allclose(t750_rewards[2], 0.0, atol=0.01)  # Biome 2 Oyster
+    assert jnp.allclose(t750_rewards[3], 20.0, atol=0.01)  # Biome 2 DeathCap
 
     # Test complementary behavior: Biome 1 + Biome 2 = 0
-    for t in [0, 250, 500, 750, 1000]:
+    for t in [0, 250000, 500000, 750000, 1000000]:
         b1_oyster = env.objects[1].reward(t, key, None)
         b2_oyster = env.objects[3].reward(t, key, None)
         b1_deathcap = env.objects[2].reward(t, key, None)

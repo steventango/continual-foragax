@@ -22,6 +22,7 @@ from foragax.objects import (
     FourierObject,
     SineObject,
     WeatherObject,
+    WeatherWaveObject,
 )
 from foragax.rendering import (
     apply_grid_lines,
@@ -128,6 +129,7 @@ class BiomeState:
 class EnvState(environment.EnvState):
     pos: jax.Array
     time: int
+    offset: int
     digestion_buffer: jax.Array
     object_state: ObjectState
     biome_state: BiomeState
@@ -154,6 +156,11 @@ class ForagaxEnv(environment.Environment):
         return_hint: bool = False,
         hint_every: int = 100,
         hint_duration: int = 4,
+        random_shift_max_steps: int = 0,
+        random_teleport_period: int = 0,
+        random_teleport_offset: int = 0,
+        deterministic_teleport_period: int = 0,
+        deterministic_teleport_offset: int = 0,
     ):
         super().__init__()
         self._name = name
@@ -164,7 +171,8 @@ class ForagaxEnv(environment.Environment):
         # Handle aperture_size = -1 for world view
         if isinstance(aperture_size, int) and aperture_size == -1:
             self.full_world = True
-            self.aperture_size = self.size  # Use full size for consistency
+            # size is (W, H), aperture_size is (H, W)
+            self.aperture_size = (self.size[1], self.size[0])
         else:
             self.full_world = False
             if isinstance(aperture_size, int):
@@ -184,6 +192,11 @@ class ForagaxEnv(environment.Environment):
         self.return_hint = return_hint
         self.hint_every = hint_every
         self.hint_duration = hint_duration
+        self.random_shift_max_steps = random_shift_max_steps
+        self.random_teleport_period = random_teleport_period
+        self.random_teleport_offset = random_teleport_offset
+        self.deterministic_teleport_period = deterministic_teleport_period
+        self.deterministic_teleport_offset = deterministic_teleport_offset
 
         objects = (EMPTY,) + objects
         if self.nowrap and not self.full_world:
@@ -616,6 +629,112 @@ class ForagaxEnv(environment.Environment):
             reward,
         )
 
+    @partial(jax.named_call, name="random_teleport")
+    def _random_teleport(self, state: EnvState, key: jax.Array) -> jax.Array:
+        """Randomly teleport agent to an empty position within a random biome.
+
+        Args:
+            state: Current environment state
+            key: Random key for biome and position selection
+
+        Returns:
+            New agent position (x, y). Returns current position if no empty cell found.
+        """
+        num_biomes = self.biome_object_frequencies.shape[0]
+
+        # Split key for biome selection and position selection
+        key, biome_key, pos_key = jax.random.split(key, 3)
+
+        # Randomly select a biome
+        biome_idx = jax.random.randint(biome_key, (), 0, num_biomes)
+
+        # Get biome mask for the selected biome
+        biome_mask = self.biome_masks_array[biome_idx]
+
+        # Find empty cells (object_id == 0) within the biome
+        empty_mask = state.object_state.object_id == 0
+        valid_spawn_mask = biome_mask & empty_mask
+
+        # Count valid spawn locations
+        num_valid_spawns = jnp.sum(valid_spawn_mask, dtype=jnp.int32)
+
+        # Get all valid positions using nonzero with fixed size
+        y_indices, x_indices = jnp.nonzero(
+            valid_spawn_mask, size=self.size[0] * self.size[1], fill_value=-1
+        )
+        valid_spawn_indices = jnp.stack([x_indices, y_indices], axis=1)  # (x, y) format
+
+        # Randomly select from valid positions
+        random_idx = jax.random.randint(
+            pos_key, (), jnp.array(0, dtype=jnp.int32), jnp.maximum(num_valid_spawns, 1)
+        )
+        new_pos = valid_spawn_indices[random_idx]
+
+        # If no valid spawn found, keep current position
+        new_pos = jax.lax.select(
+            num_valid_spawns > 0,
+            new_pos.astype(jnp.int32),
+            state.pos.astype(jnp.int32),
+        )
+
+        return new_pos
+
+    @partial(jax.named_call, name="deterministic_teleport")
+    def _deterministic_teleport(
+        self, state: EnvState, teleport_index: jax.Array, key: jax.Array
+    ) -> jax.Array:
+        """Deterministically teleport agent to a random empty cell within a deterministically selected biome.
+
+        Cycles through biomes in order: biome 0 → biome 1 → ... → biome N-1 → biome 0 → ...
+        The agent is placed at a random empty cell within the selected biome.
+        Falls back to current position if no empty cell exists.
+
+        Args:
+            state: Current environment state
+            teleport_index: The cumulative teleport count used to select the biome
+            key: Random key for position selection
+
+        Returns:
+            New agent position (x, y) within the selected biome.
+        """
+        num_biomes = self.biome_object_frequencies.shape[0]
+
+        # Deterministically select biome by cycling through them
+        biome_idx = teleport_index % num_biomes
+
+        # Get biome mask for the selected biome
+        biome_mask = self.biome_masks_array[biome_idx]
+
+        # Find empty cells (object_id == 0) within the biome
+        empty_mask = state.object_state.object_id == 0
+        valid_mask = biome_mask & empty_mask
+
+        # Count valid spawn locations
+        num_valid = jnp.sum(valid_mask, dtype=jnp.int32)
+
+        # Get all valid positions using nonzero with fixed size
+        y_indices, x_indices = jnp.nonzero(
+            valid_mask, size=self.size[0] * self.size[1], fill_value=-1
+        )
+        valid_positions = jnp.stack(
+            [x_indices, y_indices], axis=1
+        )  # (N, 2) in (x, y) format
+
+        # Randomly select from valid positions
+        random_idx = jax.random.randint(
+            key, (), jnp.array(0, dtype=jnp.int32), jnp.maximum(num_valid, 1)
+        )
+        new_pos = valid_positions[random_idx]
+
+        # If no valid cell found, keep current position
+        new_pos = jax.lax.select(
+            num_valid > 0,
+            new_pos.astype(jnp.int32),
+            state.pos.astype(jnp.int32),
+        )
+
+        return new_pos
+
     @partial(jax.named_call, name="compute_reward")
     def _compute_reward(
         self,
@@ -632,7 +751,7 @@ class ForagaxEnv(environment.Environment):
         object_reward = jax.lax.switch(
             obj_at_pos.astype(jnp.int32),
             self.reward_fns,
-            state.time,
+            state.time + state.offset,
             reward_subkey,
             object_params.astype(jnp.float32),
         )
@@ -642,7 +761,10 @@ class ForagaxEnv(environment.Environment):
 
         key, digestion_subkey = jax.random.split(key)
         reward_delay = jax.lax.switch(
-            obj_at_pos, self.reward_delay_fns, state.time, digestion_subkey
+            obj_at_pos,
+            self.reward_delay_fns,
+            state.time + state.offset,
+            digestion_subkey,
         )
         reward = jnp.where(
             should_collect & (reward_delay == jnp.array(0, dtype=jnp.int32)),
@@ -711,7 +833,7 @@ class ForagaxEnv(environment.Environment):
 
         # Collect object: set a timer
         regen_delay = jax.lax.switch(
-            obj_at_pos, self.regen_delay_fns, state.time, regen_subkey
+            obj_at_pos, self.regen_delay_fns, state.time + state.offset, regen_subkey
         )
         # Cast timer_countdown to match ObjectState.respawn_timer dtype
         timer_countdown = jax.lax.cond(
@@ -804,7 +926,7 @@ class ForagaxEnv(environment.Environment):
             reward = jax.lax.switch(
                 obj_id.astype(jnp.int32),
                 self.reward_fns,
-                state.time,
+                state.time + state.offset,
                 fixed_key,
                 params.astype(jnp.float32),
             )
@@ -887,9 +1009,9 @@ class ForagaxEnv(environment.Environment):
         info = {"discount": self.discount(state, params)}
         temperatures = jnp.zeros(len(self.objects))
         for obj_index, obj in enumerate(self.objects):
-            if isinstance(obj, WeatherObject):
+            if isinstance(obj, (WeatherObject, WeatherWaveObject)):
                 temperatures = temperatures.at[obj_index].set(
-                    get_temperature(obj.rewards, state.time, obj.repeat)
+                    get_temperature(obj.rewards, state.time + state.offset, obj.repeat)
                 )
         info["temperatures"] = temperatures
         info["biome_id"] = object_state.biome_id[pos[1], pos[0]]
@@ -944,10 +1066,54 @@ class ForagaxEnv(environment.Environment):
         state = EnvState(
             pos=pos.astype(jnp.int32),
             time=jnp.array(state.time + 1, dtype=jnp.int32),
+            offset=state.offset,
             digestion_buffer=digestion_buffer.astype(REWARD_DTYPE),
             object_state=object_state,
             biome_state=biome_state,
         )
+
+        # 5. HANDLE RANDOM TELEPORT
+        # Teleport agent to a random empty cell in a random biome at 1/4 and 3/4 of the period.
+        # The effective time is (state.time + state.offset + random_teleport_offset) to sync
+        # with the square wave timing. Teleport triggers when:
+        #   effective_time % period == period // 4  (1/4 of period)
+        #   effective_time % period == 3 * period // 4  (3/4 of period)
+        if self.random_teleport_period > 0:
+            key, teleport_key = jax.random.split(key)
+            effective_time = state.time + state.offset + self.random_teleport_offset
+            time_in_period = effective_time % self.random_teleport_period
+            quarter_period = self.random_teleport_period // 4
+            three_quarter_period = 3 * self.random_teleport_period // 4
+            should_teleport = (time_in_period == quarter_period) | (
+                time_in_period == three_quarter_period
+            )
+            new_pos = self._random_teleport(state, teleport_key)
+            state = state.replace(
+                pos=jax.lax.select(should_teleport, new_pos, state.pos)
+            )
+
+        # 6. HANDLE DETERMINISTIC TELEPORT
+        # Teleport agent to the nearest open cell to a biome center following a
+        # deterministic cycle at the beginning (0) and halfway (1/2) of the period.
+        # The biome is selected by cycling through
+        # biomes in order based on the cumulative teleport count.
+        if self.deterministic_teleport_period > 0:
+            key, teleport_key = jax.random.split(key)
+            effective_time = (
+                state.time + state.offset + self.deterministic_teleport_offset
+            )
+            time_in_period = effective_time % self.deterministic_teleport_period
+            half_period = self.deterministic_teleport_period // 2
+            should_teleport = (time_in_period == 0) | (time_in_period == half_period)
+            # Compute cumulative teleport index from time
+            # Each full period has 2 teleport events (at 0 and 1/2)
+            full_periods = effective_time // self.deterministic_teleport_period
+            past_half = (time_in_period >= half_period).astype(jnp.int32)
+            teleport_index = 2 * full_periods + past_half
+            new_pos = self._deterministic_teleport(state, teleport_index, teleport_key)
+            state = state.replace(
+                pos=jax.lax.select(should_teleport, new_pos, state.pos)
+            )
 
         reward_grid = self._reward_grid(state, object_state)
         if self.full_world:
@@ -1015,7 +1181,10 @@ class ForagaxEnv(environment.Environment):
                         obj_id = current_objects_for_expiry[y, x]
                         exp_key = jax.random.fold_in(expiry_key, flat_idx)
                         exp_delay = jax.lax.switch(
-                            obj_id, self.expiry_regen_delay_fns, state.time, exp_key
+                            obj_id,
+                            self.expiry_regen_delay_fns,
+                            state.time + state.offset,
+                            exp_key,
                         )
                         timer_countdown = jax.lax.cond(
                             exp_delay == jnp.iinfo(jnp.int32).max,
@@ -1286,6 +1455,9 @@ class ForagaxEnv(environment.Environment):
         self, key: jax.Array, params: EnvParams
     ) -> Tuple[jax.Array, EnvState]:
         """Reset environment state."""
+        key, offset_key = jax.random.split(key)
+        offset = jax.random.randint(offset_key, (), 0, self.random_shift_max_steps + 1)
+
         num_object_params = 3 + 2 * self.num_fourier_terms
         object_state = ObjectState.create_empty(self.size, num_object_params)
 
@@ -1387,6 +1559,7 @@ class ForagaxEnv(environment.Environment):
         state = EnvState(
             pos=agent_pos.astype(jnp.int32),
             time=jnp.array(0, dtype=jnp.int32),
+            offset=offset.astype(jnp.int32),
             digestion_buffer=jnp.zeros((self.max_reward_delay,), dtype=REWARD_DTYPE),
             object_state=object_state,
             biome_state=BiomeState(
@@ -1395,6 +1568,23 @@ class ForagaxEnv(environment.Environment):
                 generation=biome_generation.astype(ID_DTYPE),
             ),
         )
+
+        # 6. HANDLE DETERMINISTIC TELEPORT (Initial Placement)
+        # Place agent in the correct biome at the start of the episode.
+        if self.deterministic_teleport_period > 0:
+            effective_time = (
+                state.time + state.offset + self.deterministic_teleport_offset
+            )
+            time_in_period = effective_time % self.deterministic_teleport_period
+            half_period = self.deterministic_teleport_period // 2
+
+            full_periods = effective_time // self.deterministic_teleport_period
+            past_half = (time_in_period >= half_period).astype(jnp.int32)
+            teleport_index = 2 * full_periods + past_half
+
+            # Use available randomness from `key` for initial placement
+            new_pos = self._deterministic_teleport(state, teleport_index, key)
+            state = state.replace(pos=new_pos)
 
         return jax.lax.stop_gradient(
             self.get_obs(state, params)
@@ -1580,6 +1770,7 @@ class ForagaxEnv(environment.Environment):
             {
                 "pos": spaces.Box(0, max(self.size), (2,), int),
                 "time": spaces.Discrete(params.max_steps_in_episode),
+                "offset": spaces.Discrete(self.random_shift_max_steps + 1),
                 "digestion_buffer": spaces.Box(
                     -jnp.inf,
                     jnp.inf,
@@ -1863,7 +2054,7 @@ class ForagaxEnv(environment.Environment):
             reward = jax.lax.switch(
                 obj_id.astype(jnp.int32),
                 self.reward_fns,
-                state.time,
+                state.time + state.offset,
                 fixed_key,
                 params.astype(jnp.float32),
             )
@@ -1923,7 +2114,7 @@ class ForagaxEnv(environment.Environment):
                     base_img_x3,
                     reward_colors,
                     reward_grid,
-                    self.size,
+                    (self.size[1], self.size[0]),
                 )
 
                 # Tint the aperture region at 3x scale
@@ -1966,11 +2157,16 @@ class ForagaxEnv(environment.Environment):
             if is_true_mode:
                 # Apply true object borders
                 img = apply_true_borders(
-                    img, state.object_state.object_id, self.size, len(self.object_ids)
+                    img,
+                    state.object_state.object_id,
+                    (self.size[1], self.size[0]),
+                    len(self.object_ids),
                 )
 
             # Add grid lines
-            img = apply_grid_lines(img, self.size, self.grid_color_jax, 9)
+            img = apply_grid_lines(
+                img, (self.size[1], self.size[0]), self.grid_color_jax, 9
+            )
 
         elif is_aperture_mode:
             obs_grid = state.object_state.object_id

@@ -189,6 +189,7 @@ class WeatherObject(NormalRegenForagaxObject):
         rewards: jnp.ndarray,
         repeat: int,
         multiplier: float = 1.0,
+        base_reward: float = 0.0,
         mean_regen_delay: int = 10,
         std_regen_delay: int = 1,
         color: Tuple[int, int, int] = (0, 0, 0),
@@ -213,13 +214,54 @@ class WeatherObject(NormalRegenForagaxObject):
             std_expiry_regen_delay=std_expiry_regen_delay,
         )
         self.rewards = rewards * multiplier
+        self.base_reward = base_reward
         self.repeat = repeat
 
     def reward(
         self, clock: int, rng: jax.Array, params: Optional[jax.Array] = None
     ) -> float:
         """Reward is based on temperature."""
-        return get_temperature(self.rewards, clock, self.repeat)
+        return self.base_reward + get_temperature(self.rewards, clock, self.repeat)
+
+
+class WeatherWaveObject(DefaultForagaxObject):
+    """Object with reward based on temperature data."""
+
+    def __init__(
+        self,
+        name: str,
+        rewards: jnp.ndarray,
+        repeat: int,
+        multiplier: float = 1.0,
+        base_reward: float = 0.0,
+        color: Tuple[int, int, int] = (0, 0, 0),
+        random_respawn: bool = False,
+        reward_delay: int = 0,
+        max_reward_delay: Optional[int] = None,
+        expiry_time: Optional[int] = None,
+        regen_delay=(9, 11),
+        expiry_regen_delay=(9, 11),
+    ):
+        super().__init__(
+            name=name,
+            collectable=True,
+            color=color,
+            random_respawn=random_respawn,
+            reward_delay=reward_delay,
+            max_reward_delay=max_reward_delay,
+            expiry_time=expiry_time,
+            regen_delay=regen_delay,
+            expiry_regen_delay=expiry_regen_delay,
+        )
+        self.rewards = rewards * multiplier
+        self.base_reward = base_reward
+        self.repeat = repeat
+
+    def reward(
+        self, clock: int, rng: jax.Array = None, params: Optional[jax.Array] = None
+    ) -> float:
+        """Reward is based on temperature."""
+        return self.base_reward + get_temperature(self.rewards, clock, self.repeat)
 
 
 class FourierObject(BaseForagaxObject):
@@ -371,7 +413,9 @@ class FourierObject(BaseForagaxObject):
 
 
 EMPTY = DefaultForagaxObject()
-WALL = DefaultForagaxObject(name="wall", blocking=True, color=(0, 0, 0))
+WALL = DefaultForagaxObject(
+    name="wall", blocking=True, reward=-jnp.inf, color=(0, 0, 0)
+)
 FLOWER = DefaultForagaxObject(
     name="flower",
     reward=1.0,
@@ -665,6 +709,88 @@ def create_weather_objects(
     return hot, cold
 
 
+def create_weather_wave_objects(
+    file_index: int = 0,
+    repeat: int = 500,
+    multiplier: float = 20.0,
+    base_oyster_reward: float = 10.0,
+    base_deathcap_reward: float = -10.0,
+    random_respawn: bool = True,
+    reward_delay: int = 0,
+    expiry_time: Optional[int] = 500,
+    regen_delay: Tuple[int, int] = (9, 11),
+    expiry_regen_delay: Tuple[int, int] = (9, 11),
+):
+    # Clamp file_index
+    if file_index < 0 or file_index >= len(FILE_PATHS):
+        raise IndexError(
+            f"file_index {file_index} out of range (0..{len(FILE_PATHS) - 1})"
+        )
+
+    rewards = load_data(FILE_PATHS[file_index])
+
+    oyster_color = (124, 61, 81)
+    deathcap_color = (174, 179, 94)
+
+    biome1_oyster = WeatherWaveObject(
+        name="oyster_weather_wave_1",
+        rewards=rewards,
+        repeat=repeat,
+        base_reward=base_oyster_reward,
+        multiplier=multiplier,
+        color=oyster_color,
+        random_respawn=random_respawn,
+        reward_delay=reward_delay,
+        expiry_time=expiry_time,
+        regen_delay=regen_delay,
+        expiry_regen_delay=expiry_regen_delay,
+    )
+
+    biome1_deathcap = WeatherWaveObject(
+        name="deathcap_square_wave_1",
+        rewards=rewards,
+        repeat=repeat,
+        base_reward=base_deathcap_reward,
+        multiplier=multiplier,
+        color=deathcap_color,
+        random_respawn=random_respawn,
+        reward_delay=reward_delay,
+        expiry_time=expiry_time,
+        regen_delay=regen_delay,
+        expiry_regen_delay=expiry_regen_delay,
+    )
+
+    biome2_oyster = WeatherWaveObject(
+        name="oyster_weather_wave_2",
+        rewards=rewards,
+        repeat=repeat,
+        base_reward=-base_oyster_reward,
+        multiplier=-multiplier,
+        color=oyster_color,
+        random_respawn=random_respawn,
+        reward_delay=reward_delay,
+        expiry_time=expiry_time,
+        regen_delay=regen_delay,
+        expiry_regen_delay=expiry_regen_delay,
+    )
+
+    biome2_deathcap = WeatherWaveObject(
+        name="deathcap_square_wave_2",
+        rewards=rewards,
+        repeat=repeat,
+        base_reward=-base_deathcap_reward,
+        multiplier=-multiplier,
+        color=deathcap_color,
+        random_respawn=random_respawn,
+        reward_delay=reward_delay,
+        expiry_time=expiry_time,
+        regen_delay=regen_delay,
+        expiry_regen_delay=expiry_regen_delay,
+    )
+
+    return biome1_oyster, biome1_deathcap, biome2_oyster, biome2_deathcap
+
+
 class SineObject(DefaultForagaxObject):
     """Object with reward based on sine wave with a base reward offset.
 
@@ -712,6 +838,56 @@ class SineObject(DefaultForagaxObject):
     ) -> float:
         """Reward is base_reward + amplitude * sin(2*pi * clock / period + phase)."""
         sine_value = jnp.sin(2.0 * jnp.pi * clock / self.period + self.phase)
+        return self.base_reward + self.amplitude * sine_value
+
+
+class SquareWaveObject(DefaultForagaxObject):
+    """Object with reward based on square wave with a base reward offset.
+
+    The total reward is: base_reward + amplitude * sign(sin(2*pi * clock / period))
+    This allows for objects that have different base behaviors (positive/negative)
+    with an underlying square wave that drives continual learning.
+
+    Uses uniform distribution for regeneration delays by default (from DefaultForagaxObject).
+    """
+
+    def __init__(
+        self,
+        name: str,
+        base_reward: float = 0.0,
+        amplitude: float = 1.0,
+        period: int = 1000,
+        phase: float = 0.0,
+        regen_delay: Tuple[int, int] = (9, 11),
+        color: Tuple[int, int, int] = (0, 0, 0),
+        random_respawn: bool = False,
+        reward_delay: int = 0,
+        max_reward_delay: Optional[int] = None,
+        expiry_time: Optional[int] = None,
+        expiry_regen_delay: Tuple[int, int] = (9, 11),
+    ):
+        super().__init__(
+            name=name,
+            reward=base_reward,
+            collectable=True,
+            regen_delay=regen_delay,
+            color=color,
+            random_respawn=random_respawn,
+            reward_delay=reward_delay,
+            max_reward_delay=max_reward_delay,
+            expiry_time=expiry_time,
+            expiry_regen_delay=expiry_regen_delay,
+        )
+        self.base_reward = base_reward
+        self.amplitude = amplitude
+        self.period = period
+        self.phase = phase
+
+    def reward(
+        self, clock: int, rng: jax.Array, params: Optional[jax.Array] = None
+    ) -> float:
+        """Reward is base_reward + amplitude * sign(sin(2*pi * clock / period + phase))."""
+        sine_value = jnp.sign(jnp.sin(2.0 * jnp.pi * clock / self.period + self.phase))
         return self.base_reward + self.amplitude * sine_value
 
 
@@ -810,7 +986,7 @@ def create_sine_biome_objects(
         period=period,
         phase=0.0,
         regen_delay=regen_delay,
-        color=(0, 255, 0),  # Green color
+        color=(174, 179, 94),  # Deathcap color
         random_respawn=True,
         reward_delay=reward_delay,
         expiry_time=expiry_time,
@@ -839,6 +1015,100 @@ def create_sine_biome_objects(
         period=period,
         phase=jnp.pi,  # 180 degree phase shift (negative of biome 1)
         regen_delay=regen_delay,
+        color=(174, 179, 94),  # Same deathcap color
+        random_respawn=True,
+        reward_delay=reward_delay,
+        expiry_time=expiry_time,
+        expiry_regen_delay=expiry_regen_delay,
+    )
+
+    return biome1_oyster, biome1_deathcap, biome2_oyster, biome2_deathcap
+
+
+def create_square_wave_biome_objects(
+    period: int = 1000,
+    amplitude: float = 20.0,
+    base_oyster_reward: float = 10.0,
+    base_deathcap_reward: float = -10.0,
+    regen_delay: Tuple[int, int] = (9, 11),
+    reward_delay: int = 0,
+    expiry_time: int = 500,
+    expiry_regen_delay: Tuple[int, int] = (9, 11),
+):
+    """Create objects for the square wave-based two-biome environment.
+
+    Biome 1 (Left): Oyster (+base_reward), Death Cap (-base_reward)
+    Biome 2 (Right): Oyster (-base_reward), Death Cap (+base_reward)
+
+    Both biomes have an underlying square wave curve with the specified amplitude.
+    The square wave curve of biome 2 is the negative of biome 1 (180 degree phase shift).
+
+    Objects use uniform respawn and random expiry by default.
+
+    Args:
+        period: Period of the square wave in timesteps
+        amplitude: Amplitude of the square wave
+        base_oyster_reward: Base reward for oyster in biome 1 (will be negated in biome 2)
+        base_deathcap_reward: Base reward for death cap in biome 1 (will be negated in biome 2)
+        regen_delay: Tuple of (min, max) for uniform regeneration delay
+        reward_delay: Number of steps before reward is delivered
+        expiry_time: Time steps before object expires (None = no expiry)
+        expiry_regen_delay: Tuple of (min, max) for uniform expiry regeneration delay
+
+    Returns:
+        A tuple of (biome1_oyster, biome1_deathcap, biome2_oyster, biome2_deathcap)
+    """
+    # Biome 1 objects (phase = 0)
+    biome1_oyster = SquareWaveObject(
+        name="oyster_square_wave_1",
+        base_reward=base_oyster_reward,
+        amplitude=amplitude,
+        period=period,
+        phase=0.0,
+        regen_delay=regen_delay,
+        color=(124, 61, 81),  # Oyster color
+        random_respawn=True,
+        reward_delay=reward_delay,
+        expiry_time=expiry_time,
+        expiry_regen_delay=expiry_regen_delay,
+    )
+
+    biome1_deathcap = SquareWaveObject(
+        name="deathcap_square_wave_1",
+        base_reward=base_deathcap_reward,
+        amplitude=amplitude,
+        period=period,
+        phase=0.0,
+        regen_delay=regen_delay,
+        color=(0, 255, 0),  # Green color
+        random_respawn=True,
+        reward_delay=reward_delay,
+        expiry_time=expiry_time,
+        expiry_regen_delay=expiry_regen_delay,
+    )
+
+    # Biome 2 objects (phase = pi for 180 degree shift)
+    biome2_oyster = SquareWaveObject(
+        name="oyster_square_wave_2",
+        base_reward=-base_oyster_reward,  # Negated
+        amplitude=amplitude,
+        period=period,
+        phase=jnp.pi,  # 180 degree phase shift (negative of biome 1)
+        regen_delay=regen_delay,
+        color=(124, 61, 81),  # Same oyster color
+        random_respawn=True,
+        reward_delay=reward_delay,
+        expiry_time=expiry_time,
+        expiry_regen_delay=expiry_regen_delay,
+    )
+
+    biome2_deathcap = SquareWaveObject(
+        name="deathcap_square_wave_2",
+        base_reward=-base_deathcap_reward,  # Negated
+        amplitude=amplitude,
+        period=period,
+        phase=jnp.pi,  # 180 degree phase shift (negative of biome 1)
+        regen_delay=regen_delay,
         color=(0, 255, 0),  # Same green color
         random_respawn=True,
         reward_delay=reward_delay,
@@ -847,3 +1117,80 @@ def create_sine_biome_objects(
     )
 
     return biome1_oyster, biome1_deathcap, biome2_oyster, biome2_deathcap
+
+
+def create_shift_square_wave_biome_objects(
+    period: int = 1000,
+    amplitude_big: float = 3.0,
+    amplitude_small: float = 1.0,
+    base_oyster_reward: float = -2.0,
+    base_chanterelle_reward: float = -2.0,
+    regen_delay: Tuple[int, int] = (9, 11),
+    reward_delay: int = 0,
+    expiry_time: int = 500,
+    expiry_regen_delay: Tuple[int, int] = (9, 11),
+):
+    """Create objects for the square wave-based two-biome environment.
+
+    Returns:
+        A tuple of (biome1_oyster, biome1_chanterelle, biome2_oyster, biome2_chanterelle)
+    """
+    # Biome 1 objects
+    biome1_oyster = SquareWaveObject(
+        name="oyster_square_wave_1",
+        base_reward=base_oyster_reward,
+        amplitude=amplitude_big,
+        period=period,
+        phase=0.0,
+        regen_delay=regen_delay,
+        color=(124, 61, 81),  # Oyster color
+        random_respawn=True,
+        reward_delay=reward_delay,
+        expiry_time=expiry_time,
+        expiry_regen_delay=expiry_regen_delay,
+    )
+
+    biome1_chanterelle = SquareWaveObject(
+        name="chanterelle_square_wave_1",
+        base_reward=base_chanterelle_reward,
+        amplitude=amplitude_small,
+        period=period,
+        phase=0.0,
+        regen_delay=regen_delay,
+        color=(218, 145, 0),  # Chanterelle color
+        random_respawn=True,
+        reward_delay=reward_delay,
+        expiry_time=expiry_time,
+        expiry_regen_delay=expiry_regen_delay,
+    )
+
+    # Biome 2 objects
+    biome2_oyster = SquareWaveObject(
+        name="oyster_square_wave_2",
+        base_reward=base_oyster_reward,
+        amplitude=-amplitude_small,
+        period=period,
+        phase=0.0,
+        regen_delay=regen_delay,
+        color=(124, 61, 81),  # Same oyster color
+        random_respawn=True,
+        reward_delay=reward_delay,
+        expiry_time=expiry_time,
+        expiry_regen_delay=expiry_regen_delay,
+    )
+
+    biome2_chanterelle = SquareWaveObject(
+        name="chanterelle_square_wave_2",
+        base_reward=base_chanterelle_reward,
+        amplitude=-amplitude_big,
+        period=period,
+        phase=0.0,
+        regen_delay=regen_delay,
+        color=(218, 145, 0),  # Same chanterelle color
+        random_respawn=True,
+        reward_delay=reward_delay,
+        expiry_time=expiry_time,
+        expiry_regen_delay=expiry_regen_delay,
+    )
+
+    return biome1_oyster, biome1_chanterelle, biome2_oyster, biome2_chanterelle
