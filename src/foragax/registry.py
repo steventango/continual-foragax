@@ -174,7 +174,11 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
         "aperture_size": None,
         "objects": None,
         "biomes": (
-            Biome(start=(BIG_OFFSET, BIG_OFFSET), stop=(BIG_OFFSET + BIG_WIDTH, BIG_OFFSET + BIG_WIDTH), object_frequencies=(0.4, 0.0)),
+            Biome(
+                start=(BIG_OFFSET, BIG_OFFSET),
+                stop=(BIG_OFFSET + BIG_WIDTH, BIG_OFFSET + BIG_WIDTH),
+                object_frequencies=(0.4, 0.0),
+            ),
             Biome(
                 start=(BIG_OFFSET, BIG_OFFSET + 2 * BIG_WIDTH),
                 stop=(BIG_OFFSET + BIG_WIDTH, BIG_OFFSET + 3 * BIG_WIDTH),
@@ -197,17 +201,29 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
             ),
             Biome(
                 start=(BIG_OFFSET + BIG_WIDTH // 2, BIG_OFFSET + 5 * BIG_WIDTH // 2),
-                stop=(BIG_OFFSET + BIG_WIDTH // 2 + 1, BIG_OFFSET + 5 * BIG_WIDTH // 2 + 1),
+                stop=(
+                    BIG_OFFSET + BIG_WIDTH // 2 + 1,
+                    BIG_OFFSET + 5 * BIG_WIDTH // 2 + 1,
+                ),
                 object_frequencies=(0.0, 1.0),
             ),
             Biome(
                 start=(BIG_OFFSET + 5 * BIG_WIDTH // 2, BIG_OFFSET + BIG_WIDTH // 2),
-                stop=(BIG_OFFSET + 5 * BIG_WIDTH // 2 + 1, BIG_OFFSET + BIG_WIDTH // 2 + 1),
+                stop=(
+                    BIG_OFFSET + 5 * BIG_WIDTH // 2 + 1,
+                    BIG_OFFSET + BIG_WIDTH // 2 + 1,
+                ),
                 object_frequencies=(0.0, 1.0),
             ),
             Biome(
-                start=(BIG_OFFSET + 5 * BIG_WIDTH // 2, BIG_OFFSET + 5 * BIG_WIDTH // 2),
-                stop=(BIG_OFFSET + 5 * BIG_WIDTH // 2 + 1, BIG_OFFSET + 5 * BIG_WIDTH // 2 + 1),
+                start=(
+                    BIG_OFFSET + 5 * BIG_WIDTH // 2,
+                    BIG_OFFSET + 5 * BIG_WIDTH // 2,
+                ),
+                stop=(
+                    BIG_OFFSET + 5 * BIG_WIDTH // 2 + 1,
+                    BIG_OFFSET + 5 * BIG_WIDTH // 2 + 1,
+                ),
                 object_frequencies=(0.0, 1.0),
             ),
         ),
