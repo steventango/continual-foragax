@@ -1,3 +1,13 @@
+## 0.42.2 (2026-02-04)
+
+### Fix
+
+- respawn state
+
+### Refactor
+
+- rendering
+
 ## 0.42.1 (2026-01-22)
 
 ### Fix
