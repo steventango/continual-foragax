@@ -2882,3 +2882,66 @@ def test_info_rewards():
     empty_mask = state.object_state.object_id == 0
     rewards_at_empty = info["rewards"][empty_mask]
     assert jnp.all(rewards_at_empty == 0.0)
+
+
+def test_random_respawn_preserves_state():
+    """Test that an object preserves its color and parameters when respawning at a random location."""
+    key = jax.random.key(0)
+
+    # Custom object with recognizable color and state-dependent reward
+    class StateDependentObject(DefaultForagaxObject):
+        def reward(self, time, key, params):
+            return params[0]  # Reward is the first parameter
+
+    custom_obj = StateDependentObject(
+        name="custom",
+        collectable=True,
+        color=(123, 45, 67),
+        random_respawn=True,
+    )
+
+    env = ForagaxEnv(
+        size=10,
+        objects=(custom_obj,),
+        biomes=(Biome(start=(0, 0), stop=(10, 10), object_frequencies=(0.0,)),),
+        observation_type="color",
+    )
+    params = env.default_params
+    _, state = env.reset(key, params)
+
+    # Manually place the object with specific parameters
+    y, x = 5, 5
+    magenta = jnp.array([123, 45, 67], dtype=jnp.uint8)
+    params_val = jnp.zeros(env.num_fourier_terms * 2 + 3, dtype=jnp.float16)
+    params_val = params_val.at[0].set(42.0)
+
+    object_state = state.object_state.replace(
+        object_id=state.object_state.object_id.at[y, x].set(1),
+        color=state.object_state.color.at[y, x].set(magenta),
+        state_params=state.object_state.state_params.at[y, x].set(params_val),
+        biome_id=jnp.zeros((10, 10), dtype=jnp.int16),  # Every cell is biome 0
+        generation=state.object_state.generation.at[y, x].set(99),
+    )
+    # Move agent next to it
+    state = state.replace(object_state=object_state, pos=jnp.array([x - 1, y]))
+
+    # Collect the object (move RIGHT onto it)
+    key, step_key = jax.random.split(key)
+    # Use a key that we know moves it to a different location if possible,
+    # but any random move is fine as long as we check the new location.
+    # We'll try a few keys if needed, but let's just use key 0.
+    _, news, reward, _, _ = env.step(step_key, state, Actions.RIGHT, params)
+
+    # Should get the reward based on params
+    assert reward == 42.0
+
+    # Find where the timer was placed
+    timer_mask = news.object_state.respawn_timer > 0
+    ny_indices, nx_indices = jnp.nonzero(timer_mask)
+    assert len(ny_indices) == 1
+    ny, nx = ny_indices[0], nx_indices[0]
+
+    # Check that state was moved to the timer location
+    chex.assert_trees_all_equal(news.object_state.color[ny, nx], magenta)
+    assert news.object_state.state_params[ny, nx, 0] == 42.0
+    assert news.object_state.generation[ny, nx] == 99
