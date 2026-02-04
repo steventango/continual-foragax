@@ -31,10 +31,14 @@ from foragax.objects import (
     LARGE_MOREL,
     LARGE_OYSTER,
     MEDIUM_MOREL,
+    WALL,
     create_fourier_objects,
     create_sine_biome_objects,
     create_weather_objects,
 )
+
+BIG_WIDTH = 15
+BIG_OFFSET = BIG_WIDTH // 2
 
 ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
     "ForagaxWeather-v1": {
@@ -164,6 +168,54 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
         "dynamic_biomes": True,
         "biome_consumption_threshold": 10000,
         "dynamic_biome_spawn_empty": 0.4,
+    },
+    "ForagaxBig-v1": {
+        "size": (4 * BIG_WIDTH, 4 * BIG_WIDTH),
+        "aperture_size": None,
+        "objects": None,
+        "biomes": (
+            Biome(start=(BIG_OFFSET, BIG_OFFSET), stop=(BIG_OFFSET + BIG_WIDTH, BIG_OFFSET + BIG_WIDTH), object_frequencies=(0.4, 0.0)),
+            Biome(
+                start=(BIG_OFFSET, BIG_OFFSET + 2 * BIG_WIDTH),
+                stop=(BIG_OFFSET + BIG_WIDTH, BIG_OFFSET + 3 * BIG_WIDTH),
+                object_frequencies=(0.4, 0.0),
+            ),
+            Biome(
+                start=(BIG_OFFSET + 2 * BIG_WIDTH, BIG_OFFSET),
+                stop=(BIG_OFFSET + 3 * BIG_WIDTH, BIG_OFFSET + BIG_WIDTH),
+                object_frequencies=(0.4, 0.0),
+            ),
+            Biome(
+                start=(BIG_OFFSET + 2 * BIG_WIDTH, BIG_OFFSET + 2 * BIG_WIDTH),
+                stop=(BIG_OFFSET + 3 * BIG_WIDTH, BIG_OFFSET + 3 * BIG_WIDTH),
+                object_frequencies=(0.4, 0.0),
+            ),
+            Biome(
+                start=(BIG_OFFSET + BIG_WIDTH // 2, BIG_OFFSET + BIG_WIDTH // 2),
+                stop=(BIG_OFFSET + BIG_WIDTH // 2 + 1, BIG_OFFSET + BIG_WIDTH // 2 + 1),
+                object_frequencies=(0.0, 1.0),
+            ),
+            Biome(
+                start=(BIG_OFFSET + BIG_WIDTH // 2, BIG_OFFSET + 5 * BIG_WIDTH // 2),
+                stop=(BIG_OFFSET + BIG_WIDTH // 2 + 1, BIG_OFFSET + 5 * BIG_WIDTH // 2 + 1),
+                object_frequencies=(0.0, 1.0),
+            ),
+            Biome(
+                start=(BIG_OFFSET + 5 * BIG_WIDTH // 2, BIG_OFFSET + BIG_WIDTH // 2),
+                stop=(BIG_OFFSET + 5 * BIG_WIDTH // 2 + 1, BIG_OFFSET + BIG_WIDTH // 2 + 1),
+                object_frequencies=(0.0, 1.0),
+            ),
+            Biome(
+                start=(BIG_OFFSET + 5 * BIG_WIDTH // 2, BIG_OFFSET + 5 * BIG_WIDTH // 2),
+                stop=(BIG_OFFSET + 5 * BIG_WIDTH // 2 + 1, BIG_OFFSET + 5 * BIG_WIDTH // 2 + 1),
+                object_frequencies=(0.0, 1.0),
+            ),
+        ),
+        "nowrap": False,
+        "deterministic_spawn": True,
+        "dynamic_biomes": True,
+        "biome_consumption_threshold": 10000,
+        "dynamic_biome_spawn_empty": 1.0,
     },
     "ForagaxTwoBiome-v1": {
         "size": (15, 15),
@@ -633,6 +685,16 @@ def make(
             regen_delay=(9, 11),
             reward_repeat=1000,
         )[:1]
+    if env_id == "ForagaxBig-v1":
+        config["objects"] = (
+            create_fourier_objects(
+                num_fourier_terms=10,
+                reward_delay=reward_delay,
+                regen_delay=(9, 11),
+                reward_repeat=1000,
+            )[0],
+            WALL,
+        )
 
     if env_id == "ForagaxSineTwoBiome-v1":
         biome1_oyster, biome1_deathcap, biome2_oyster, biome2_deathcap = (
