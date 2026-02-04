@@ -22,7 +22,13 @@ from foragax.objects import (
     FourierObject,
     WeatherObject,
 )
-from foragax.rendering import apply_true_borders
+from foragax.rendering import (
+    apply_grid_lines,
+    apply_reward_overlay,
+    apply_true_borders,
+    get_base_image,
+    reward_to_color,
+)
 from foragax.weather import get_temperature
 
 
@@ -633,11 +639,11 @@ class ForagaxEnv(environment.Environment):
 
         def compute_reward(obj_id, params, timer):
             reward = jax.lax.switch(
-                    obj_id.astype(jnp.int32),
-                    self.reward_fns,
-                    state.time,
-                    fixed_key,
-                    params.astype(jnp.float32),
+                obj_id.astype(jnp.int32),
+                self.reward_fns,
+                state.time,
+                fixed_key,
+                params.astype(jnp.float32),
             )
             # Only show reward for objects that are fully present (no timer)
             mask = (obj_id > 0) & (timer == 0)
@@ -1492,68 +1498,34 @@ class ForagaxEnv(environment.Environment):
         return spaces.Box(0, 1, obs_shape, float)
 
     def _compute_reward_grid(
-        self, state: EnvState, object_id=None, state_params=None
+        self, state: EnvState, object_id=None, state_params=None, respawn_timer=None
     ) -> jax.Array:
         """Compute rewards for given positions. If no grid provided, uses full world."""
         if object_id is None:
             object_id = state.object_state.object_id
         if state_params is None:
             state_params = state.object_state.state_params
+        if respawn_timer is None:
+            respawn_timer = state.object_state.respawn_timer
 
         fixed_key = jax.random.key(0)  # Fixed key for deterministic reward computation
 
-        def compute_reward(obj_id, params):
-            return jax.lax.cond(
-                obj_id > 0,
-                lambda: jax.lax.switch(
-                    obj_id, self.reward_fns, state.time, fixed_key, params
-                ),
-                lambda: 0.0,
+        def compute_reward(obj_id, params, timer):
+            reward = jax.lax.switch(
+                obj_id.astype(jnp.int32),
+                self.reward_fns,
+                state.time,
+                fixed_key,
+                params.astype(jnp.float32),
             )
+            # Only show reward for objects that are fully present (no timer)
+            mask = (obj_id > 0) & (timer == 0)
+            return jnp.where(mask, reward, 0.0)
 
-        reward_grid = jax.vmap(jax.vmap(compute_reward))(object_id, state_params)
+        reward_grid = jax.vmap(jax.vmap(compute_reward))(
+            object_id, state_params, respawn_timer
+        )
         return reward_grid
-
-    def _reward_to_color(self, reward: jax.Array) -> jax.Array:
-        """Convert reward value to RGB color using diverging gradient.
-
-        Args:
-            reward: Reward value (typically -1 to +1)
-
-        Returns:
-            RGB color array with shape (..., 3) and dtype uint8
-        """
-        # Diverging gradient: +1 = green (0, 255, 0), 0 = white (255, 255, 255), -1 = magenta (255, 0, 255)
-        # Clamp reward to [-1, 1] range for color mapping
-        reward_clamped = jnp.clip(reward, -1.0, 1.0)
-
-        # For positive rewards: interpolate from white to green
-        # For negative rewards: interpolate from white to magenta
-        # At reward = 0: white (255, 255, 255)
-        # At reward = +1: green (0, 255, 0)
-        # At reward = -1: magenta (255, 0, 255)
-
-        red_component = jnp.where(
-            reward_clamped >= 0,
-            (1 - reward_clamped) * 255,  # Fade from white to green: 255 -> 0
-            255,  # Stay at 255 for all negative rewards
-        )
-
-        green_component = jnp.where(
-            reward_clamped >= 0,
-            255,  # Stay at 255 for all positive rewards
-            (1 + reward_clamped) * 255,  # Fade from white to magenta: 255 -> 0
-        )
-
-        blue_component = jnp.where(
-            reward_clamped >= 0,
-            (1 - reward_clamped) * 255,  # Fade from white to green: 255 -> 0
-            255,  # Stay at 255 for all negative rewards
-        )
-
-        return jnp.stack(
-            [red_component, green_component, blue_component], axis=-1
-        ).astype(jnp.uint8)
 
     @partial(jax.jit, static_argnames=("self", "render_mode"))
     def render(
@@ -1562,13 +1534,7 @@ class ForagaxEnv(environment.Environment):
         params: EnvParams,
         render_mode: str = "world",
     ):
-        """Render the environment state.
-
-        Args:
-            state: Current environment state
-            params: Environment parameters
-            render_mode: One of "world", "world_true", "world_reward", "aperture", "aperture_true", "aperture_reward"
-        """
+        """Render the environment state."""
         is_world_mode = render_mode in ("world", "world_true", "world_reward")
         is_aperture_mode = render_mode in (
             "aperture",
@@ -1579,27 +1545,12 @@ class ForagaxEnv(environment.Environment):
         is_reward_mode = render_mode in ("world_reward", "aperture_reward")
 
         if is_world_mode:
-            # Create an RGB image from the object grid
-            # Use stateful object colors if dynamic_biomes is enabled, else use default colors
-            if self.dynamic_biomes:
-                # Use per-instance colors from state
-                img = state.object_state.color.copy()
-                # Mask empty cells (object_id == 0) to white
-                empty_mask = state.object_state.object_id == 0
-                white_color = jnp.array([255, 255, 255], dtype=jnp.uint8)
-                img = jnp.where(empty_mask[..., None], white_color, img)
-            else:
-                # Use default object colors
-                img = jnp.zeros((self.size[1], self.size[0], 3))
-                render_grid = state.object_state.object_id
-
-                def update_image(i, img):
-                    color = self.object_colors[i]
-                    mask = render_grid == i
-                    img = jnp.where(mask[..., None], color, img)
-                    return img
-
-                img = jax.lax.fori_loop(0, len(self.object_ids), update_image, img)
+            img = get_base_image(
+                state.object_state.object_id,
+                state.object_state.color,
+                self.object_colors,
+                self.dynamic_biomes,
+            )
 
             # Define constants for all world modes
             alpha = 0.2
@@ -1609,26 +1560,18 @@ class ForagaxEnv(environment.Environment):
 
             if is_reward_mode:
                 # Construct 3x intermediate image
-                # Each cell is 3x3, with reward color in center
                 reward_grid = self._compute_reward_grid(state)
-                reward_colors = self._reward_to_color(reward_grid)
+                reward_colors = reward_to_color(reward_grid)
 
-                # Each cell has its base color in 8 pixels and reward color in 1 (center)
-                # Create a 3x3 pattern mask for center pixels
-                cell_mask = jnp.array(
-                    [[False, False, False], [False, True, False], [False, False, False]]
-                )
-                grid_reward_mask = jnp.tile(cell_mask, (self.size[1], self.size[0]))
-
-                # Repeat base colors and rewards to 3x3
+                # Repeat base colors to 3x scale
                 base_img_x3 = jnp.repeat(jnp.repeat(img, 3, axis=0), 3, axis=1)
-                reward_colors_x3 = jnp.repeat(
-                    jnp.repeat(reward_colors, 3, axis=0), 3, axis=1
-                )
 
-                # Composite base and reward colors
-                img = jnp.where(
-                    grid_reward_mask[..., None], reward_colors_x3, base_img_x3
+                # Composite base and reward colors using helper
+                img = apply_reward_overlay(
+                    base_img_x3,
+                    reward_colors,
+                    reward_grid,
+                    self.size,
                 )
 
                 # Tint the aperture region at 3x scale
@@ -1674,83 +1617,72 @@ class ForagaxEnv(environment.Environment):
                     img, state.object_state.object_id, self.size, len(self.object_ids)
                 )
 
-            # Add grid lines using masking instead of slice-setting
-            row_grid = (jnp.arange(self.size[1] * 24) % 24) == 0
-            col_grid = (jnp.arange(self.size[0] * 24) % 24) == 0
-            # skip first rows/cols as they are borders or managed by caller
-            row_grid = row_grid.at[0].set(False)
-            col_grid = col_grid.at[0].set(False)
-            grid_mask = row_grid[:, None] | col_grid[None, :]
-            img = jnp.where(grid_mask[..., None], self.grid_color_jax, img)
+            # Add grid lines
+            img = apply_grid_lines(img, self.size, self.grid_color_jax)
 
         elif is_aperture_mode:
             obs_grid = state.object_state.object_id
             aperture = self._get_aperture(obs_grid, state.pos)
 
-            if self.dynamic_biomes:
-                # Use per-instance colors from state - extract aperture view
-                y_coords, x_coords, y_coords_adj, x_coords_adj = (
-                    self._compute_aperture_coordinates(state.pos)
-                )
-                img = state.object_state.color[y_coords_adj, x_coords_adj]
+            y_coords, x_coords, y_coords_adj, x_coords_adj = (
+                self._compute_aperture_coordinates(state.pos)
+            )
+            color_state = state.object_state.color[y_coords_adj, x_coords_adj]
 
-                # Mask empty cells (object_id == 0) to white
-                aperture_object_ids = state.object_state.object_id[
-                    y_coords_adj, x_coords_adj
-                ]
-                empty_mask = aperture_object_ids == 0
-                white_color = jnp.array([255, 255, 255], dtype=jnp.uint8)
-                img = jnp.where(empty_mask[..., None], white_color, img)
+            img = get_base_image(
+                aperture,
+                color_state,
+                self.object_colors,
+                self.dynamic_biomes,
+            )
 
-                if self.nowrap:
-                    # For out-of-bounds, use padding object color
-                    y_out = (y_coords < 0) | (y_coords >= self.size[1])
-                    x_out = (x_coords < 0) | (x_coords >= self.size[0])
-                    out_of_bounds = y_out | x_out
-                    padding_color = jnp.array(self.objects[-1].color, dtype=jnp.float32)
-                    img = jnp.where(out_of_bounds[..., None], padding_color, img)
-            else:
-                # Use default object colors
-                aperture_one_hot = jax.nn.one_hot(aperture, len(self.object_ids))
-                img = jnp.tensordot(aperture_one_hot, self.object_colors, axes=1)
+            if self.dynamic_biomes and self.nowrap:
+                # For out-of-bounds, use padding object color
+                y_out = (y_coords < 0) | (y_coords >= self.size[1])
+                x_out = (x_coords < 0) | (x_coords >= self.size[0])
+                out_of_bounds = y_out | x_out
+                padding_color = jnp.array(self.objects[-1].color, dtype=jnp.float32)
+                img = jnp.where(out_of_bounds[..., None], padding_color, img)
 
             if is_reward_mode:
                 # Scale image by 3 to create space for reward visualization
                 img = img.astype(jnp.uint8)
                 img = jax.image.resize(
                     img,
-                    (self.aperture_size[0] * 3, self.aperture_size[1] * 3, 3),
+                    (
+                        self.aperture_size[0] * 3,
+                        self.aperture_size[1] * 3,
+                        3,
+                    ),
                     jax.image.ResizeMethod.NEAREST,
                 )
 
                 # Compute rewards for aperture region
-                y_coords, x_coords, y_coords_adj, x_coords_adj = (
-                    self._compute_aperture_coordinates(state.pos)
-                )
-
-                # Get reward grid only for aperture region
-                aperture_object_ids = state.object_state.object_id[
-                    y_coords_adj, x_coords_adj
-                ]
                 aperture_params = state.object_state.state_params[
                     y_coords_adj, x_coords_adj
                 ]
+                aperture_timer = self._get_aperture(
+                    state.object_state.respawn_timer, state.pos
+                )
                 aperture_rewards = self._compute_reward_grid(
-                    state, aperture_object_ids, aperture_params
+                    state, aperture, aperture_params, aperture_timer
                 )
 
                 # Convert rewards to colors
-                reward_colors = self._reward_to_color(aperture_rewards)
+                reward_colors = reward_to_color(aperture_rewards)
 
-                # Place reward colors in the middle cells (index 1 in each 3x3 block)
-                i_indices = jnp.arange(self.aperture_size[0])[:, None] * 3 + 1
-                j_indices = jnp.arange(self.aperture_size[1])[None, :] * 3 + 1
-                img = img.at[i_indices, j_indices].set(reward_colors)
+                # Apply reward overlay using helper
+                img = apply_reward_overlay(
+                    img,
+                    reward_colors,
+                    aperture_rewards,
+                    self.aperture_size,
+                )
 
                 # Draw agent in the center (all 9 cells of the 3x3 block)
                 center_y, center_x = (
-                    self.aperture_size[1] // 2,
                     self.aperture_size[0] // 2,
+                    self.aperture_size[1] // 2,
                 )
                 agent_offsets = jnp.array(
                     [[dy, dx] for dy in range(3) for dx in range(3)]
@@ -1784,17 +1716,13 @@ class ForagaxEnv(environment.Environment):
                 )
 
             if is_true_mode:
-                # Apply true object borders by overlaying true colors on border pixels
+                # Apply true object borders
                 img = apply_true_borders(
                     img, aperture, self.aperture_size, len(self.object_ids)
                 )
 
-            # Add grid lines for aperture mode
-            grid_color = jnp.zeros(3, dtype=jnp.uint8)
-            row_indices = jnp.arange(1, self.aperture_size[0]) * 24
-            col_indices = jnp.arange(1, self.aperture_size[1]) * 24
-            img = img.at[row_indices, :].set(grid_color)
-            img = img.at[:, col_indices].set(grid_color)
+            # Add grid lines
+            img = apply_grid_lines(img, self.aperture_size, self.grid_color_jax)
 
         else:
             raise ValueError(f"Unknown render_mode: {render_mode}")
