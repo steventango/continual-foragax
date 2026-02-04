@@ -38,7 +38,7 @@ from foragax.objects import (
 )
 
 BIG_WIDTH = 15
-BIG_OFFSET = BIG_WIDTH // 2
+BIG_OFFSET = BIG_WIDTH // 2 + 1
 
 ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
     "ForagaxWeather-v1": {
