@@ -364,6 +364,19 @@ class ForagaxEnv(environment.Environment):
                     jnp.array(0, dtype=ID_DTYPE)
                 )
 
+                # Extract the actual state to move
+                obj_color = object_state.color[y, x]
+                obj_params = object_state.state_params[y, x]
+                obj_gen = object_state.generation[y, x]
+
+                # Clear visuals at old position
+                new_color = object_state.color.at[y, x].set(
+                    jnp.zeros(3, dtype=COLOR_DTYPE)
+                )
+                new_params = object_state.state_params.at[y, x].set(
+                    jnp.zeros_like(obj_params)
+                )
+
                 # Find valid spawn locations in the same biome
                 biome_id = object_state.biome_id[y, x]
                 biome_mask = object_state.biome_id == biome_id
@@ -381,7 +394,7 @@ class ForagaxEnv(environment.Environment):
                 )
                 new_spawn_pos = valid_spawn_indices[random_idx]
 
-                # Place timer at the new random position
+                # Place timer and move properties at the new random position
                 new_respawn_timer = new_respawn_timer.at[
                     new_spawn_pos[0], new_spawn_pos[1]
                 ].set(timer_val)
@@ -389,10 +402,24 @@ class ForagaxEnv(environment.Environment):
                     new_spawn_pos[0], new_spawn_pos[1]
                 ].set(object_type)
 
+                # Move properties to new position
+                new_color = new_color.at[new_spawn_pos[0], new_spawn_pos[1]].set(
+                    obj_color
+                )
+                new_params = new_params.at[new_spawn_pos[0], new_spawn_pos[1]].set(
+                    obj_params
+                )
+                new_generation = object_state.generation.at[
+                    new_spawn_pos[0], new_spawn_pos[1]
+                ].set(obj_gen)
+
                 return object_state.replace(
                     object_id=new_object_id,
                     respawn_timer=new_respawn_timer,
                     respawn_object_id=new_respawn_object_id,
+                    color=new_color,
+                    state_params=new_params,
+                    generation=new_generation,
                 )
 
             return jax.lax.cond(random_respawn, place_randomly, place_at_position)
@@ -604,22 +631,22 @@ class ForagaxEnv(environment.Environment):
         # Compute reward at each grid position
         fixed_key = jax.random.key(0)  # Fixed key for deterministic reward computation
 
-        def compute_reward(obj_id, params):
-            return jax.lax.cond(
-                obj_id > jnp.array(0, dtype=ID_DTYPE),
-                lambda: jax.lax.switch(
+        def compute_reward(obj_id, params, timer):
+            reward = jax.lax.switch(
                     obj_id.astype(jnp.int32),
                     self.reward_fns,
                     state.time,
                     fixed_key,
                     params.astype(jnp.float32),
-                ),
-                lambda: 0.0,
             )
+            # Only show reward for objects that are fully present (no timer)
+            mask = (obj_id > 0) & (timer == 0)
+            return jnp.where(mask, reward, 0.0)
 
         reward_grid = jax.vmap(jax.vmap(compute_reward))(
             object_state.object_id.astype(ID_DTYPE),
             object_state.state_params.astype(PARAM_DTYPE),
+            object_state.respawn_timer.astype(TIMER_DTYPE),
         )
         return reward_grid
 
