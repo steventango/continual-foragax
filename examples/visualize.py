@@ -22,7 +22,7 @@ def main():
 
         for aperture_size in aperture_sizes:
             env = make(
-                "ForagaxDiwali-v5",
+                "ForagaxDiwali-v6",
                 aperture_size=aperture_size,
                 observation_type="color",
             )
