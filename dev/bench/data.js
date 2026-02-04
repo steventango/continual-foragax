@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1769045572247,
+  "lastUpdate": 1770238894931,
   "repoUrl": "https://github.com/steventango/continual-foragax",
   "entries": {
     "Python Benchmark with pytest-benchmark": [
@@ -498,6 +498,121 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.004839482836225351",
             "extra": "mean: 3.444588885399992 sec\nrounds: 5"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "18170455+steventango@users.noreply.github.com",
+            "name": "Steven Tang",
+            "username": "steventango"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "62f8643fc71fdc90a54e001faac77ae91f7d7030",
+          "message": "Merge pull request #68 from steventango/fix-respawn\n\nFix respawn",
+          "timestamp": "2026-02-04T13:58:49-07:00",
+          "tree_id": "3d9d368a50e654a24cb4e3126831cb1a36713335",
+          "url": "https://github.com/steventango/continual-foragax/commit/62f8643fc71fdc90a54e001faac77ae91f7d7030"
+        },
+        "date": 1770238893995,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_vision",
+            "value": 7226.181705320764,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009861417767596507",
+            "extra": "mean: 138.38567043832882 usec\nrounds: 1414"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_reset",
+            "value": 86.59568429968921,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0021273077379940887",
+            "extra": "mean: 11.547919600002388 msec\nrounds: 5"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_tiny_env",
+            "value": 2218.433621494235,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000021591013779809373",
+            "extra": "mean: 450.7685018434069 usec\nrounds: 1628"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_small_env",
+            "value": 65.61078740488757,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0008677586777642844",
+            "extra": "mean: 15.241396111114291 msec\nrounds: 54"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_big_env",
+            "value": 0.43768587171993595,
+            "unit": "iter/sec",
+            "range": "stddev: 0.009006300648156417",
+            "extra": "mean: 2.2847436132000043 sec\nrounds: 5"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_vmap_env",
+            "value": 0.6976274034821668,
+            "unit": "iter/sec",
+            "range": "stddev: 0.02224064573888643",
+            "extra": "mean: 1.433429929800002 sec\nrounds: 5"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_small_env_color",
+            "value": 72.06645482810215,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0007614629108174451",
+            "extra": "mean: 13.876081491524298 msec\nrounds: 59"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_small_env_world",
+            "value": 69.06388722463771,
+            "unit": "iter/sec",
+            "range": "stddev: 0.001011464357527225",
+            "extra": "mean: 14.479347169489497 msec\nrounds: 59"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_diwali_v5",
+            "value": 1775.966807256934,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000060531124141077796",
+            "extra": "mean: 563.0735866874383 usec\nrounds: 1292"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_sine_two_biome_v1",
+            "value": 1194.8976347251755,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00010062647244518713",
+            "extra": "mean: 836.8917729341713 usec\nrounds: 1101"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_render",
+            "value": 1747.2288362660966,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000254518103624041",
+            "extra": "mean: 572.3348763731734 usec\nrounds: 1456"
+          },
+          {
+            "name": "tests/test_optimize.py::test_benchmark_diwali_v5_vmap",
+            "value": 0.18508800592046637,
+            "unit": "iter/sec",
+            "range": "stddev: 0.006587859516207703",
+            "extra": "mean: 5.40283523519999 sec\nrounds: 5"
+          },
+          {
+            "name": "tests/test_optimize.py::test_benchmark_sine_two_biome_v1_vmap",
+            "value": 0.28116630555619376,
+            "unit": "iter/sec",
+            "range": "stddev: 0.006578828330046088",
+            "extra": "mean: 3.5566139336000218 sec\nrounds: 5"
           }
         ]
       }
