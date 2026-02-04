@@ -37,8 +37,8 @@ from foragax.objects import (
     create_weather_objects,
 )
 
-W = 15
-O = W // 2
+BIG_WIDTH = 15
+BIG_OFFSET = BIG_WIDTH // 2
 
 ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
     "ForagaxWeather-v1": {
@@ -170,44 +170,44 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
         "dynamic_biome_spawn_empty": 0.4,
     },
     "ForagaxBig-v1": {
-        "size": (4 * W, 4 * W),
+        "size": (4 * BIG_WIDTH, 4 * BIG_WIDTH),
         "aperture_size": None,
         "objects": None,
         "biomes": (
-            Biome(start=(O, O), stop=(O + W, O + W), object_frequencies=(0.4, 0.0)),
+            Biome(start=(BIG_OFFSET, BIG_OFFSET), stop=(BIG_OFFSET + BIG_WIDTH, BIG_OFFSET + BIG_WIDTH), object_frequencies=(0.4, 0.0)),
             Biome(
-                start=(O, O + 2 * W),
-                stop=(O + W, O + 3 * W),
+                start=(BIG_OFFSET, BIG_OFFSET + 2 * BIG_WIDTH),
+                stop=(BIG_OFFSET + BIG_WIDTH, BIG_OFFSET + 3 * BIG_WIDTH),
                 object_frequencies=(0.4, 0.0),
             ),
             Biome(
-                start=(O + 2 * W, O),
-                stop=(O + 3 * W, O + W),
+                start=(BIG_OFFSET + 2 * BIG_WIDTH, BIG_OFFSET),
+                stop=(BIG_OFFSET + 3 * BIG_WIDTH, BIG_OFFSET + BIG_WIDTH),
                 object_frequencies=(0.4, 0.0),
             ),
             Biome(
-                start=(O + 2 * W, O + 2 * W),
-                stop=(O + 3 * W, O + 3 * W),
+                start=(BIG_OFFSET + 2 * BIG_WIDTH, BIG_OFFSET + 2 * BIG_WIDTH),
+                stop=(BIG_OFFSET + 3 * BIG_WIDTH, BIG_OFFSET + 3 * BIG_WIDTH),
                 object_frequencies=(0.4, 0.0),
             ),
             Biome(
-                start=(O + W // 2, O + W // 2),
-                stop=(O + W // 2 + 1, O + W // 2 + 1),
+                start=(BIG_OFFSET + BIG_WIDTH // 2, BIG_OFFSET + BIG_WIDTH // 2),
+                stop=(BIG_OFFSET + BIG_WIDTH // 2 + 1, BIG_OFFSET + BIG_WIDTH // 2 + 1),
                 object_frequencies=(0.0, 1.0),
             ),
             Biome(
-                start=(O + W // 2, O + 5 * W // 2),
-                stop=(O + W // 2 + 1, O + 5 * W // 2 + 1),
+                start=(BIG_OFFSET + BIG_WIDTH // 2, BIG_OFFSET + 5 * BIG_WIDTH // 2),
+                stop=(BIG_OFFSET + BIG_WIDTH // 2 + 1, BIG_OFFSET + 5 * BIG_WIDTH // 2 + 1),
                 object_frequencies=(0.0, 1.0),
             ),
             Biome(
-                start=(O + 5 * W // 2, O + W // 2),
-                stop=(O + 5 * W // 2 + 1, O + W // 2 + 1),
+                start=(BIG_OFFSET + 5 * BIG_WIDTH // 2, BIG_OFFSET + BIG_WIDTH // 2),
+                stop=(BIG_OFFSET + 5 * BIG_WIDTH // 2 + 1, BIG_OFFSET + BIG_WIDTH // 2 + 1),
                 object_frequencies=(0.0, 1.0),
             ),
             Biome(
-                start=(O + 5 * W // 2, O + 5 * W // 2),
-                stop=(O + 5 * W // 2 + 1, O + 5 * W // 2 + 1),
+                start=(BIG_OFFSET + 5 * BIG_WIDTH // 2, BIG_OFFSET + 5 * BIG_WIDTH // 2),
+                stop=(BIG_OFFSET + 5 * BIG_WIDTH // 2 + 1, BIG_OFFSET + 5 * BIG_WIDTH // 2 + 1),
                 object_frequencies=(0.0, 1.0),
             ),
         ),
