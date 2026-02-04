@@ -180,7 +180,7 @@ class ForagaxEnv(environment.Environment):
             objects = objects + (PADDING,)
         self.objects = objects
 
-        # Infer num_fourier_terms from objects
+        # Infer num_fourier_terms and record which objects are Fourier types
         self.num_fourier_terms = max(
             (
                 obj.num_fourier_terms
@@ -188,6 +188,9 @@ class ForagaxEnv(environment.Environment):
                 if isinstance(obj, FourierObject)
             ),
             default=0,
+        )
+        self.object_is_fourier = jnp.array(
+            [isinstance(obj, FourierObject) for obj in self.objects]
         )
 
         # JIT-compatible versions of object and biome properties
@@ -949,7 +952,14 @@ class ForagaxEnv(environment.Environment):
                 should_update = biome_mask & should_respawn[i][..., None]
 
                 # 1. Merge: Overwrite with new objects if present, otherwise keep existing
+                # However, for non-Fourier objects, we want to keep them even if they are in a respawning biome
+                # unless a new object is specifically spawned on top of them.
                 new_spawn_valid = all_new_objects[i] > 0
+
+                # We only want to replace objects if the new spawn is valid
+                # Or if it's a Fourier object and we are regenerating
+                # But the request says: "the walls should remain in place"
+                # So we only overwrite walls if a new object is spawned there.
 
                 merged_objs = jnp.where(new_spawn_valid, all_new_objects[i], new_obj_id)
                 merged_colors = jnp.where(
@@ -964,30 +974,40 @@ class ForagaxEnv(environment.Environment):
 
                 if self.dynamic_biome_spawn_empty > 0:
                     key, dropout_key = jax.random.split(key)
-                    keep_mask = jax.random.bernoulli(
+                    # Dropout only applies to Fourier objects
+                    keep_mask_fourier = jax.random.bernoulli(
                         dropout_key,
                         1.0 - self.dynamic_biome_spawn_empty,
                         merged_objs.shape,
                     )
-                    dropout_mask = should_update & keep_mask
+
+                    # An object is kept if:
+                    # 1. It is NOT a Fourier object
+                    # 2. It IS a Fourier object AND keep_mask_fourier is True
+                    is_fourier_mask = self.object_is_fourier[merged_objs]
+                    keep_mask = (~is_fourier_mask) | keep_mask_fourier
+
+                    dropout_update_mask = should_update & keep_mask
                     final_objs = jnp.where(
-                        dropout_mask, merged_objs, jnp.array(0, dtype=ID_DTYPE)
+                        dropout_update_mask, merged_objs, jnp.array(0, dtype=ID_DTYPE)
                     )
                     final_colors = jnp.where(
-                        dropout_mask[..., None],
+                        dropout_update_mask[..., None],
                         merged_colors,
                         jnp.array(0, dtype=COLOR_DTYPE),
                     )
                     final_params = jnp.where(
-                        dropout_mask[..., None],
+                        dropout_update_mask[..., None],
                         merged_params,
                         jnp.array(0, dtype=PARAM_DTYPE),
                     )
                     final_gen = jnp.where(
-                        dropout_mask, merged_gen, jnp.array(0, dtype=ID_DTYPE)
+                        dropout_update_mask, merged_gen, jnp.array(0, dtype=ID_DTYPE)
                     )
                     final_spawn = jnp.where(
-                        dropout_mask, merged_spawn, jnp.array(0, dtype=TIME_DTYPE)
+                        dropout_update_mask,
+                        merged_spawn,
+                        jnp.array(0, dtype=TIME_DTYPE),
                     )
                 else:
                     final_objs = merged_objs
@@ -1198,9 +1218,13 @@ class ForagaxEnv(environment.Environment):
             # Assign colors based on object type (starting from index 1)
             for obj_idx in range(1, num_object_types):
                 obj_mask = (object_grid == obj_idx) & biome_mask
-                obj_color = biome_object_colors[
-                    obj_idx - 1
-                ]  # Offset by 1 since we skip EMPTY
+
+                obj_color = jax.lax.cond(
+                    self.object_is_fourier[obj_idx],
+                    lambda: biome_object_colors[obj_idx - 1],
+                    lambda: self.object_colors[obj_idx].astype(COLOR_DTYPE),
+                )
+
                 color_grid = jnp.where(obj_mask[..., None], obj_color, color_grid)
 
         # Initialize parameters grid

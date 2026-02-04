@@ -371,7 +371,7 @@ class FourierObject(BaseForagaxObject):
 
 
 EMPTY = DefaultForagaxObject()
-WALL = DefaultForagaxObject(name="wall", blocking=True, color=(127, 127, 127))
+WALL = DefaultForagaxObject(name="wall", blocking=True, color=(0, 0, 0))
 FLOWER = DefaultForagaxObject(
     name="flower",
     reward=1.0,
