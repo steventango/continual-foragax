@@ -876,7 +876,7 @@ def test_color_channel_mapping():
     # Check that unique colors are correctly identified in order of first appearance
     expected_colors = jnp.array(
         [
-            [127, 127, 127],  # gray (WALL) - appears first
+            [0, 0, 0],  # black (WALL) - appears first
             [0, 255, 0],  # green (FLOWER) - appears second
             [255, 0, 0],  # red (THORNS) - appears third
         ]
@@ -2860,6 +2860,7 @@ def test_info_rewards():
         objects=(FLOWER,),
         biomes=(Biome(object_frequencies=(0.5,)),),
         observation_type="object",
+        aperture_size=-1,
     )
     params = env.default_params
     obs, state = env.reset(key, params)
@@ -2945,3 +2946,76 @@ def test_random_respawn_preserves_state():
     chex.assert_trees_all_equal(news.object_state.color[ny, nx], magenta)
     assert news.object_state.state_params[ny, nx, 0] == 42.0
     assert news.object_state.generation[ny, nx] == 99
+
+
+def test_wall_properties_and_preservation():
+    """Test that walls are black and preserved during regeneration."""
+    key = jax.random.key(42)
+
+    # Create an environment with walls and dynamic biomes
+    fourier = create_fourier_objects(num_fourier_terms=1)[0]
+    objects = (fourier, WALL)
+    biomes = (Biome(start=(0, 0), stop=(10, 10), object_frequencies=(0.5, 0.5)),)
+    env = ForagaxEnv(
+        size=10,
+        objects=objects,
+        biomes=biomes,
+        deterministic_spawn=True,
+        dynamic_biomes=True,
+        biome_consumption_threshold=1,  # Trigger easily
+    )
+    params = env.default_params
+
+    # Reset
+    _, state = env.reset(key, params)
+
+    # Check wall color (ID 2 because 0=EMPTY, 1=fourier, 2=WALL)
+    wall_mask = state.object_state.object_id == 2
+    chex.assert_trees_all_equal(
+        state.object_state.color[wall_mask][0], jnp.array([0, 0, 0], dtype=jnp.uint8)
+    )
+
+    initial_wall_positions = jnp.argwhere(wall_mask)
+
+    # Collect a dynamic object to trigger consumption
+    dynamic_pos = jnp.argwhere(state.object_state.object_id == 1)[0]
+    state = state.replace(pos=dynamic_pos.astype(jnp.int32))
+
+    key, subkey = jax.random.split(key)
+    _, news, _, _, _ = env.step(subkey, state, Actions.DOWN, params)
+
+    # Verify walls are still in the same place
+    new_wall_mask = news.object_state.object_id == 2
+    new_wall_positions = jnp.argwhere(new_wall_mask)
+    assert jnp.array_equal(initial_wall_positions, new_wall_positions)
+    chex.assert_trees_all_equal(
+        news.object_state.color[new_wall_mask][0], jnp.array([0, 0, 0], dtype=jnp.uint8)
+    )
+
+
+def test_info_rewards_aperture():
+    """Test that info['rewards'] shape matches aperture size when not in world mode."""
+    key = jax.random.key(0)
+    aperture_size = (5, 7)
+    env = ForagaxEnv(
+        size=20,
+        aperture_size=aperture_size,
+    )
+    params = env.default_params
+    _, state = env.reset(key, params)
+
+    _, _, _, _, info = env.step(key, state, Actions.DOWN, params)
+    assert info["rewards"].shape == aperture_size
+
+
+def test_info_rewards_world():
+    """Test that info['rewards'] shape matches world size when in world mode."""
+    key = jax.random.key(0)
+    env_world = ForagaxEnv(
+        size=20,
+        aperture_size=-1,
+    )
+    params = env_world.default_params
+    _, state_w = env_world.reset(key, params)
+    _, _, _, _, info_w = env_world.step(key, state_w, Actions.DOWN, params)
+    assert info_w["rewards"].shape == (20, 20)

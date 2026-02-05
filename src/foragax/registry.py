@@ -39,6 +39,7 @@ from foragax.objects import (
 
 BIG_WIDTH = 15
 BIG_OFFSET = BIG_WIDTH // 2 + 1
+BIG_WALL_WIDTH = 1
 
 ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
     "ForagaxWeather-v1": {
@@ -177,54 +178,66 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
             Biome(
                 start=(BIG_OFFSET, BIG_OFFSET),
                 stop=(BIG_OFFSET + BIG_WIDTH, BIG_OFFSET + BIG_WIDTH),
-                object_frequencies=(0.4, 0.0),
+                object_frequencies=(0.2, 0.0),
             ),
             Biome(
                 start=(BIG_OFFSET, BIG_OFFSET + 2 * BIG_WIDTH),
                 stop=(BIG_OFFSET + BIG_WIDTH, BIG_OFFSET + 3 * BIG_WIDTH),
-                object_frequencies=(0.4, 0.0),
+                object_frequencies=(0.2, 0.0),
             ),
             Biome(
                 start=(BIG_OFFSET + 2 * BIG_WIDTH, BIG_OFFSET),
                 stop=(BIG_OFFSET + 3 * BIG_WIDTH, BIG_OFFSET + BIG_WIDTH),
-                object_frequencies=(0.4, 0.0),
+                object_frequencies=(0.2, 0.0),
             ),
             Biome(
                 start=(BIG_OFFSET + 2 * BIG_WIDTH, BIG_OFFSET + 2 * BIG_WIDTH),
                 stop=(BIG_OFFSET + 3 * BIG_WIDTH, BIG_OFFSET + 3 * BIG_WIDTH),
-                object_frequencies=(0.4, 0.0),
-            ),
-            Biome(
-                start=(BIG_OFFSET + BIG_WIDTH // 2, BIG_OFFSET + BIG_WIDTH // 2),
-                stop=(BIG_OFFSET + BIG_WIDTH // 2 + 1, BIG_OFFSET + BIG_WIDTH // 2 + 1),
-                object_frequencies=(0.0, 1.0),
-            ),
-            Biome(
-                start=(BIG_OFFSET + BIG_WIDTH // 2, BIG_OFFSET + 5 * BIG_WIDTH // 2),
-                stop=(
-                    BIG_OFFSET + BIG_WIDTH // 2 + 1,
-                    BIG_OFFSET + 5 * BIG_WIDTH // 2 + 1,
-                ),
-                object_frequencies=(0.0, 1.0),
-            ),
-            Biome(
-                start=(BIG_OFFSET + 5 * BIG_WIDTH // 2, BIG_OFFSET + BIG_WIDTH // 2),
-                stop=(
-                    BIG_OFFSET + 5 * BIG_WIDTH // 2 + 1,
-                    BIG_OFFSET + BIG_WIDTH // 2 + 1,
-                ),
-                object_frequencies=(0.0, 1.0),
+                object_frequencies=(0.2, 0.0),
             ),
             Biome(
                 start=(
-                    BIG_OFFSET + 5 * BIG_WIDTH // 2,
-                    BIG_OFFSET + 5 * BIG_WIDTH // 2,
+                    BIG_OFFSET + BIG_WIDTH // 2 - BIG_WALL_WIDTH,
+                    BIG_OFFSET + BIG_WIDTH // 2 - BIG_WALL_WIDTH,
                 ),
                 stop=(
-                    BIG_OFFSET + 5 * BIG_WIDTH // 2 + 1,
-                    BIG_OFFSET + 5 * BIG_WIDTH // 2 + 1,
+                    BIG_OFFSET + BIG_WIDTH // 2 + 1 + BIG_WALL_WIDTH,
+                    BIG_OFFSET + BIG_WIDTH // 2 + 1 + BIG_WALL_WIDTH,
                 ),
-                object_frequencies=(0.0, 1.0),
+                object_frequencies=(0.0, 0.6),
+            ),
+            Biome(
+                start=(
+                    BIG_OFFSET + BIG_WIDTH // 2 - BIG_WALL_WIDTH,
+                    BIG_OFFSET + 5 * BIG_WIDTH // 2 - BIG_WALL_WIDTH,
+                ),
+                stop=(
+                    BIG_OFFSET + BIG_WIDTH // 2 + 1 + BIG_WALL_WIDTH,
+                    BIG_OFFSET + 5 * BIG_WIDTH // 2 + 1 + BIG_WALL_WIDTH,
+                ),
+                object_frequencies=(0.0, 0.6),
+            ),
+            Biome(
+                start=(
+                    BIG_OFFSET + 5 * BIG_WIDTH // 2 - BIG_WALL_WIDTH,
+                    BIG_OFFSET + BIG_WIDTH // 2 - BIG_WALL_WIDTH,
+                ),
+                stop=(
+                    BIG_OFFSET + 5 * BIG_WIDTH // 2 + 1 + BIG_WALL_WIDTH,
+                    BIG_OFFSET + BIG_WIDTH // 2 + 1 + BIG_WALL_WIDTH,
+                ),
+                object_frequencies=(0.0, 0.6),
+            ),
+            Biome(
+                start=(
+                    BIG_OFFSET + 5 * BIG_WIDTH // 2 - BIG_WALL_WIDTH,
+                    BIG_OFFSET + 5 * BIG_WIDTH // 2 - BIG_WALL_WIDTH,
+                ),
+                stop=(
+                    BIG_OFFSET + 5 * BIG_WIDTH // 2 + 1 + BIG_WALL_WIDTH,
+                    BIG_OFFSET + 5 * BIG_WIDTH // 2 + 1 + BIG_WALL_WIDTH,
+                ),
+                object_frequencies=(0.0, 0.6),
             ),
         ),
         "nowrap": False,

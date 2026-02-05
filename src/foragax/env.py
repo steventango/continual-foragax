@@ -6,7 +6,7 @@ Source: https://github.com/andnp/Forager
 from dataclasses import dataclass
 from enum import IntEnum
 from functools import partial
-from typing import Any, Dict, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union
 
 import jax
 import jax.numpy as jnp
@@ -20,6 +20,7 @@ from foragax.objects import (
     PADDING,
     BaseForagaxObject,
     FourierObject,
+    SineObject,
     WeatherObject,
 )
 from foragax.rendering import (
@@ -180,7 +181,7 @@ class ForagaxEnv(environment.Environment):
             objects = objects + (PADDING,)
         self.objects = objects
 
-        # Infer num_fourier_terms from objects
+        # Infer num_fourier_terms and record which objects are Fourier types
         self.num_fourier_terms = max(
             (
                 obj.num_fourier_terms
@@ -188,6 +189,9 @@ class ForagaxEnv(environment.Environment):
                 if isinstance(obj, FourierObject)
             ),
             default=0,
+        )
+        self.object_is_fourier = jnp.array(
+            [isinstance(obj, (FourierObject, SineObject)) for obj in self.objects]
         )
 
         # JIT-compatible versions of object and biome properties
@@ -225,6 +229,16 @@ class ForagaxEnv(environment.Environment):
         self.biome_stops = np.array(
             [b.stop if b.stop is not None else (-1, -1) for b in biomes]
         )
+
+        # Precompute whether each biome contains ANY Fourier objects (for static reset_env branching)
+        self.is_fourier_biome = []
+        for b in biomes:
+            is_fourier = any(
+                isinstance(self.objects[j + 1], (FourierObject, SineObject))
+                for j, freq in enumerate(b.object_frequencies)
+                if freq > 0
+            )
+            self.is_fourier_biome.append(is_fourier)
         self.biome_sizes = np.prod(self.biome_stops - self.biome_starts, axis=1)
         self.biome_sizes_jax = jnp.array(self.biome_sizes)  # JAX version for indexing
         self.biome_starts_jax = jnp.array(self.biome_starts)
@@ -738,7 +752,12 @@ class ForagaxEnv(environment.Environment):
         )
 
         reward_grid = self._reward_grid(state, object_state)
-        info["rewards"] = reward_grid.astype(jnp.float16)
+        if self.full_world:
+            info["rewards"] = reward_grid.astype(jnp.float16)
+        else:
+            info["rewards"] = self._get_aperture(reward_grid, state.pos).astype(
+                jnp.float16
+            )
 
         done = self.is_terminal(state, params)
         return (
@@ -876,13 +895,21 @@ class ForagaxEnv(environment.Environment):
             key, subkey = jax.random.split(key)
             biome_keys = jax.random.split(subkey, num_biomes)
 
+            # Prepare existing state with dropout
+            is_curr_fourier = self.object_is_fourier[object_state.object_id]
+            is_static = (object_state.object_id > 0) & (~is_curr_fourier)
+            is_free_mask = ~is_static
+
             # Compute all new spawns in parallel using vmap for random, switch for deterministic
             if self.deterministic_spawn:
-                # Use switch to dispatch to concrete biome spawns for deterministic
+                # Deterministic spawn needs static loop for per-biome sizes
                 def make_spawn_fn(biome_idx):
                     def spawn_fn(key):
                         return self._spawn_biome_objects(
-                            biome_idx, key, deterministic=True
+                            biome_idx,
+                            key,
+                            deterministic=True,
+                            is_free_mask=is_free_mask,
                         )
 
                     return spawn_fn
@@ -905,7 +932,9 @@ class ForagaxEnv(environment.Environment):
             else:
                 # Random spawn works with vmap
                 all_new_objects, all_new_colors, all_new_params = jax.vmap(
-                    lambda i, k: self._spawn_biome_objects(i, k, deterministic=False)
+                    lambda i, k: self._spawn_biome_objects(
+                        i, k, deterministic=False, is_free_mask=is_free_mask
+                    )
                 )(jnp.arange(num_biomes), biome_keys)
 
             # Initialize updated grids
@@ -948,53 +977,69 @@ class ForagaxEnv(environment.Environment):
                 # Update mask: biome area AND needs respawn
                 should_update = biome_mask & should_respawn[i][..., None]
 
-                # 1. Merge: Overwrite with new objects if present, otherwise keep existing
-                new_spawn_valid = all_new_objects[i] > 0
-
-                merged_objs = jnp.where(new_spawn_valid, all_new_objects[i], new_obj_id)
-                merged_colors = jnp.where(
-                    new_spawn_valid[..., None], all_new_colors[i], new_color
-                )
-                merged_params = jnp.where(
-                    new_spawn_valid[..., None], all_new_params[i], new_params
-                )
-
-                merged_gen = jnp.where(new_spawn_valid, new_gen_value, new_gen)
-                merged_spawn = jnp.where(new_spawn_valid, current_time, new_spawn)
+                # 1. Prepare existing state with dropout
+                is_curr_fourier = self.object_is_fourier[new_obj_id]
+                is_static = (new_obj_id > 0) & (~is_curr_fourier)
 
                 if self.dynamic_biome_spawn_empty > 0:
                     key, dropout_key = jax.random.split(key)
-                    keep_mask = jax.random.bernoulli(
+                    # Dropout only applies to CURRENT Fourier objects in the biome
+                    keep_mask_fourier = jax.random.bernoulli(
                         dropout_key,
                         1.0 - self.dynamic_biome_spawn_empty,
-                        merged_objs.shape,
+                        new_obj_id.shape,
                     )
-                    dropout_mask = should_update & keep_mask
-                    final_objs = jnp.where(
-                        dropout_mask, merged_objs, jnp.array(0, dtype=ID_DTYPE)
+                    # We keep it if it's static OR if it's fourier and not dropped
+                    keep_mask = is_static | (is_curr_fourier & keep_mask_fourier)
+
+                    # Apply dropout to the current state (only within the update area)
+                    # We only clear if it was a fourier object and we decided to drop it
+                    dropped_obj_id = jnp.where(
+                        keep_mask, new_obj_id, jnp.array(0, dtype=ID_DTYPE)
                     )
-                    final_colors = jnp.where(
-                        dropout_mask[..., None],
-                        merged_colors,
-                        jnp.array(0, dtype=COLOR_DTYPE),
+                    dropped_color = jnp.where(
+                        keep_mask[..., None], new_color, jnp.array(0, dtype=COLOR_DTYPE)
                     )
-                    final_params = jnp.where(
-                        dropout_mask[..., None],
-                        merged_params,
+                    dropped_params = jnp.where(
+                        keep_mask[..., None],
+                        new_params,
                         jnp.array(0, dtype=PARAM_DTYPE),
                     )
-                    final_gen = jnp.where(
-                        dropout_mask, merged_gen, jnp.array(0, dtype=ID_DTYPE)
+                    dropped_gen = jnp.where(
+                        keep_mask, new_gen, jnp.array(0, dtype=ID_DTYPE)
                     )
-                    final_spawn = jnp.where(
-                        dropout_mask, merged_spawn, jnp.array(0, dtype=TIME_DTYPE)
+                    dropped_spawn = jnp.where(
+                        keep_mask, new_spawn, jnp.array(0, dtype=TIME_DTYPE)
                     )
                 else:
-                    final_objs = merged_objs
-                    final_colors = merged_colors
-                    final_params = merged_params
-                    final_gen = merged_gen
-                    final_spawn = merged_spawn
+                    dropped_obj_id = new_obj_id
+                    dropped_color = new_color
+                    dropped_params = new_params
+                    dropped_gen = new_gen
+                    dropped_spawn = new_spawn
+
+                # 2. Merge with new state
+                # Only allow Fourier objects to be spawned during regeneration
+                new_is_fourier = self.object_is_fourier[all_new_objects[i]]
+                regeneration_objs = jnp.where(
+                    new_is_fourier, all_new_objects[i], jnp.array(0, dtype=ID_DTYPE)
+                )
+
+                new_spawn_valid = regeneration_objs > 0
+                # Protect static objects from being overwritten by new spawns
+                take_new = new_spawn_valid & (~is_static)
+
+                final_objs = jnp.where(take_new, regeneration_objs, dropped_obj_id)
+                final_colors = jnp.where(
+                    take_new[..., None], all_new_colors[i], dropped_color
+                )
+                final_params = jnp.where(
+                    take_new[..., None], all_new_params[i], dropped_params
+                )
+
+                # Update generation and spawn time only for new spawns
+                final_gen = jnp.where(take_new, new_gen_value, dropped_gen)
+                final_spawn = jnp.where(take_new, current_time, dropped_spawn)
 
                 new_obj_id = jnp.where(should_update, final_objs, new_obj_id)
                 new_color = jnp.where(should_update[..., None], final_colors, new_color)
@@ -1023,8 +1068,6 @@ class ForagaxEnv(environment.Environment):
                 respawn_object_id=new_respawn_object_id,
                 color=new_color,
                 state_params=new_params,
-                generation=new_gen,
-                spawn_time=new_spawn,
             )
             return new_object_state, new_biome_state, key
 
@@ -1048,11 +1091,11 @@ class ForagaxEnv(environment.Environment):
         num_object_params = 3 + 2 * self.num_fourier_terms
         object_state = ObjectState.create_empty(self.size, num_object_params)
 
+        num_biomes = self.biome_object_frequencies.shape[0]
         key, iter_key = jax.random.split(key)
 
-        # Spawn objects in each biome using unified method
-        for i in range(self.biome_object_frequencies.shape[0]):
-            iter_key, biome_key = jax.random.split(iter_key)
+        # Pass 1: Set Biome IDs and spawn Static Objects (non-Fourier)
+        for i in range(num_biomes):
             mask = self.biome_masks[i]
 
             # Set biome_id
@@ -1062,19 +1105,56 @@ class ForagaxEnv(environment.Environment):
                 )
             )
 
-            # Use unified spawn method
-            biome_objects, biome_colors, biome_object_params = (
-                self._spawn_biome_objects(i, biome_key, self.deterministic_spawn)
-            )
+            if not self.is_fourier_biome[i]:
+                iter_key, biome_key = jax.random.split(iter_key)
+                # Use unified spawn method
+                biome_objects, biome_colors, biome_object_params = (
+                    self._spawn_biome_objects(i, biome_key, self.deterministic_spawn)
+                )
 
-            # Merge biome objects/colors/params into object_state
-            object_state = object_state.replace(
-                object_id=jnp.where(mask, biome_objects, object_state.object_id),
-                color=jnp.where(mask[..., None], biome_colors, object_state.color),
-                state_params=jnp.where(
-                    mask[..., None], biome_object_params, object_state.state_params
-                ),
-            )
+                # Merge biome objects/colors/params into object_state
+                object_state = object_state.replace(
+                    object_id=jnp.where(mask, biome_objects, object_state.object_id),
+                    color=jnp.where(mask[..., None], biome_colors, object_state.color),
+                    state_params=jnp.where(
+                        mask[..., None], biome_object_params, object_state.state_params
+                    ),
+                )
+
+        # Pass 2: Spawn Dynamic Objects (Fourier) using is_free_mask to avoid static objects
+        is_free_mask = ~(object_state.object_id > 0)
+        for i in range(num_biomes):
+            if self.is_fourier_biome[i]:
+                iter_key, biome_key = jax.random.split(iter_key)
+                mask = self.biome_masks[i]
+
+                # Use unified spawn method with is_free_mask
+                biome_objects, biome_colors, biome_object_params = (
+                    self._spawn_biome_objects(
+                        i,
+                        biome_key,
+                        self.deterministic_spawn,
+                        is_free_mask=is_free_mask,
+                    )
+                )
+
+                # Merge biome objects/colors/params into object_state
+                # Only overwrite where a new object was actually spawned (biome_objects > 0)
+                # to preserve static objects from Pass 1.
+                take_new = mask & (biome_objects > 0)
+                object_state = object_state.replace(
+                    object_id=jnp.where(
+                        take_new, biome_objects, object_state.object_id
+                    ),
+                    color=jnp.where(
+                        take_new[..., None], biome_colors, object_state.color
+                    ),
+                    state_params=jnp.where(
+                        take_new[..., None],
+                        biome_object_params,
+                        object_state.state_params,
+                    ),
+                )
 
         # Place agent in the center of the world
         agent_pos = jnp.array([self.size[0] // 2, self.size[1] // 2])
@@ -1126,6 +1206,8 @@ class ForagaxEnv(environment.Environment):
         biome_idx: int,
         key: jax.Array,
         deterministic: bool = False,
+        is_free_mask: Optional[jax.Array] = None,
+        biome_freqs: Optional[jax.Array] = None,
     ) -> Tuple[jax.Array, jax.Array, jax.Array]:
         """Spawn objects in a biome.
 
@@ -1134,7 +1216,8 @@ class ForagaxEnv(environment.Environment):
             color_grid: (H, W, 3) array of RGB colors
             state_grid: (H, W, num_state_params) array of object state parameters
         """
-        biome_freqs = self.biome_object_frequencies[biome_idx]
+        if biome_freqs is None:
+            biome_freqs = self.biome_object_frequencies[biome_idx]
         biome_mask = self.biome_masks_array[biome_idx]
 
         key, spawn_key, color_key, params_key = jax.random.split(key, 4)
@@ -1143,22 +1226,45 @@ class ForagaxEnv(environment.Environment):
         if deterministic:
             # Deterministic spawn: exact number of each object type
             # NOTE: Requires concrete biome_idx to compute size at trace time
-            # Get static biome bounds
             biome_start = self.biome_starts[biome_idx]
             biome_stop = self.biome_stops[biome_idx]
             biome_height = biome_stop[1] - biome_start[1]
             biome_width = biome_stop[0] - biome_start[0]
             biome_size = int(self.biome_sizes[biome_idx])
 
+            # Handle is_free_mask for the biome area
+            if is_free_mask is None:
+                biome_free_mask = jnp.ones((biome_height, biome_width), dtype=jnp.bool_)
+            else:
+                biome_free_mask = is_free_mask[
+                    biome_start[1] : biome_stop[1], biome_start[0] : biome_stop[0]
+                ]
+
             grid = jnp.linspace(0, 1, biome_size, endpoint=False)
             biome_objects_flat = (
                 len(biome_freqs)
                 - jnp.searchsorted(jnp.cumsum(biome_freqs[::-1]), grid, side="right")
             ).astype(ID_DTYPE)
-            biome_objects_flat = jax.random.permutation(spawn_key, biome_objects_flat)
 
-            # Reshape to match biome dimensions (use concrete dimensions)
-            biome_objects = biome_objects_flat.reshape(biome_height, biome_width)
+            # Priority-based placement to avoid blocked cells
+            # 1. Sort objects so non-zero IDs are at the front
+            sorted_objects = jnp.sort(biome_objects_flat)[::-1]
+
+            # 2. Assign high priority to free cells, extremely low to blocked ones
+            priorities = jax.random.uniform(spawn_key, (biome_height, biome_width))
+            priorities = jnp.where(biome_free_mask, priorities, -10.0)
+
+            # 3. Get order of cells by priority (highest priority first)
+            # Flatten to map objects to the ranked cells
+            order = jnp.argsort(priorities.flatten())[::-1]
+
+            # 4. Place objects in the ranked order
+            # The top N ranked slots (all free if possible) get the top N objects from sorted_objects
+            final_biome_grid_flat = jnp.zeros(
+                biome_height * biome_width, dtype=ID_DTYPE
+            )
+            final_biome_grid_flat = final_biome_grid_flat.at[order].set(sorted_objects)
+            biome_objects = final_biome_grid_flat.reshape(biome_height, biome_width)
 
             # Place in full grid using slicing with static bounds
             object_grid = jnp.zeros((self.size[1], self.size[0]), dtype=ID_DTYPE)
@@ -1176,6 +1282,12 @@ class ForagaxEnv(environment.Environment):
             object_grid = (
                 jnp.searchsorted(cumulative_freqs, grid_rand, side="right") - 1
             ).astype(ID_DTYPE)
+
+            # Apply occupancy mask if provided
+            if is_free_mask is not None:
+                object_grid = jnp.where(
+                    is_free_mask, object_grid, jnp.array(0, dtype=ID_DTYPE)
+                )
 
         # Initialize color grid
         color_grid = jnp.full((self.size[1], self.size[0], 3), 255, dtype=COLOR_DTYPE)
@@ -1198,9 +1310,13 @@ class ForagaxEnv(environment.Environment):
             # Assign colors based on object type (starting from index 1)
             for obj_idx in range(1, num_object_types):
                 obj_mask = (object_grid == obj_idx) & biome_mask
-                obj_color = biome_object_colors[
-                    obj_idx - 1
-                ]  # Offset by 1 since we skip EMPTY
+
+                obj_color = jax.lax.cond(
+                    self.object_is_fourier[obj_idx],
+                    lambda: biome_object_colors[obj_idx - 1],
+                    lambda: self.object_colors[obj_idx].astype(COLOR_DTYPE),
+                )
+
                 color_grid = jnp.where(obj_mask[..., None], obj_color, color_grid)
 
         # Initialize parameters grid
@@ -1362,13 +1478,15 @@ class ForagaxEnv(environment.Environment):
 
         return y_coords, x_coords, y_coords_adj, x_coords_adj
 
-    def _get_aperture(self, object_id_grid: jax.Array, pos: jax.Array) -> jax.Array:
-        """Extract the aperture view from the object id grid."""
+    def _get_aperture(
+        self, grid: jax.Array, pos: jax.Array, fill_value: Optional[Any] = None
+    ) -> jax.Array:
+        """Extract the aperture view from the grid."""
         y_coords, x_coords, y_coords_adj, x_coords_adj = (
             self._compute_aperture_coordinates(pos)
         )
 
-        values = object_id_grid[y_coords_adj, x_coords_adj]
+        values = grid[y_coords_adj, x_coords_adj]
 
         if self.nowrap:
             # Mark out-of-bounds positions with padding
@@ -1376,15 +1494,23 @@ class ForagaxEnv(environment.Environment):
             x_out = (x_coords < 0) | (x_coords >= self.size[0])
             out_of_bounds = y_out | x_out
 
-            # Handle both object_id grids (2D) and color grids (3D)
-            if len(values.shape) == 3:
-                # Color grid: use PADDING color (0, 0, 0)
-                padding_value = jnp.array([0, 0, 0], dtype=values.dtype)
-                aperture = jnp.where(out_of_bounds[..., None], padding_value, values)
+            if fill_value is not None:
+                if len(values.shape) == 3:
+                    aperture = jnp.where(out_of_bounds[..., None], fill_value, values)
+                else:
+                    aperture = jnp.where(out_of_bounds, fill_value, values)
             else:
-                # Object ID grid: use PADDING index
-                padding_index = self.object_ids[-1].astype(values.dtype)
-                aperture = jnp.where(out_of_bounds, padding_index, values)
+                # Handle both object_id grids (2D) and color grids (3D)
+                if len(values.shape) == 3:
+                    # Color grid: use PADDING color (0, 0, 0)
+                    padding_value = jnp.array([0, 0, 0], dtype=values.dtype)
+                    aperture = jnp.where(
+                        out_of_bounds[..., None], padding_value, values
+                    )
+                else:
+                    # Object ID grid: use PADDING index
+                    padding_index = self.object_ids[-1].astype(values.dtype)
+                    aperture = jnp.where(out_of_bounds, padding_index, values)
         else:
             aperture = values
 
