@@ -1,3 +1,15 @@
+## 0.44.0 (2026-02-05)
+
+### Feat
+
+- update wall color to black, and refine dynamic object respawning
+- adjust ForagaxBig, 3x3 wall pattern, decreased object frequency
+- only apply dynamic biome to fourier object
+
+### Refactor
+
+- extract variable for BIG_WALL_WIDTH
+
 ## 0.43.1 (2026-02-04)
 
 ### Fix
