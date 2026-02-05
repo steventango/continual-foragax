@@ -38,7 +38,10 @@ from foragax.objects import (
 )
 
 BIG_WIDTH = 15
+BIG_GAP = 9
+BIG_WIDTH_V2 = 9
 BIG_OFFSET = BIG_WIDTH // 2 + 1
+BIG_OFFSET_V2 = BIG_GAP // 2 + 1
 BIG_WALL_WIDTH = 1
 
 ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
@@ -236,6 +239,82 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
                 stop=(
                     BIG_OFFSET + 5 * BIG_WIDTH // 2 + 1 + BIG_WALL_WIDTH,
                     BIG_OFFSET + 5 * BIG_WIDTH // 2 + 1 + BIG_WALL_WIDTH,
+                ),
+                object_frequencies=(0.0, 0.6),
+            ),
+        ),
+        "nowrap": False,
+        "deterministic_spawn": True,
+        "dynamic_biomes": True,
+        "biome_consumption_threshold": 10000,
+        "dynamic_biome_spawn_empty": 1.0,
+    },
+    "ForagaxBig-v2": {
+        "size": (2 * (BIG_WIDTH_V2 + BIG_GAP), 2 * (BIG_WIDTH_V2 + BIG_GAP)),
+        "aperture_size": None,
+        "objects": None,
+        "biomes": (
+            Biome(
+                start=(BIG_OFFSET_V2, BIG_OFFSET_V2),
+                stop=(BIG_OFFSET_V2 + BIG_WIDTH_V2, BIG_OFFSET_V2 + BIG_WIDTH_V2),
+                object_frequencies=(0.2, 0.0),
+            ),
+            Biome(
+                start=(BIG_OFFSET_V2, BIG_OFFSET_V2 + BIG_WIDTH_V2 + BIG_GAP),
+                stop=(BIG_OFFSET_V2 + BIG_WIDTH_V2, BIG_OFFSET_V2 + 2 * BIG_WIDTH_V2 + BIG_GAP),
+                object_frequencies=(0.2, 0.0),
+            ),
+            Biome(
+                start=(BIG_OFFSET_V2 + BIG_WIDTH_V2 + BIG_GAP, BIG_OFFSET_V2),
+                stop=(BIG_OFFSET_V2 + 2 * BIG_WIDTH_V2 + BIG_GAP, BIG_OFFSET_V2 + BIG_WIDTH_V2),
+                object_frequencies=(0.2, 0.0),
+            ),
+            Biome(
+                start=(BIG_OFFSET_V2 + BIG_WIDTH_V2 + BIG_GAP, BIG_OFFSET_V2 + BIG_WIDTH_V2 + BIG_GAP),
+                stop=(BIG_OFFSET_V2 + 2 * BIG_WIDTH_V2 + BIG_GAP, BIG_OFFSET_V2 + 2 * BIG_WIDTH_V2 + BIG_GAP),
+                object_frequencies=(0.2, 0.0),
+            ),
+            Biome(
+                start=(
+                    BIG_OFFSET_V2 + BIG_WIDTH_V2 // 2 - BIG_WALL_WIDTH,
+                    BIG_OFFSET_V2 + BIG_WIDTH_V2 // 2 - BIG_WALL_WIDTH,
+                ),
+                stop=(
+                    BIG_OFFSET_V2 + BIG_WIDTH_V2 // 2 + 1 + BIG_WALL_WIDTH,
+                    BIG_OFFSET_V2 + BIG_WIDTH_V2 // 2 + 1 + BIG_WALL_WIDTH,
+                ),
+                object_frequencies=(0.0, 0.6),
+            ),
+            Biome(
+                start=(
+                    BIG_OFFSET_V2 + BIG_WIDTH_V2 // 2 - BIG_WALL_WIDTH,
+                    BIG_OFFSET_V2 + 5 * BIG_WIDTH_V2 // 2 - BIG_WALL_WIDTH,
+                ),
+                stop=(
+                    BIG_OFFSET_V2 + BIG_WIDTH_V2 // 2 + 1 + BIG_WALL_WIDTH,
+                    BIG_OFFSET_V2 + 5 * BIG_WIDTH_V2 // 2 + 1 + BIG_WALL_WIDTH,
+                ),
+                object_frequencies=(0.0, 0.6),
+            ),
+            Biome(
+                start=(
+                    BIG_OFFSET_V2 + 5 * BIG_WIDTH_V2 // 2 - BIG_WALL_WIDTH,
+                    BIG_OFFSET_V2 + BIG_WIDTH_V2 // 2 - BIG_WALL_WIDTH,
+                ),
+                stop=(
+                    BIG_OFFSET_V2 + 5 * BIG_WIDTH_V2 // 2 + 1 + BIG_WALL_WIDTH,
+                    BIG_OFFSET_V2 + BIG_WIDTH_V2 // 2 + 1 + BIG_WALL_WIDTH,
+                ),
+                object_frequencies=(0.0, 0.6),
+            ),
+            Biome(
+                start=(
+                    BIG_OFFSET_V2 + 5 * BIG_WIDTH_V2 // 2 - BIG_WALL_WIDTH,
+                    BIG_OFFSET_V2 + 5 * BIG_WIDTH_V2 // 2 - BIG_WALL_WIDTH,
+                ),
+                stop=(
+                    BIG_OFFSET_V2 + 5 * BIG_WIDTH_V2 // 2 + 1 + BIG_WALL_WIDTH,
+                    BIG_OFFSET_V2 + 5 * BIG_WIDTH_V2 // 2 + 1 + BIG_WALL_WIDTH,
                 ),
                 object_frequencies=(0.0, 0.6),
             ),
@@ -714,7 +793,7 @@ def make(
             regen_delay=(9, 11),
             reward_repeat=1000,
         )[:1]
-    if env_id == "ForagaxBig-v1":
+    if env_id.startswith("ForagaxBig"):
         config["objects"] = (
             create_fourier_objects(
                 num_fourier_terms=10,
