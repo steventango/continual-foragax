@@ -876,7 +876,7 @@ def test_color_channel_mapping():
     # Check that unique colors are correctly identified in order of first appearance
     expected_colors = jnp.array(
         [
-            [0, 0, 0],    # black (WALL) - appears first
+            [0, 0, 0],  # black (WALL) - appears first
             [0, 255, 0],  # green (FLOWER) - appears second
             [255, 0, 0],  # red (THORNS) - appears third
         ]
