@@ -118,7 +118,7 @@ wheels = [
 
 [[package]]
 name = "continual-foragax"
-version = "0.42.1"
+version = "0.42.2"
 source = { editable = "." }
 dependencies = [
     { name = "gymnax", version = "0.0.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
