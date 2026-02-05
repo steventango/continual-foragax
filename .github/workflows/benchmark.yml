@@ -18,7 +18,7 @@ jobs:
       with:
         activate-environment: true
         python-version: "3.11"
-    - run: uv sync --dev
+    - run: uv sync --frozen --dev
     - name: Test with pytest
       run: uv run pytest --benchmark-json output.json --benchmark-only
     - name: Store benchmark result
