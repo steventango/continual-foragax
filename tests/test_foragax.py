@@ -3065,11 +3065,14 @@ def test_reward_centering():
     assert jnp.isclose(reward, 4.0), f"Expected reward 4.0, got {reward}"
 
     # Move right again to (3, 2) and collect obj2
+    # At this point, obj1 at (2, 2) is EMPTY (collected in previous step).
+    # The only active object is now obj2 itself.
+    # Global mean = reward(obj2) = 2.0
+    # Expected centered reward = 2.0 - 2.0 = 0.0
     key, step_key = jax.random.split(key)
     obs, state, reward, done, info = env.step(step_key, state, Actions.RIGHT, params)
 
-    # Expected reward for obj2: 2.0 - 6.0 = -4.0
-    assert jnp.isclose(reward, -4.0), f"Expected reward -4.0, got {reward}"
+    assert jnp.isclose(reward, 0.0), f"Expected reward 0.0, got {reward}"
 
     # Test reward grid centering
     reward_grid = env._reward_grid(state, state.object_state)

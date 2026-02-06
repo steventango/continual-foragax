@@ -483,30 +483,50 @@ class ForagaxEnv(environment.Environment):
         )
         return pos, new_pos
 
+    def _get_global_mean_reward(self, state: EnvState) -> jax.Array:
+        """Calculate mean reward of all active objects in the world."""
+        if not self.center_reward:
+            return jnp.array(0.0)
+
+        fixed_key = jax.random.key(0)  # Use fixed key for baseline rewards
+
+        def compute_reward(obj_id, params, timer):
+            reward = jax.lax.switch(
+                obj_id.astype(jnp.int32),
+                self.reward_fns,
+                state.time,
+                fixed_key,
+                params.astype(jnp.float32),
+            )
+            # Mask for "real" active objects (not EMPTY/PADDING and not respawning)
+            is_real = (obj_id >= self.real_object_start) & (
+                obj_id < self.real_object_end
+            )
+            active = timer == 0
+            mask = is_real & active
+            return jnp.where(mask, reward, 0.0), mask.astype(jnp.float32)
+
+        rewards, masks = jax.vmap(jax.vmap(compute_reward))(
+            state.object_state.object_id,
+            state.object_state.state_params,
+            state.object_state.respawn_timer,
+        )
+
+        total_reward = jnp.sum(rewards)
+        count = jnp.sum(masks)
+        return jnp.where(count > 0, total_reward / count, 0.0)
+
     def _apply_centering(
         self,
         reward: jax.Array,
         obj_id: jax.Array,
-        clock: int,
-        rng: jax.Array,
-        params: jax.Array,
+        mean_reward: jax.Array,
     ) -> jax.Array:
-        """Subtract mean reward of real object types if centering is enabled."""
+        """Subtract global mean reward if centering is enabled."""
         if not self.center_reward:
             return reward
 
-        def eval_reward(obj_idx):
-            return jax.lax.switch(
-                obj_idx,
-                self.reward_fns,
-                clock,
-                rng,
-                params.astype(jnp.float32),
-            )
-
-        all_type_rewards = jax.vmap(eval_reward)(self.real_object_indices)
-        mean_reward = jnp.mean(all_type_rewards)
-
+        # Subtract mean if the object is a real object
         return jnp.where(
             (obj_id >= self.real_object_start) & (obj_id < self.real_object_end),
             reward - mean_reward,
@@ -534,9 +554,8 @@ class ForagaxEnv(environment.Environment):
             object_params.astype(jnp.float32),
         )
 
-        object_reward = self._apply_centering(
-            object_reward, obj_at_pos, state.time, reward_subkey, object_params
-        )
+        global_mean = self._get_global_mean_reward(state)
+        object_reward = self._apply_centering(object_reward, obj_at_pos, global_mean)
 
         key, digestion_subkey = jax.random.split(key)
         reward_delay = jax.lax.switch(
@@ -696,6 +715,7 @@ class ForagaxEnv(environment.Environment):
     def _reward_grid(self, state: EnvState, object_state: ObjectState) -> jax.Array:
         # Compute reward at each grid position
         fixed_key = jax.random.key(0)  # Fixed key for deterministic reward computation
+        global_mean = self._get_global_mean_reward(state)
 
         def compute_reward(obj_id, params, timer):
             reward = jax.lax.switch(
@@ -706,9 +726,7 @@ class ForagaxEnv(environment.Environment):
                 params.astype(jnp.float32),
             )
 
-            reward = self._apply_centering(
-                reward, obj_id, state.time, fixed_key, params
-            )
+            reward = self._apply_centering(reward, obj_id, global_mean)
 
             # Only show reward for objects that are fully present (no timer)
             mask = (obj_id > 0) & (timer == 0)
@@ -1686,6 +1704,7 @@ class ForagaxEnv(environment.Environment):
             respawn_timer = state.object_state.respawn_timer
 
         fixed_key = jax.random.key(0)  # Fixed key for deterministic reward computation
+        global_mean = self._get_global_mean_reward(state)
 
         def compute_reward(obj_id, params, timer):
             reward = jax.lax.switch(
@@ -1696,9 +1715,7 @@ class ForagaxEnv(environment.Environment):
                 params.astype(jnp.float32),
             )
 
-            reward = self._apply_centering(
-                reward, obj_id, state.time, fixed_key, params
-            )
+            reward = self._apply_centering(reward, obj_id, global_mean)
 
             # Only show reward for objects that are fully present (no timer)
             mask = (obj_id > 0) & (timer == 0)
