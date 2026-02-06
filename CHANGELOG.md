@@ -1,3 +1,10 @@
+## 0.46.0 (2026-02-06)
+
+### Feat
+
+- reduce render size from 24x to 9x
+- reward centering
+
 ## 0.45.0 (2026-02-05)
 
 ### Feat
