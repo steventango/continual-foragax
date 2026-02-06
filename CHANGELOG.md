@@ -1,3 +1,9 @@
+## 0.46.1 (2026-02-06)
+
+### Fix
+
+- reward center with global mean reward
+
 ## 0.46.0 (2026-02-06)
 
 ### Feat
