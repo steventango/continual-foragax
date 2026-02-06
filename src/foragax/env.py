@@ -149,6 +149,7 @@ class ForagaxEnv(environment.Environment):
         biome_consumption_threshold: float = 0.9,
         dynamic_biome_spawn_empty: float = 0.0,
         max_expiries_per_step: int = 1,
+        center_reward: bool = False,
     ):
         super().__init__()
         self._name = name
@@ -175,11 +176,22 @@ class ForagaxEnv(environment.Environment):
         if max_expiries_per_step < 1:
             raise ValueError("max_expiries_per_step must be at least 1")
         self.max_expiries_per_step = max_expiries_per_step
+        self.center_reward = center_reward
 
         objects = (EMPTY,) + objects
         if self.nowrap and not self.full_world:
             objects = objects + (PADDING,)
         self.objects = objects
+
+        # Identify real objects (index 0 is EMPTY, last might be PADDING)
+        self.real_object_start = 1
+        num_objects = len(self.objects)
+        self.real_object_end = num_objects - (
+            1 if self.nowrap and not self.full_world else 0
+        )
+        self.real_object_indices = jnp.arange(
+            self.real_object_start, self.real_object_end
+        )
 
         # Infer num_fourier_terms and record which objects are Fourier types
         self.num_fourier_terms = max(
@@ -471,6 +483,36 @@ class ForagaxEnv(environment.Environment):
         )
         return pos, new_pos
 
+    def _apply_centering(
+        self,
+        reward: jax.Array,
+        obj_id: jax.Array,
+        clock: int,
+        rng: jax.Array,
+        params: jax.Array,
+    ) -> jax.Array:
+        """Subtract mean reward of real object types if centering is enabled."""
+        if not self.center_reward:
+            return reward
+
+        def eval_reward(obj_idx):
+            return jax.lax.switch(
+                obj_idx,
+                self.reward_fns,
+                clock,
+                rng,
+                params.astype(jnp.float32),
+            )
+
+        all_type_rewards = jax.vmap(eval_reward)(self.real_object_indices)
+        mean_reward = jnp.mean(all_type_rewards)
+
+        return jnp.where(
+            (obj_id >= self.real_object_start) & (obj_id < self.real_object_end),
+            reward - mean_reward,
+            reward,
+        )
+
     @partial(jax.named_call, name="compute_reward")
     def _compute_reward(
         self,
@@ -490,6 +532,10 @@ class ForagaxEnv(environment.Environment):
             state.time,
             reward_subkey,
             object_params.astype(jnp.float32),
+        )
+
+        object_reward = self._apply_centering(
+            object_reward, obj_at_pos, state.time, reward_subkey, object_params
         )
 
         key, digestion_subkey = jax.random.split(key)
@@ -659,6 +705,11 @@ class ForagaxEnv(environment.Environment):
                 fixed_key,
                 params.astype(jnp.float32),
             )
+
+            reward = self._apply_centering(
+                reward, obj_id, state.time, fixed_key, params
+            )
+
             # Only show reward for objects that are fully present (no timer)
             mask = (obj_id > 0) & (timer == 0)
             return jnp.where(mask, reward, 0.0)
@@ -1644,6 +1695,11 @@ class ForagaxEnv(environment.Environment):
                 fixed_key,
                 params.astype(jnp.float32),
             )
+
+            reward = self._apply_centering(
+                reward, obj_id, state.time, fixed_key, params
+            )
+
             # Only show reward for objects that are fully present (no timer)
             mask = (obj_id > 0) & (timer == 0)
             return jnp.where(mask, reward, 0.0)
@@ -1719,8 +1775,8 @@ class ForagaxEnv(environment.Environment):
                 agent_mask_x3 = jnp.repeat(jnp.repeat(agent_mask, 3, axis=0), 3, axis=1)
                 img = jnp.where(agent_mask_x3[..., None], self.agent_color_jax, img)
 
-                # Final scale by 8 to get 24x
-                img = jnp.repeat(jnp.repeat(img, 8, axis=0), 8, axis=1)
+                # Final scale by 3 to get 9x
+                img = jnp.repeat(jnp.repeat(img, 3, axis=0), 3, axis=1)
             else:
                 # Standard rendering without reward visualization
                 aperture_mask = jnp.zeros((self.size[1], self.size[0]), dtype=bool)
@@ -1734,8 +1790,8 @@ class ForagaxEnv(environment.Environment):
 
                 # Set agent
                 img = img.at[state.pos[1], state.pos[0]].set(self.agent_color_jax)
-                # Scale by 24
-                img = jnp.repeat(jnp.repeat(img, 24, axis=0), 24, axis=1)
+                # Scale by 9
+                img = jnp.repeat(jnp.repeat(img, 9, axis=0), 9, axis=1)
 
             if is_true_mode:
                 # Apply true object borders
@@ -1744,7 +1800,7 @@ class ForagaxEnv(environment.Environment):
                 )
 
             # Add grid lines
-            img = apply_grid_lines(img, self.size, self.grid_color_jax)
+            img = apply_grid_lines(img, self.size, self.grid_color_jax, 9)
 
         elif is_aperture_mode:
             obs_grid = state.object_state.object_id
@@ -1819,10 +1875,10 @@ class ForagaxEnv(environment.Environment):
                     jnp.array(AGENT.color, dtype=jnp.uint8)
                 )
 
-                # Scale by 8 to final size
+                # Scale by 3 to final size
                 img = jax.image.resize(
                     img,
-                    (self.aperture_size[0] * 24, self.aperture_size[1] * 24, 3),
+                    (self.aperture_size[0] * 3, self.aperture_size[1] * 3, 3),
                     jax.image.ResizeMethod.NEAREST,
                 )
             else:
@@ -1837,7 +1893,7 @@ class ForagaxEnv(environment.Environment):
                 img = img.astype(jnp.uint8)
                 img = jax.image.resize(
                     img,
-                    (self.aperture_size[0] * 24, self.aperture_size[1] * 24, 3),
+                    (self.aperture_size[0] * 9, self.aperture_size[1] * 9, 3),
                     jax.image.ResizeMethod.NEAREST,
                 )
 
@@ -1848,7 +1904,7 @@ class ForagaxEnv(environment.Environment):
                 )
 
             # Add grid lines
-            img = apply_grid_lines(img, self.aperture_size, self.grid_color_jax)
+            img = apply_grid_lines(img, self.aperture_size, self.grid_color_jax, 9)
 
         else:
             raise ValueError(f"Unknown render_mode: {render_mode}")

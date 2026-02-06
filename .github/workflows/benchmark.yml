@@ -21,6 +21,7 @@ jobs:
     - run: uv sync --frozen --dev
     - name: Test with pytest
       run: uv run pytest --benchmark-json output.json --benchmark-only
+    - run: rm -f uv.lock
     - name: Store benchmark result
       uses: benchmark-action/github-action-benchmark@v1
       with:
