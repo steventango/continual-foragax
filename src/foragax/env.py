@@ -149,6 +149,7 @@ class ForagaxEnv(environment.Environment):
         biome_consumption_threshold: float = 0.9,
         dynamic_biome_spawn_empty: float = 0.0,
         max_expiries_per_step: int = 1,
+        center_reward: bool = False,
     ):
         super().__init__()
         self._name = name
@@ -175,11 +176,22 @@ class ForagaxEnv(environment.Environment):
         if max_expiries_per_step < 1:
             raise ValueError("max_expiries_per_step must be at least 1")
         self.max_expiries_per_step = max_expiries_per_step
+        self.center_reward = center_reward
 
         objects = (EMPTY,) + objects
         if self.nowrap and not self.full_world:
             objects = objects + (PADDING,)
         self.objects = objects
+
+        # Identify real objects (index 0 is EMPTY, last might be PADDING)
+        self.real_object_start = 1
+        num_objects = len(self.objects)
+        self.real_object_end = num_objects - (
+            1 if self.nowrap and not self.full_world else 0
+        )
+        self.real_object_indices = jnp.arange(
+            self.real_object_start, self.real_object_end
+        )
 
         # Infer num_fourier_terms and record which objects are Fourier types
         self.num_fourier_terms = max(
@@ -471,6 +483,36 @@ class ForagaxEnv(environment.Environment):
         )
         return pos, new_pos
 
+    def _apply_centering(
+        self,
+        reward: jax.Array,
+        obj_id: jax.Array,
+        clock: int,
+        rng: jax.Array,
+        params: jax.Array,
+    ) -> jax.Array:
+        """Subtract mean reward of real object types if centering is enabled."""
+        if not self.center_reward:
+            return reward
+
+        def eval_reward(obj_idx):
+            return jax.lax.switch(
+                obj_idx,
+                self.reward_fns,
+                clock,
+                rng,
+                params.astype(jnp.float32),
+            )
+
+        all_type_rewards = jax.vmap(eval_reward)(self.real_object_indices)
+        mean_reward = jnp.mean(all_type_rewards)
+
+        return jnp.where(
+            (obj_id >= self.real_object_start) & (obj_id < self.real_object_end),
+            reward - mean_reward,
+            reward,
+        )
+
     @partial(jax.named_call, name="compute_reward")
     def _compute_reward(
         self,
@@ -490,6 +532,10 @@ class ForagaxEnv(environment.Environment):
             state.time,
             reward_subkey,
             object_params.astype(jnp.float32),
+        )
+
+        object_reward = self._apply_centering(
+            object_reward, obj_at_pos, state.time, reward_subkey, object_params
         )
 
         key, digestion_subkey = jax.random.split(key)
@@ -659,6 +705,11 @@ class ForagaxEnv(environment.Environment):
                 fixed_key,
                 params.astype(jnp.float32),
             )
+
+            reward = self._apply_centering(
+                reward, obj_id, state.time, fixed_key, params
+            )
+
             # Only show reward for objects that are fully present (no timer)
             mask = (obj_id > 0) & (timer == 0)
             return jnp.where(mask, reward, 0.0)
@@ -1644,6 +1695,11 @@ class ForagaxEnv(environment.Environment):
                 fixed_key,
                 params.astype(jnp.float32),
             )
+
+            reward = self._apply_centering(
+                reward, obj_id, state.time, fixed_key, params
+            )
+
             # Only show reward for objects that are fully present (no timer)
             mask = (obj_id > 0) & (timer == 0)
             return jnp.where(mask, reward, 0.0)

@@ -3019,3 +3019,107 @@ def test_info_rewards_world():
     _, state_w = env_world.reset(key, params)
     _, _, _, _, info_w = env_world.step(key, state_w, Actions.DOWN, params)
     assert info_w["rewards"].shape == (20, 20)
+
+
+def test_reward_centering():
+    # Define two object types
+    obj1 = DefaultForagaxObject(
+        name="obj1", reward=10.0, collectable=True, color=(1, 1, 1)
+    )
+    obj2 = DefaultForagaxObject(
+        name="obj2", reward=2.0, collectable=True, color=(2, 2, 2)
+    )
+
+    # Env with centering enabled
+    env = ForagaxEnv(
+        size=(5, 5),
+        objects=(obj1, obj2),
+        biomes=(Biome(object_frequencies=(0.2, 0.2)),),
+        center_reward=True,
+        deterministic_spawn=True,
+    )
+
+    params = env.default_params
+    key = jax.random.key(0)
+
+    # Reset env
+    obs, state = env.reset(key, params)
+
+    # Place obj1 and obj2 explicitly for predictable test
+    grid = jnp.zeros((5, 5), dtype=jnp.int32)
+    grid = grid.at[2, 2].set(1)  # obj1 (index 1 after EMPTY)
+    grid = grid.at[2, 3].set(2)  # obj2 (index 2 after EMPTY)
+
+    state = state.replace(
+        object_state=state.object_state.replace(object_id=grid),
+        pos=jnp.array([1, 2]),  # Agent at (1, 2)
+    )
+
+    # Mean reward of real objects (obj1, obj2) = (10.0 + 2.0) / 2 = 6.0
+
+    # Move right to (2, 2) and collect obj1
+    key, step_key = jax.random.split(key)
+    obs, state, reward, done, info = env.step(step_key, state, Actions.RIGHT, params)
+
+    # Expected reward for obj1: 10.0 - 6.0 = 4.0
+    assert jnp.isclose(reward, 4.0), f"Expected reward 4.0, got {reward}"
+
+    # Move right again to (3, 2) and collect obj2
+    key, step_key = jax.random.split(key)
+    obs, state, reward, done, info = env.step(step_key, state, Actions.RIGHT, params)
+
+    # Expected reward for obj2: 2.0 - 6.0 = -4.0
+    assert jnp.isclose(reward, -4.0), f"Expected reward -4.0, got {reward}"
+
+    # Test reward grid centering
+    reward_grid = env._reward_grid(state, state.object_state)
+    # obj1 was collected, so it's empty now at (2, 2)
+    # obj2 was collected, so it's empty now at (3, 2)
+
+    # Let's reset the grid to test the whole grid
+    state = state.replace(
+        object_state=state.object_state.replace(
+            object_id=grid, respawn_timer=jnp.zeros((5, 5))
+        )
+    )
+    reward_grid = env._reward_grid(state, state.object_state)
+
+    assert jnp.isclose(reward_grid[2, 2], 4.0)
+    assert jnp.isclose(reward_grid[2, 3], -4.0)
+    assert jnp.all(reward_grid[jnp.where(grid == 0)] == 0.0)
+
+    # Test compute_rewards centering
+    rewards_from_compute = env._compute_reward_grid(
+        state,
+        object_id=grid,
+        state_params=state.object_state.state_params,
+        respawn_timer=jnp.zeros((5, 5)),
+    )
+    assert jnp.isclose(rewards_from_compute[2, 2], 4.0)
+    assert jnp.isclose(rewards_from_compute[2, 3], -4.0)
+
+
+def test_reward_centering_with_empty():
+    # Verify that EMPTY objects don't contribute to mean and get 0 reward
+    obj1 = DefaultForagaxObject(name="obj1", reward=10.0, collectable=True)
+
+    env = ForagaxEnv(size=(5, 5), objects=(obj1,), center_reward=True)
+
+    params = env.default_params
+    key = jax.random.key(0)
+
+    obs, state = env.reset(key, params)
+
+    # Mean of real objects (just obj1) = 10.0
+    # Center reward for obj1 = 10.0 - 10.0 = 0.0
+
+    grid = jnp.zeros((5, 5), dtype=jnp.int32)
+    grid = grid.at[2, 2].set(1)  # obj1
+    state = state.replace(
+        object_state=state.object_state.replace(object_id=grid), pos=jnp.array([1, 2])
+    )
+
+    key, step_key = jax.random.split(key)
+    obs, state, reward, done, info = env.step(step_key, state, Actions.RIGHT, params)
+
+    assert jnp.isclose(reward, 0.0), f"Expected reward 0.0, got {reward}"
