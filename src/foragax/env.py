@@ -292,7 +292,9 @@ class ForagaxEnv(environment.Environment):
         self.biome_masks_array = jnp.array(biome_masks_array)
 
         # Identify "food biomes" (those defined with non-blocking objects)
-        is_food_mask = ~self.object_blocking[1:]
+        # Handle cases where biome_object_frequencies might have fewer columns than objects
+        num_freq_cols = self.biome_object_frequencies.shape[1]
+        is_food_mask = ~self.object_blocking[1 : 1 + num_freq_cols]
         is_food_biome = np.any(
             (np.array(self.biome_object_frequencies) > 0)
             & np.array(is_food_mask)[None, :],
@@ -314,16 +316,6 @@ class ForagaxEnv(environment.Environment):
             metrics_idx_grid[mask] = i
 
         self.cell_to_metrics_idx_grid = jnp.array(metrics_idx_grid)
-
-        # Pre-calculate which biomes are "food biomes"
-        # A biome is a food biome if it contains any non-blocking real objects.
-        # frequencies: (num_biomes, num_object_types-1)
-        # object_blocking: (num_object_types,)
-        # We check objects from index 1 onwards.
-        is_food_mask = ~self.object_blocking[1:]
-        self.is_food_biome = jnp.any(
-            (self.biome_object_frequencies > 0) & is_food_mask[None, :], axis=1
-        )
 
         # Compute unique colors and mapping for partial observability (for 'color' observation_type)
         # Exclude EMPTY (index 0) from color channels
