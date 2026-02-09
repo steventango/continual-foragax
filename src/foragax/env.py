@@ -295,13 +295,13 @@ class ForagaxEnv(environment.Environment):
         # Handle cases where biome_object_frequencies might have fewer columns than objects
         num_freq_cols = self.biome_object_frequencies.shape[1]
         is_food_mask = ~self.object_blocking[1 : 1 + num_freq_cols]
-        is_food_biome = np.any(
-            (np.array(self.biome_object_frequencies) > 0)
-            & np.array(is_food_mask)[None, :],
+        is_food_biome = jnp.any(
+            (jnp.array(self.biome_object_frequencies) > 0)
+            & jnp.array(is_food_mask)[None, :],
             axis=1,
         )
-        self.is_food_biome = jnp.array(is_food_biome)
-        self.food_biome_indices = np.where(is_food_biome)[0]
+        self.is_food_biome = is_food_biome
+        self.food_biome_indices = jnp.where(is_food_biome)[0]
         self.num_food_biomes = len(self.food_biome_indices)
 
         # Pre-calculate effective metrics index grid
