@@ -1,3 +1,13 @@
+## 0.47.0 (2026-02-09)
+
+### Feat
+
+- biome regret and rank metrics
+
+### Fix
+
+- is_food_mask calculation
+
 ## 0.46.1 (2026-02-06)
 
 ### Fix
