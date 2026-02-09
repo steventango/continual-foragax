@@ -871,10 +871,10 @@ class ForagaxEnv(environment.Environment):
         metrics_idx = self.cell_to_metrics_idx_grid[pos[1], pos[0]]
         current_biome_mean = biome_means[metrics_idx]
 
-        # Valid regions for max calculation (must have at least one non-wall object)
-        is_valid_for_max = biome_counts > 0
-        max_biome_mean = jnp.max(jnp.where(is_valid_for_max, biome_means, -jnp.inf))
-        max_biome_mean = jnp.where(jnp.isinf(max_biome_mean), 0.0, max_biome_mean)
+        # Max mean over all consolidated regions (food biomes + void)
+        # This ensures max_biome_mean is at least 0.0 (from an empty region)
+        # and guarantees max_biome_mean >= current_biome_mean.
+        max_biome_mean = jnp.max(biome_means)
 
         biome_regret = max_biome_mean - current_biome_mean
 
