@@ -291,6 +291,32 @@ class ForagaxEnv(environment.Environment):
         # Convert to JAX array for indexing in JIT-compiled code
         self.biome_masks_array = jnp.array(biome_masks_array)
 
+        # Identify "food biomes" (those defined with non-blocking objects)
+        # Handle cases where biome_object_frequencies might have fewer columns than objects
+        num_freq_cols = self.biome_object_frequencies.shape[1]
+        is_food_mask = ~self.object_blocking[1 : 1 + num_freq_cols]
+        is_food_biome = jnp.any(
+            (jnp.array(self.biome_object_frequencies) > 0)
+            & jnp.array(is_food_mask)[None, :],
+            axis=1,
+        )
+        self.is_food_biome = is_food_biome
+        self.food_biome_indices = jnp.where(is_food_biome)[0]
+        self.num_food_biomes = len(self.food_biome_indices)
+
+        # Pre-calculate effective metrics index grid
+        # This grid maps each cell to its index in the [food_biomes] + [void] metrics array.
+        # Length of metrics array: num_food_biomes + 1
+        metrics_idx_grid = np.full(
+            (self.size[1], self.size[0]), self.num_food_biomes, dtype=np.int32
+        )
+        # Fill food biomes in order (later biomes overwrite earlier ones if overlapping)
+        for i, original_idx in enumerate(self.food_biome_indices.tolist()):
+            mask = np.array(self.biome_masks[original_idx])
+            metrics_idx_grid[mask] = i
+
+        self.cell_to_metrics_idx_grid = jnp.array(metrics_idx_grid)
+
         # Compute unique colors and mapping for partial observability (for 'color' observation_type)
         # Exclude EMPTY (index 0) from color channels
         object_colors_no_empty = self.object_colors[1:]
@@ -511,10 +537,53 @@ class ForagaxEnv(environment.Environment):
             state.object_state.state_params,
             state.object_state.respawn_timer,
         )
-
         total_reward = jnp.sum(rewards)
         count = jnp.sum(masks)
         return jnp.where(count > 0, total_reward / count, 0.0)
+
+    def _get_biome_mean_rewards(self, state: EnvState) -> Tuple[jax.Array, jax.Array]:
+        """Calculate mean reward for each effective metrics region (food biomes + void)."""
+        fixed_key = jax.random.key(0)  # Use fixed key for baseline rewards
+
+        def compute_reward(obj_id, params, timer):
+            reward = jax.lax.switch(
+                obj_id.astype(jnp.int32),
+                self.reward_fns,
+                state.time,
+                fixed_key,
+                params.astype(jnp.float32),
+            )
+            # Mask for "real" active objects (not EMPTY/PADDING and not respawning)
+            is_real = (obj_id >= self.real_object_start) & (
+                obj_id < self.real_object_end
+            )
+            active = timer == 0
+            # Ignore walls (blocking objects)
+            is_not_wall = ~self.object_blocking[obj_id.astype(jnp.int32)]
+
+            mask = is_real & active & is_not_wall
+            return jnp.where(mask, reward, 0.0), mask.astype(jnp.float32)
+
+        rewards, masks = jax.vmap(jax.vmap(compute_reward))(
+            state.object_state.object_id,
+            state.object_state.state_params,
+            state.object_state.respawn_timer,
+        )
+
+        # Aggregate using the pre-calculated metrics index grid
+        # This ensures wall biomes are ignored and overlaps are resolved to food biomes.
+        num_metrics_regions = self.num_food_biomes + 1
+
+        def get_region_mask(i):
+            return self.cell_to_metrics_idx_grid == i
+
+        region_masks = jax.vmap(get_region_mask)(jnp.arange(num_metrics_regions))
+
+        biome_total_rewards = jnp.sum(region_masks * rewards[None, ...], axis=(1, 2))
+        biome_counts = jnp.sum(region_masks * masks[None, ...], axis=(1, 2))
+
+        means = jnp.where(biome_counts > 0, biome_total_rewards / biome_counts, 0.0)
+        return means, biome_counts
 
     def _apply_centering(
         self,
@@ -793,6 +862,30 @@ class ForagaxEnv(environment.Environment):
             obj_at_pos.astype(ID_DTYPE),
             jnp.array(-1, dtype=ID_DTYPE),
         )
+
+        # Biome regret metrics
+        biome_means, biome_counts = self._get_biome_mean_rewards(state)
+
+        # Use the effective metrics index for the agent's current position
+        # biome_means has shape (num_food_biomes + 1,)
+        metrics_idx = self.cell_to_metrics_idx_grid[pos[1], pos[0]]
+        current_biome_mean = biome_means[metrics_idx]
+
+        # Valid regions for max calculation (must have at least one non-wall object)
+        is_valid_for_max = biome_counts > 0
+        max_biome_mean = jnp.max(jnp.where(is_valid_for_max, biome_means, -jnp.inf))
+        max_biome_mean = jnp.where(jnp.isinf(max_biome_mean), 0.0, max_biome_mean)
+
+        biome_regret = max_biome_mean - current_biome_mean
+
+        # Rank strictly among food biomes and void region
+        ranks = jnp.argsort(jnp.argsort(-biome_means)) + 1
+        biome_rank = ranks[metrics_idx]
+
+        info["current_biome_mean"] = current_biome_mean
+        info["max_biome_mean"] = max_biome_mean
+        info["biome_regret"] = biome_regret
+        info["biome_rank"] = biome_rank
 
         # 4. UPDATE STATE
         # Ensure all fields have canonical dtypes for consistency (e.g., for gymnax step selection)
