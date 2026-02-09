@@ -76,4 +76,3 @@ def test_biome_regret_metrics():
     assert infoW6["biome_rank"] == info2["biome_rank"]
 
     print("\nForagaxBig-v2 consolidated benchmarks PASSED!")
-
