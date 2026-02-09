@@ -77,6 +77,3 @@ def test_biome_regret_metrics():
 
     print("\nForagaxBig-v2 consolidated benchmarks PASSED!")
 
-
-if __name__ == "__main__":
-    test_biome_regret_metrics()
