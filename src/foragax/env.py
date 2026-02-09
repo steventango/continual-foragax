@@ -293,12 +293,12 @@ class ForagaxEnv(environment.Environment):
 
         # Identify "food biomes" (those defined with non-blocking objects)
         is_food_mask = ~self.object_blocking[1:]
-        is_food_biome = np.any(
-            (np.array(self.biome_object_frequencies) > 0)
-            & np.array(is_food_mask)[None, :],
+        is_food_biome = jnp.any(
+            (jnp.array(self.biome_object_frequencies) > 0)
+            & jnp.array(is_food_mask)[None, :],
             axis=1,
         )
-        self.is_food_biome = jnp.array(is_food_biome)
+        self.is_food_biome = is_food_biome
         self.food_biome_indices = np.where(is_food_biome)[0]
         self.num_food_biomes = len(self.food_biome_indices)
 
