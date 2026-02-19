@@ -1,3 +1,9 @@
+## 0.49.0 (2026-02-19)
+
+### Feat
+
+- exclude walls from reward centering
+
 ## 0.48.0 (2026-02-19)
 
 ### Feat
