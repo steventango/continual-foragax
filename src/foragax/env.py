@@ -597,9 +597,12 @@ class ForagaxEnv(environment.Environment):
         if not self.center_reward:
             return reward
 
-        # Subtract mean if the object is a real object
+        # Subtract mean if the object is a real object and not a wall
+        is_real = (obj_id >= self.real_object_start) & (obj_id < self.real_object_end)
+        is_not_wall = ~self.object_blocking[obj_id.astype(jnp.int32)]
+
         return jnp.where(
-            (obj_id >= self.real_object_start) & (obj_id < self.real_object_end),
+            is_real & is_not_wall,
             reward - mean_reward,
             reward,
         )

@@ -3161,3 +3161,7 @@ def test_reward_centering_with_walls():
     obs, state, reward, done, info = env.step(step_key, state, Actions.RIGHT, params)
 
     assert jnp.isclose(reward, 0.0), f"Expected reward 0.0, got {reward}"
+
+    # Also verify that the wall's reward in the reward grid is exactly 0.0
+    reward_grid = env._reward_grid(state, state.object_state)
+    assert jnp.isclose(reward_grid[2, 3], 0.0), "Wall should receive exactly 0 reward"
