@@ -3126,3 +3126,38 @@ def test_reward_centering_with_empty():
     obs, state, reward, done, info = env.step(step_key, state, Actions.RIGHT, params)
 
     assert jnp.isclose(reward, 0.0), f"Expected reward 0.0, got {reward}"
+
+
+def test_reward_centering_with_walls():
+    # Verify that walls (blocking objects) are excluded from the global mean reward
+    obj1 = DefaultForagaxObject(name="obj1", reward=10.0, collectable=True)
+
+    env = ForagaxEnv(
+        size=(5, 5),
+        objects=(obj1, WALL),
+        center_reward=True,
+        deterministic_spawn=True,
+    )
+
+    params = env.default_params
+    key = jax.random.key(0)
+
+    obs, state = env.reset(key, params)
+
+    # Place obj1 and a WALL in the environment
+    grid = jnp.zeros((5, 5), dtype=jnp.int32)
+    grid = grid.at[2, 2].set(1)  # obj1 (index 1)
+    grid = grid.at[2, 3].set(2)  # WALL (index 2)
+
+    state = state.replace(
+        object_state=state.object_state.replace(object_id=grid), pos=jnp.array([1, 2])
+    )
+
+    # If the wall was incorrectly included in the mean, it would drag it down: (10.0 + 0.0) / 2 = 5.0
+    # Because the wall is correctly excluded, the mean is just 10.0 / 1 = 10.0.
+    # Therefore, the centered reward for collecting obj1 is 10.0 - 10.0 = 0.0
+
+    key, step_key = jax.random.split(key)
+    obs, state, reward, done, info = env.step(step_key, state, Actions.RIGHT, params)
+
+    assert jnp.isclose(reward, 0.0), f"Expected reward 0.0, got {reward}"
