@@ -39,9 +39,11 @@ from foragax.objects import (
 
 BIG_WIDTH = 15
 BIG_GAP = 9
+BIG_GAP_V3 = 5
 BIG_WIDTH_V2 = 9
 BIG_OFFSET = BIG_WIDTH // 2 + 1
 BIG_OFFSET_V2 = BIG_GAP // 2 + 1
+BIG_OFFSET_V3 = BIG_GAP_V3 // 2 + 1
 BIG_WALL_WIDTH = 1
 
 ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
@@ -300,33 +302,194 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
             Biome(
                 start=(
                     BIG_OFFSET_V2 + BIG_WIDTH_V2 // 2 - BIG_WALL_WIDTH,
-                    BIG_OFFSET_V2 + 5 * BIG_WIDTH_V2 // 2 - BIG_WALL_WIDTH,
+                    BIG_OFFSET_V2
+                    + BIG_WIDTH_V2
+                    + BIG_GAP
+                    + BIG_WIDTH_V2 // 2
+                    - BIG_WALL_WIDTH,
                 ),
                 stop=(
                     BIG_OFFSET_V2 + BIG_WIDTH_V2 // 2 + 1 + BIG_WALL_WIDTH,
-                    BIG_OFFSET_V2 + 5 * BIG_WIDTH_V2 // 2 + 1 + BIG_WALL_WIDTH,
+                    BIG_OFFSET_V2
+                    + BIG_WIDTH_V2
+                    + BIG_GAP
+                    + BIG_WIDTH_V2 // 2
+                    + 1
+                    + BIG_WALL_WIDTH,
                 ),
                 object_frequencies=(0.0, 0.6),
             ),
             Biome(
                 start=(
-                    BIG_OFFSET_V2 + 5 * BIG_WIDTH_V2 // 2 - BIG_WALL_WIDTH,
+                    BIG_OFFSET_V2
+                    + BIG_WIDTH_V2
+                    + BIG_GAP
+                    + BIG_WIDTH_V2 // 2
+                    - BIG_WALL_WIDTH,
                     BIG_OFFSET_V2 + BIG_WIDTH_V2 // 2 - BIG_WALL_WIDTH,
                 ),
                 stop=(
-                    BIG_OFFSET_V2 + 5 * BIG_WIDTH_V2 // 2 + 1 + BIG_WALL_WIDTH,
+                    BIG_OFFSET_V2
+                    + BIG_WIDTH_V2
+                    + BIG_GAP
+                    + BIG_WIDTH_V2 // 2
+                    + 1
+                    + BIG_WALL_WIDTH,
                     BIG_OFFSET_V2 + BIG_WIDTH_V2 // 2 + 1 + BIG_WALL_WIDTH,
                 ),
                 object_frequencies=(0.0, 0.6),
             ),
             Biome(
                 start=(
-                    BIG_OFFSET_V2 + 5 * BIG_WIDTH_V2 // 2 - BIG_WALL_WIDTH,
-                    BIG_OFFSET_V2 + 5 * BIG_WIDTH_V2 // 2 - BIG_WALL_WIDTH,
+                    BIG_OFFSET_V2
+                    + BIG_WIDTH_V2
+                    + BIG_GAP
+                    + BIG_WIDTH_V2 // 2
+                    - BIG_WALL_WIDTH,
+                    BIG_OFFSET_V2
+                    + BIG_WIDTH_V2
+                    + BIG_GAP
+                    + BIG_WIDTH_V2 // 2
+                    - BIG_WALL_WIDTH,
                 ),
                 stop=(
-                    BIG_OFFSET_V2 + 5 * BIG_WIDTH_V2 // 2 + 1 + BIG_WALL_WIDTH,
-                    BIG_OFFSET_V2 + 5 * BIG_WIDTH_V2 // 2 + 1 + BIG_WALL_WIDTH,
+                    BIG_OFFSET_V2
+                    + BIG_WIDTH_V2
+                    + BIG_GAP
+                    + BIG_WIDTH_V2 // 2
+                    + 1
+                    + BIG_WALL_WIDTH,
+                    BIG_OFFSET_V2
+                    + BIG_WIDTH_V2
+                    + BIG_GAP
+                    + BIG_WIDTH_V2 // 2
+                    + 1
+                    + BIG_WALL_WIDTH,
+                ),
+                object_frequencies=(0.0, 0.6),
+            ),
+        ),
+        "nowrap": False,
+        "deterministic_spawn": True,
+        "dynamic_biomes": True,
+        "biome_consumption_threshold": 10000,
+        "dynamic_biome_spawn_empty": 1.0,
+        "center_reward": True,
+    },
+    "ForagaxBig-v3": {
+        "size": (2 * (BIG_WIDTH_V2 + BIG_GAP_V3), 2 * (BIG_WIDTH_V2 + BIG_GAP_V3)),
+        "aperture_size": None,
+        "objects": None,
+        "biomes": (
+            Biome(
+                start=(BIG_OFFSET_V3, BIG_OFFSET_V3),
+                stop=(BIG_OFFSET_V3 + BIG_WIDTH_V2, BIG_OFFSET_V3 + BIG_WIDTH_V2),
+                object_frequencies=(0.2, 0.0),
+            ),
+            Biome(
+                start=(BIG_OFFSET_V3, BIG_OFFSET_V3 + BIG_WIDTH_V2 + BIG_GAP_V3),
+                stop=(
+                    BIG_OFFSET_V3 + BIG_WIDTH_V2,
+                    BIG_OFFSET_V3 + 2 * BIG_WIDTH_V2 + BIG_GAP_V3,
+                ),
+                object_frequencies=(0.2, 0.0),
+            ),
+            Biome(
+                start=(BIG_OFFSET_V3 + BIG_WIDTH_V2 + BIG_GAP_V3, BIG_OFFSET_V3),
+                stop=(
+                    BIG_OFFSET_V3 + 2 * BIG_WIDTH_V2 + BIG_GAP_V3,
+                    BIG_OFFSET_V3 + BIG_WIDTH_V2,
+                ),
+                object_frequencies=(0.2, 0.0),
+            ),
+            Biome(
+                start=(
+                    BIG_OFFSET_V3 + BIG_WIDTH_V2 + BIG_GAP_V3,
+                    BIG_OFFSET_V3 + BIG_WIDTH_V2 + BIG_GAP_V3,
+                ),
+                stop=(
+                    BIG_OFFSET_V3 + 2 * BIG_WIDTH_V2 + BIG_GAP_V3,
+                    BIG_OFFSET_V3 + 2 * BIG_WIDTH_V2 + BIG_GAP_V3,
+                ),
+                object_frequencies=(0.2, 0.0),
+            ),
+            Biome(
+                start=(
+                    BIG_OFFSET_V3 + BIG_WIDTH_V2 // 2 - BIG_WALL_WIDTH,
+                    BIG_OFFSET_V3 + BIG_WIDTH_V2 // 2 - BIG_WALL_WIDTH,
+                ),
+                stop=(
+                    BIG_OFFSET_V3 + BIG_WIDTH_V2 // 2 + 1 + BIG_WALL_WIDTH,
+                    BIG_OFFSET_V3 + BIG_WIDTH_V2 // 2 + 1 + BIG_WALL_WIDTH,
+                ),
+                object_frequencies=(0.0, 0.6),
+            ),
+            Biome(
+                start=(
+                    BIG_OFFSET_V3 + BIG_WIDTH_V2 // 2 - BIG_WALL_WIDTH,
+                    BIG_OFFSET_V3
+                    + BIG_WIDTH_V2
+                    + BIG_GAP_V3
+                    + BIG_WIDTH_V2 // 2
+                    - BIG_WALL_WIDTH,
+                ),
+                stop=(
+                    BIG_OFFSET_V3 + BIG_WIDTH_V2 // 2 + 1 + BIG_WALL_WIDTH,
+                    BIG_OFFSET_V3
+                    + BIG_WIDTH_V2
+                    + BIG_GAP_V3
+                    + BIG_WIDTH_V2 // 2
+                    + 1
+                    + BIG_WALL_WIDTH,
+                ),
+                object_frequencies=(0.0, 0.6),
+            ),
+            Biome(
+                start=(
+                    BIG_OFFSET_V3
+                    + BIG_WIDTH_V2
+                    + BIG_GAP_V3
+                    + BIG_WIDTH_V2 // 2
+                    - BIG_WALL_WIDTH,
+                    BIG_OFFSET_V3 + BIG_WIDTH_V2 // 2 - BIG_WALL_WIDTH,
+                ),
+                stop=(
+                    BIG_OFFSET_V3
+                    + BIG_WIDTH_V2
+                    + BIG_GAP_V3
+                    + BIG_WIDTH_V2 // 2
+                    + 1
+                    + BIG_WALL_WIDTH,
+                    BIG_OFFSET_V3 + BIG_WIDTH_V2 // 2 + 1 + BIG_WALL_WIDTH,
+                ),
+                object_frequencies=(0.0, 0.6),
+            ),
+            Biome(
+                start=(
+                    BIG_OFFSET_V3
+                    + BIG_WIDTH_V2
+                    + BIG_GAP_V3
+                    + BIG_WIDTH_V2 // 2
+                    - BIG_WALL_WIDTH,
+                    BIG_OFFSET_V3
+                    + BIG_WIDTH_V2
+                    + BIG_GAP_V3
+                    + BIG_WIDTH_V2 // 2
+                    - BIG_WALL_WIDTH,
+                ),
+                stop=(
+                    BIG_OFFSET_V3
+                    + BIG_WIDTH_V2
+                    + BIG_GAP_V3
+                    + BIG_WIDTH_V2 // 2
+                    + 1
+                    + BIG_WALL_WIDTH,
+                    BIG_OFFSET_V3
+                    + BIG_WIDTH_V2
+                    + BIG_GAP_V3
+                    + BIG_WIDTH_V2 // 2
+                    + 1
+                    + BIG_WALL_WIDTH,
                 ),
                 object_frequencies=(0.0, 0.6),
             ),
