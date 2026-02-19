@@ -1,3 +1,13 @@
+## 0.48.0 (2026-02-19)
+
+### Feat
+
+- ForagaxBig-v3
+
+### Fix
+
+- exclude wall objects from the  reward centering calculation
+
 ## 0.47.1 (2026-02-09)
 
 ### Fix
