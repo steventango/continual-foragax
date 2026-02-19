@@ -529,7 +529,9 @@ class ForagaxEnv(environment.Environment):
                 obj_id < self.real_object_end
             )
             active = timer == 0
-            mask = is_real & active
+            # Ignore walls (blocking objects)
+            is_not_wall = ~self.object_blocking[obj_id.astype(jnp.int32)]
+            mask = is_real & active & is_not_wall
             return jnp.where(mask, reward, 0.0), mask.astype(jnp.float32)
 
         rewards, masks = jax.vmap(jax.vmap(compute_reward))(
