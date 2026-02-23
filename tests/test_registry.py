@@ -894,9 +894,7 @@ def test_foragax_big_v4_hint_render():
     # However, at t=0, the color array should contain white (255,255,255) in the bottom segment bar
     # and at t=5, the color array in the bottom segment bar should be completely black (0,0,0)
 
-    bottom_bar_with_hint = img_with_hint[
-        -9:, :, :
-    ]  # The bar is height 9 at the bottom
+    bottom_bar_with_hint = img_with_hint[-9:, :, :]  # The bar is height 9 at the bottom
     bottom_bar_without_hint = img_without_hint[-9:, :, :]
 
     # When hint is active, at least one block should be white (max value 255)
