@@ -169,3 +169,52 @@ def apply_reward_overlay(
     reward_colors_x3 = jnp.repeat(jnp.repeat(reward_colors, 3, axis=0), 3, axis=1)
 
     return jnp.where(composite_mask[..., None], reward_colors_x3, base_img)
+
+
+def apply_hint_bottom_bar(
+    img: jax.Array,
+    hint_vector: jax.Array,
+    bar_height: int = 12,
+    separator_height: int = 2,
+) -> jax.Array:
+    """Append a black separator and a bottom bar showing the binary hint vector.
+
+    Args:
+        img: RGB image array of shape (H, W, 3).
+        hint_vector: Binary vector of shape (N,) to visualize.
+        bar_height: Height of the hint bar segments.
+        separator_height: Height of the black line separator.
+
+    Returns:
+        New image of shape (H + separator_height + bar_height, W, 3) with the hint overlay.
+    """
+    H, W, C = img.shape
+    num_bins = hint_vector.shape[0]
+
+    # Create the black separator line
+    separator = jnp.zeros((separator_height, W, C), dtype=jnp.uint8)
+
+    # Calculate widths for each hint segment
+    segment_width = W // num_bins
+
+    # Expand hint vector to create blocks of colors:
+    # 0 -> Black (0,0,0), 1 -> White (255,255,255)
+    hint_colors = hint_vector[:, None] * 255
+    hint_colors = jnp.tile(hint_colors, (1, 3)).astype(jnp.uint8)  # (N, 3)
+
+    # Repeat colors across width
+    hint_bar = jnp.repeat(hint_colors, segment_width, axis=0)  # (segment_width * N, 3)
+
+    # Handle remainder if W is not perfectly divisible by num_bins
+    remainder = W - (segment_width * num_bins)
+    if remainder > 0:
+        last_color = jnp.expand_dims(hint_colors[-1], axis=0)
+        padding = jnp.repeat(last_color, remainder, axis=0)
+        hint_bar = jnp.concatenate([hint_bar, padding], axis=0)
+
+    # Expand to height
+    hint_bar = jnp.expand_dims(hint_bar, axis=0)  # (1, W, 3)
+    hint_bar = jnp.repeat(hint_bar, bar_height, axis=0)  # (bar_height, W, 3)
+
+    # Concatenate vertically
+    return jnp.concatenate([img, separator, hint_bar], axis=0)

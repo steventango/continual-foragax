@@ -806,3 +806,98 @@ def test_sine_twobiome_environment():
         )
         assert not done  # Continuing environment
         assert obs.shape == (5, 5, 2)
+
+
+def test_foragax_big_v4_hint_observation():
+    """Test that ForagaxBig-v4 returns a dictionary observation with a hint."""
+    env = make("ForagaxBig-v4", observation_type="color")
+    params = env.default_params
+
+    # Check that return_hint is configured
+    assert env.return_hint is True
+
+    key = jax.random.key(0)
+    obs, state = env.reset(key, params)
+
+    # Output observation should be a dictionary with 'image' and 'hint'
+    assert isinstance(obs, dict)
+    assert "image" in obs
+    assert "hint" in obs
+
+    num_food_biomes = env.num_food_biomes
+    assert obs["hint"].shape == (num_food_biomes,)
+
+    # Test hint partial observability (visible steps 0, 1, 2, 3)
+    # At t=0, hint should be visible
+    assert jnp.sum(obs["hint"]) > 0
+
+    # When the hint is visible, it points to the best biome
+    biome_means, _ = env._get_biome_mean_rewards(state)
+    best_biome = jnp.argmax(biome_means[:num_food_biomes])
+    expected_hint = jax.nn.one_hot(best_biome, num_food_biomes)
+    chex.assert_trees_all_close(obs["hint"], expected_hint)
+
+    # Step the environment and collect hint sums
+    hint_sums = []
+
+    current_state = state
+    current_key = key
+    for step in range(105):
+        current_key, step_key = jax.random.split(current_key)
+        action = env.action_space(params).sample(step_key)
+
+        # Step returns: (obs, state, reward, done, info)
+        obs, current_state, _, _, _ = env.step(step_key, current_state, action, params)
+
+        hint_sums.append(float(jnp.sum(obs["hint"])))
+
+    # Step 0 was in reset, loop goes from time=1 to time=105
+    # time 1, 2, 3 should have hint sum = 1
+    # time 4 to 99 should have hint sum = 0
+    # time 100, 101, 102, 103 should have hint sum = 1
+    for t in range(1, 106):
+        expected_sum = 1.0 if (t % 100) < 4 else 0.0
+        assert jnp.isclose(hint_sums[t - 1], expected_sum), (
+            f"Mismatch at time {t}: expected {expected_sum}, got {hint_sums[t - 1]}"
+        )
+
+
+def test_foragax_big_v4_hint_render():
+    """Test that the rendered image for ForagaxBig-v4 contains the hint bar when the hint is active."""
+    env = make("ForagaxBig-v4", observation_type="color")
+    params = env.default_params
+
+    key = jax.random.key(0)
+    obs, state = env.reset(key, params)
+
+    # Render string natively when hint is explicitly enabled/active
+    # At t=0, hint is active (state.time % 100 < 4)
+    img_with_hint = env.render(state, params, render_mode="world")
+
+    # Standard image dimensions are (15*9*size, 15*9*size) + hint margins
+    # We explicitly check the bottom region for the hint bar
+
+    # The default return_hint behavior is true in config, and it should apply
+    assert img_with_hint.shape[0] > (env.size[1] * 9)  # Height is expanded
+
+    # We step the environment past the hint visibility window (e.g. step=5)
+    current_state = state
+    current_key = key
+    for _ in range(5):
+        current_key, step_key = jax.random.split(current_key)
+        action = env.action_space(params).sample(step_key)
+        _, current_state, _, _, _ = env.step(step_key, current_state, action, params)
+
+    img_without_hint = env.render(current_state, params, render_mode="world")
+    assert img_with_hint.shape[0] == img_without_hint.shape[0]
+
+    # However, at t=0, the color array should contain white (255,255,255) in the bottom segment bar
+    # and at t=5, the color array in the bottom segment bar should be completely black (0,0,0)
+
+    bottom_bar_with_hint = img_with_hint[-9:, :, :]  # The bar is height 9 at the bottom
+    bottom_bar_without_hint = img_without_hint[-9:, :, :]
+
+    # When hint is active, at least one block should be white (max value 255)
+    assert jnp.max(bottom_bar_with_hint) == 255
+    # When hint is inactive (all zeros), the blocks are all black (0)
+    assert jnp.max(bottom_bar_without_hint) == 0

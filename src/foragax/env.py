@@ -29,6 +29,7 @@ from foragax.rendering import (
     apply_true_borders,
     get_base_image,
     reward_to_color,
+    apply_hint_bottom_bar,
 )
 from foragax.weather import get_temperature
 
@@ -150,6 +151,9 @@ class ForagaxEnv(environment.Environment):
         dynamic_biome_spawn_empty: float = 0.0,
         max_expiries_per_step: int = 1,
         center_reward: bool = False,
+        return_hint: bool = False,
+        hint_every: int = 100,
+        hint_duration: int = 4,
     ):
         super().__init__()
         self._name = name
@@ -177,6 +181,9 @@ class ForagaxEnv(environment.Environment):
             raise ValueError("max_expiries_per_step must be at least 1")
         self.max_expiries_per_step = max_expiries_per_step
         self.center_reward = center_reward
+        self.return_hint = return_hint
+        self.hint_every = hint_every
+        self.hint_duration = hint_duration
 
         objects = (EMPTY,) + objects
         if self.nowrap and not self.full_world:
@@ -252,6 +259,8 @@ class ForagaxEnv(environment.Environment):
             )
             self.is_fourier_biome.append(is_fourier)
         self.biome_sizes = np.prod(self.biome_stops - self.biome_starts, axis=1)
+        # Precompute the order to apply biomes: largest to smallest, ensuring smaller biomes overwrite correctly.
+        self.biome_order = np.argsort(self.biome_sizes)[::-1].tolist()
         self.biome_sizes_jax = jnp.array(self.biome_sizes)  # JAX version for indexing
         self.biome_starts_jax = jnp.array(self.biome_starts)
         self.biome_stops_jax = jnp.array(self.biome_stops)
@@ -813,6 +822,28 @@ class ForagaxEnv(environment.Environment):
         )
         return reward_grid
 
+    @partial(jax.jit, static_argnames=("self",))
+    def step(
+        self,
+        key: jax.Array,
+        state: EnvState,
+        action: Union[int, float, jax.Array],
+        params: Optional[EnvParams] = None,
+    ) -> Tuple[jax.Array, EnvState, jax.Array, jax.Array, Dict[Any, Any]]:
+        """Performs step transitions in the environment."""
+        if params is None:
+            params = self.default_params
+
+        # Step
+        key_step, key_reset = jax.random.split(key)
+        obs_st, state_st, reward, done, info = self.step_env(
+            key_step, state, action, params
+        )
+
+        # No auto-reset (Foragax is a continuing environment).
+
+        return obs_st, state_st, reward, done, info
+
     def step_env(
         self,
         key: jax.Array,
@@ -1262,7 +1293,8 @@ class ForagaxEnv(environment.Environment):
         key, iter_key = jax.random.split(key)
 
         # Pass 1: Set Biome IDs and spawn Static Objects (non-Fourier)
-        for i in range(num_biomes):
+        # Apply biomes from largest to smallest so that nested/overlapping biomes correctly overwrite background biomes.
+        for i in self.biome_order:
             mask = self.biome_masks[i]
 
             # Set biome_id
@@ -1290,7 +1322,7 @@ class ForagaxEnv(environment.Environment):
 
         # Pass 2: Spawn Dynamic Objects (Fourier) using is_free_mask to avoid static objects
         is_free_mask = ~(object_state.object_id > 0)
-        for i in range(num_biomes):
+        for i in self.biome_order:
             if self.is_fourier_biome[i]:
                 iter_key, biome_key = jax.random.split(iter_key)
                 mask = self.biome_masks[i]
@@ -1683,17 +1715,31 @@ class ForagaxEnv(environment.Environment):
 
         return aperture
 
-    def get_obs(self, state: EnvState, params: EnvParams, key=None) -> jax.Array:
+    def get_obs(
+        self, state: EnvState, params: EnvParams, key=None
+    ) -> Union[jax.Array, Dict[str, jax.Array]]:
         """Get observation based on observation_type and full_world."""
         obs_grid = state.object_state.object_id
         color_grid = state.object_state.color
 
         if self.full_world:
-            return self._get_world_obs(obs_grid, state)
+            obs = self._get_world_obs(obs_grid, state)
         else:
             grid = self._get_aperture(obs_grid, state.pos)
             color_grid = self._get_aperture(color_grid, state.pos)
-            return self._get_aperture_obs(grid, color_grid, state)
+            obs = self._get_aperture_obs(grid, color_grid, state)
+
+        if self.return_hint:
+            biome_means, _ = self._get_biome_mean_rewards(state)
+            # Max over food biomes (first self.num_food_biomes elements)
+            food_biome_means = biome_means[: self.num_food_biomes]
+            best_biome = jnp.argmax(food_biome_means)
+            hint = jax.nn.one_hot(best_biome, self.num_food_biomes)
+            show_hint = (state.time % self.hint_every) < self.hint_duration
+            hint = jnp.where(show_hint, hint, jnp.zeros_like(hint))
+            return {"image": obs, "hint": hint}
+
+        return obs
 
     def _get_world_obs(self, obs_grid: jax.Array, state: EnvState) -> jax.Array:
         """Get world observation."""
@@ -1788,7 +1834,16 @@ class ForagaxEnv(environment.Environment):
 
         obs_shape = (*size, channels)
 
-        return spaces.Box(0, 1, obs_shape, float)
+        obs_space = spaces.Box(0, 1, obs_shape, float)
+        if self.return_hint:
+            return spaces.Dict(
+                {
+                    "image": obs_space,
+                    "hint": spaces.Box(0, 1, (self.num_food_biomes,), float),
+                }
+            )
+
+        return obs_space
 
     def _compute_reward_grid(
         self, state: EnvState, object_id=None, state_params=None, respawn_timer=None
@@ -2023,5 +2078,11 @@ class ForagaxEnv(environment.Environment):
 
         else:
             raise ValueError(f"Unknown render_mode: {render_mode}")
+
+        if self.return_hint:
+            obs = self.get_obs(state, params)
+            if isinstance(obs, dict) and "hint" in obs:
+                hint = obs["hint"]
+                img = apply_hint_bottom_bar(img, hint, bar_height=9, separator_height=9)
 
         return img
