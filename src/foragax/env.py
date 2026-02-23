@@ -827,9 +827,9 @@ class ForagaxEnv(environment.Environment):
         self,
         key: jax.Array,
         state: EnvState,
-        action: int | float | jax.Array,
-        params: EnvParams | None = None,
-    ) -> tuple[jax.Array, EnvState, jax.Array, jax.Array, dict[Any, Any]]:
+        action: Union[int, float, jax.Array],
+        params: Optional[EnvParams] = None,
+    ) -> Tuple[jax.Array, EnvState, jax.Array, jax.Array, Dict[Any, Any]]:
         """Performs step transitions in the environment."""
         if params is None:
             params = self.default_params
