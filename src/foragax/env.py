@@ -1717,7 +1717,7 @@ class ForagaxEnv(environment.Environment):
 
     def get_obs(
         self, state: EnvState, params: EnvParams, key=None
-    ) -> jax.Array | Dict[str, jax.Array]:
+    ) -> Union[jax.Array, Dict[str, jax.Array]]:
         """Get observation based on observation_type and full_world."""
         obs_grid = state.object_state.object_id
         color_grid = state.object_state.color
