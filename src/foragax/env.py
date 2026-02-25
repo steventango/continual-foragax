@@ -21,6 +21,7 @@ from foragax.objects import (
     BaseForagaxObject,
     FourierObject,
     SineObject,
+    SquareWaveObject,
     WeatherObject,
     WeatherWaveObject,
 )
@@ -262,11 +263,20 @@ class ForagaxEnv(environment.Environment):
             [b.stop if b.stop is not None else (-1, -1) for b in biomes]
         )
 
-        # Precompute whether each biome contains ANY Fourier objects (for static reset_env branching)
+        # Precompute whether each biome contains ANY dynamic objects (for static reset_env branching)
         self.is_fourier_biome = []
         for b in biomes:
             is_fourier = any(
-                isinstance(self.objects[j + 1], (FourierObject, SineObject))
+                isinstance(
+                    self.objects[j + 1],
+                    (
+                        FourierObject,
+                        SineObject,
+                        WeatherObject,
+                        WeatherWaveObject,
+                        SquareWaveObject,
+                    ),
+                )
                 for j, freq in enumerate(b.object_frequencies)
                 if freq > 0
             )
