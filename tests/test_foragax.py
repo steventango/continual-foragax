@@ -3218,7 +3218,7 @@ def test_reward_centering_with_walls():
     # Also verify that the wall's reward in the reward grid is exactly -inf
     reward_grid = env._reward_grid(state, state.object_state)
     assert jnp.isclose(reward_grid[2, 3], -jnp.inf), (
-        "Wall should receive exactly 0 reward"
+        "Wall should receive exactly -inf reward"
     )
 
 

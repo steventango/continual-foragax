@@ -225,7 +225,7 @@ class WeatherObject(NormalRegenForagaxObject):
 
 
 class WeatherWaveObject(DefaultForagaxObject):
-    """Object with reward based on temperature data."""
+    """Object with reward based on temperature data. Uses uniform regeneration delay distribution."""
 
     def __init__(
         self,

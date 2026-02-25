@@ -1093,8 +1093,8 @@ class ForagaxEnv(environment.Environment):
             )
 
         # 6. HANDLE DETERMINISTIC TELEPORT
-        # Teleport agent to the nearest open cell to a biome center following a
-        # deterministic cycle at the beginning (0) and halfway (1/2) of the period.
+        # Teleport agent to a random empty cell within a deterministically selected biome,
+        # following a deterministic cycle at the beginning (0) and halfway (1/2) of the period.
         # The biome is selected by cycling through
         # biomes in order based on the cumulative teleport count.
         if self.deterministic_teleport_period > 0:
