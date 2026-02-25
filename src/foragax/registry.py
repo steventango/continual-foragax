@@ -1049,13 +1049,13 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
                 stop=(20, 15),
                 object_frequencies=(0.0, 0.0, 0.0, 0.0, 4 / 60),
             ),
-            # Biome 1 (left): Oyster +10, Death Cap -10 with weather
+            # Biome 1 (left): Oyster +10, Death Cap -10 with square wave
             Biome(
                 start=(3, 0),
                 stop=(7, 15),
                 object_frequencies=(16 / 60, 16 / 60, 0.0, 0.0, 4 / 60),
             ),
-            # Biome 2 (right): Oyster -10, Death Cap +10 with inverted weather
+            # Biome 2 (right): Oyster -10, Death Cap +10 with inverted square wave
             Biome(
                 start=(13, 0),
                 stop=(17, 15),
@@ -1076,13 +1076,13 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
                 stop=(24, 15),
                 object_frequencies=(0.0, 0.0, 0.0, 0.0, 4 / 60),
             ),
-            # Biome 1 (left): Oyster +10, Death Cap -10 with weather
+            # Biome 1 (left): Oyster +10, Death Cap -10 with square wave
             Biome(
                 start=(4, 0),
                 stop=(8, 15),
                 object_frequencies=(16 / 60, 16 / 60, 0.0, 0.0, 4 / 60),
             ),
-            # Biome 2 (right): Oyster -10, Death Cap +10 with inverted weather
+            # Biome 2 (right): Oyster -10, Death Cap +10 with inverted square wave
             Biome(
                 start=(16, 0),
                 stop=(20, 15),

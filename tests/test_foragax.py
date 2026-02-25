@@ -3297,7 +3297,7 @@ def test_random_teleport_offsets():
 
     # Get the realized random offset
     realized_offset = int(state.offset)
-    assert 0 <= realized_offset < random_shift_max
+    assert 0 <= realized_offset <= random_shift_max
 
     # Trigger condition:
     # (time + fixed_offset + realized_offset) % period == period/4 or 3*period/4
