@@ -160,9 +160,9 @@ def test_create_weather_wave_objects():
 
     # Basic identity
     assert o1.name == "oyster_weather_wave_1"
-    assert d1.name == "deathcap_square_wave_1"
+    assert d1.name == "deathcap_weather_wave_1"
     assert o2.name == "oyster_weather_wave_2"
-    assert d2.name == "deathcap_square_wave_2"
+    assert d2.name == "deathcap_weather_wave_2"
 
     # Collectable + respawn defaults
     assert o1.collectable is True
@@ -2090,7 +2090,8 @@ def test_biome_regeneration_preserves_old_objects():
                     and env.object_collectable[obj_id]
                 ):
                     # Teleport agent to object and collect it
-                    current_state = current_state.replace(pos=jnp.array([x, y]))
+                    start_y = (y - 1) % size[1]
+                    current_state = current_state.replace(pos=jnp.array([x, start_y]))
                     key_step, step_key = jax.random.split(key_step)
                     obs, current_state, reward, done, info = env.step(
                         step_key, current_state, 0, env.default_params
@@ -2203,7 +2204,8 @@ def test_biome_regeneration_updates_only_new_objects():
             ):  # Collect extra to ensure threshold is hit
                 break
             if biome_mask[y, x] and current_state.object_state.object_id[y, x] > 0:
-                current_state = current_state.replace(pos=jnp.array([x, y]))
+                start_y = (y - 1) % size[1]
+                current_state = current_state.replace(pos=jnp.array([x, start_y]))
                 key_step, step_key = jax.random.split(key_step)
                 obs, current_state, reward, done, info = env.step(
                     step_key, current_state, 0, env.default_params
@@ -2458,12 +2460,12 @@ def test_biome_respawn_maintains_total_object_count_nondeterministic():
         color=(255, 0, 0),
     )
 
-    size = (5, 5)  # 25 cells
+    size = (20, 20)  # 400 cells
     biomes = (
         Biome(
             start=(0, 0),
-            stop=(5, 5),
-            object_frequencies=(0.6,),  # ~60% occupancy = ~15 objects
+            stop=(20, 20),
+            object_frequencies=(0.6,),  # ~60% occupancy = ~240 objects
         ),
     )
 
@@ -2502,8 +2504,9 @@ def test_biome_respawn_maintains_total_object_count_nondeterministic():
                 break
             # Check if there's a collectable object at this position in ORIGINAL state
             if state.object_state.object_id[y, x] > 0:
-                # Move agent to this position
-                current_state = current_state.replace(pos=jnp.array([x, y]))
+                # Move agent to the position above, so action 0 (DOWN) moves it to [x, y]
+                start_y = (y - 1) % size[1]
+                current_state = current_state.replace(pos=jnp.array([x, start_y]))
                 # Step to collect
                 key_step, step_key = jax.random.split(key_step)
                 obs, current_state, reward, done, info = env.step(
@@ -2527,7 +2530,7 @@ def test_biome_respawn_maintains_total_object_count_nondeterministic():
     # The new_total should reflect only NEWLY spawned objects (from this generation)
     # NOT the total including old preserved objects
     # So new_total should be similar to initial_total (both based on same frequency)
-    variance_threshold = 0.4
+    variance_threshold = 0.2  # Lower variance threshold for larger grid
     lower_bound = initial_total * (1 - variance_threshold)
     upper_bound = initial_total * (1 + variance_threshold)
 
@@ -2601,8 +2604,9 @@ def test_biome_respawn_maintains_total_object_count_deterministic():
                 break
             # Check if there's a collectable object at this position in ORIGINAL state
             if state.object_state.object_id[y, x] > 0:
-                # Move agent to this position
-                current_state = current_state.replace(pos=jnp.array([x, y]))
+                # Move agent to the position above, so action 0 (DOWN) moves it to [x, y]
+                start_y = (y - 1) % size[1]
+                current_state = current_state.replace(pos=jnp.array([x, start_y]))
                 # Take NOOP action to collect
                 key_step, step_key = jax.random.split(key_step)
                 obs, current_state, reward, done, info = env.step(

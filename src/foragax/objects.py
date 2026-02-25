@@ -747,7 +747,7 @@ def create_weather_wave_objects(
     )
 
     biome1_deathcap = WeatherWaveObject(
-        name="deathcap_square_wave_1",
+        name="deathcap_weather_wave_1",
         rewards=rewards,
         repeat=repeat,
         base_reward=base_deathcap_reward,
@@ -775,7 +775,7 @@ def create_weather_wave_objects(
     )
 
     biome2_deathcap = WeatherWaveObject(
-        name="deathcap_square_wave_2",
+        name="deathcap_weather_wave_2",
         rewards=rewards,
         repeat=repeat,
         base_reward=-base_deathcap_reward,
