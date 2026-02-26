@@ -24,6 +24,7 @@ from foragax.objects import (
     NormalRegenForagaxObject,
     SineObject,
     WeatherObject,
+    create_weather_wave_objects,
     create_fourier_objects,
 )
 
@@ -152,6 +153,58 @@ def test_rgb_observation_mode_large_aperture():
     obs, state = env.reset(key, params)
 
     assert obs.shape == (20, 20, 3)
+
+
+def test_create_weather_wave_objects():
+    o1, d1, o2, d2 = create_weather_wave_objects(file_index=0, repeat=7)
+
+    # Basic identity
+    assert o1.name == "oyster_weather_wave_1"
+    assert d1.name == "deathcap_weather_wave_1"
+    assert o2.name == "oyster_weather_wave_2"
+    assert d2.name == "deathcap_weather_wave_2"
+
+    # Collectable + respawn defaults
+    assert o1.collectable is True
+    assert d1.collectable is True
+    assert o2.collectable is True
+    assert d2.collectable is True
+    assert o1.random_respawn is True
+    assert d1.random_respawn is True
+    assert o2.random_respawn is True
+    assert d2.random_respawn is True
+
+    # Factory uses fixed colors
+    assert o1.color == (124, 61, 81)
+    assert o2.color == (124, 61, 81)
+    assert d1.color == (174, 179, 94)
+    assert d2.color == (174, 179, 94)
+
+    # Rewards are loaded and attached (should be identical references or identical arrays)
+    chex.assert_rank(o1.rewards, 1)
+    chex.assert_rank(d1.rewards, 1)
+    chex.assert_rank(o2.rewards, 1)
+    chex.assert_rank(d2.rewards, 1)
+    chex.assert_trees_all_equal(o1.rewards, d1.rewards)
+    chex.assert_trees_all_equal(d1.rewards, -o2.rewards)
+    chex.assert_trees_all_equal(o2.rewards, d2.rewards)
+
+    # Base rewards are symmetric across biomes
+    assert o2.base_reward == -o1.base_reward
+    assert d2.base_reward == -d1.base_reward
+
+    # Multiplier sign symmetry across biomes
+    assert o2.rewards.shape == o1.rewards.shape
+    assert d2.rewards.shape == d1.rewards.shape
+
+    for i in range(0, o1.rewards.shape[0] * 500, 500):
+        chex.assert_trees_all_close(o1.reward(i) - d1.reward(i), 20, atol=1e-6)
+        chex.assert_trees_all_close(d2.reward(i) - o2.reward(i), 20, atol=1e-6)
+        chex.assert_trees_all_close(o1.reward(i) + o2.reward(i), 0, atol=1e-6)
+        chex.assert_trees_all_close(d1.reward(i) + d2.reward(i), 0, atol=1e-6)
+        chex.assert_trees_all_close(
+            o1.reward(i) + d1.reward(i) + o2.reward(i) + d2.reward(i), 0, atol=1e-6
+        )
 
 
 def test_world_observation_mode():
@@ -1417,7 +1470,7 @@ def test_expiry_with_collection():
         observation_type="object",
     )
 
-    key = jax.random.key(123)
+    key = jax.random.key(124)
     key, key_reset = jax.random.split(key)
     obs, state = env.reset(key_reset, env.default_params)
 
@@ -2037,7 +2090,8 @@ def test_biome_regeneration_preserves_old_objects():
                     and env.object_collectable[obj_id]
                 ):
                     # Teleport agent to object and collect it
-                    current_state = current_state.replace(pos=jnp.array([x, y]))
+                    start_y = (y - 1) % size[1]
+                    current_state = current_state.replace(pos=jnp.array([x, start_y]))
                     key_step, step_key = jax.random.split(key_step)
                     obs, current_state, reward, done, info = env.step(
                         step_key, current_state, 0, env.default_params
@@ -2150,7 +2204,8 @@ def test_biome_regeneration_updates_only_new_objects():
             ):  # Collect extra to ensure threshold is hit
                 break
             if biome_mask[y, x] and current_state.object_state.object_id[y, x] > 0:
-                current_state = current_state.replace(pos=jnp.array([x, y]))
+                start_y = (y - 1) % size[1]
+                current_state = current_state.replace(pos=jnp.array([x, start_y]))
                 key_step, step_key = jax.random.split(key_step)
                 obs, current_state, reward, done, info = env.step(
                     step_key, current_state, 0, env.default_params
@@ -2405,12 +2460,12 @@ def test_biome_respawn_maintains_total_object_count_nondeterministic():
         color=(255, 0, 0),
     )
 
-    size = (5, 5)  # 25 cells
+    size = (20, 20)  # 400 cells
     biomes = (
         Biome(
             start=(0, 0),
-            stop=(5, 5),
-            object_frequencies=(0.6,),  # ~60% occupancy = ~15 objects
+            stop=(20, 20),
+            object_frequencies=(0.6,),  # ~60% occupancy = ~240 objects
         ),
     )
 
@@ -2449,8 +2504,9 @@ def test_biome_respawn_maintains_total_object_count_nondeterministic():
                 break
             # Check if there's a collectable object at this position in ORIGINAL state
             if state.object_state.object_id[y, x] > 0:
-                # Move agent to this position
-                current_state = current_state.replace(pos=jnp.array([x, y]))
+                # Move agent to the position above, so action 0 (DOWN) moves it to [x, y]
+                start_y = (y - 1) % size[1]
+                current_state = current_state.replace(pos=jnp.array([x, start_y]))
                 # Step to collect
                 key_step, step_key = jax.random.split(key_step)
                 obs, current_state, reward, done, info = env.step(
@@ -2474,7 +2530,7 @@ def test_biome_respawn_maintains_total_object_count_nondeterministic():
     # The new_total should reflect only NEWLY spawned objects (from this generation)
     # NOT the total including old preserved objects
     # So new_total should be similar to initial_total (both based on same frequency)
-    variance_threshold = 0.4
+    variance_threshold = 0.2  # Lower variance threshold for larger grid
     lower_bound = initial_total * (1 - variance_threshold)
     upper_bound = initial_total * (1 + variance_threshold)
 
@@ -2548,8 +2604,9 @@ def test_biome_respawn_maintains_total_object_count_deterministic():
                 break
             # Check if there's a collectable object at this position in ORIGINAL state
             if state.object_state.object_id[y, x] > 0:
-                # Move agent to this position
-                current_state = current_state.replace(pos=jnp.array([x, y]))
+                # Move agent to the position above, so action 0 (DOWN) moves it to [x, y]
+                start_y = (y - 1) % size[1]
+                current_state = current_state.replace(pos=jnp.array([x, start_y]))
                 # Take NOOP action to collect
                 key_step, step_key = jax.random.split(key_step)
                 obs, current_state, reward, done, info = env.step(
@@ -3153,7 +3210,7 @@ def test_reward_centering_with_walls():
         object_state=state.object_state.replace(object_id=grid), pos=jnp.array([1, 2])
     )
 
-    # If the wall was incorrectly included in the mean, it would drag it down: (10.0 + 0.0) / 2 = 5.0
+    # If the wall was incorrectly included in the mean, it would drag it down: (10.0 + -inf) / 2 = -inf
     # Because the wall is correctly excluded, the mean is just 10.0 / 1 = 10.0.
     # Therefore, the centered reward for collecting obj1 is 10.0 - 10.0 = 0.0
 
@@ -3162,6 +3219,445 @@ def test_reward_centering_with_walls():
 
     assert jnp.isclose(reward, 0.0), f"Expected reward 0.0, got {reward}"
 
-    # Also verify that the wall's reward in the reward grid is exactly 0.0
+    # Also verify that the wall's reward in the reward grid is exactly -inf
     reward_grid = env._reward_grid(state, state.object_state)
-    assert jnp.isclose(reward_grid[2, 3], 0.0), "Wall should receive exactly 0 reward"
+    assert jnp.isclose(reward_grid[2, 3], -jnp.inf), (
+        "Wall should receive exactly -inf reward"
+    )
+
+
+def test_random_teleport_mechanics_and_timing():
+    """Test random teleport mechanics, timing, and disabling."""
+    key = jax.random.key(0)
+    period = 40
+
+    # CASE 1: Active Teleport
+    env = ForagaxEnv(
+        size=(20, 20),
+        objects=(),
+        observation_type="object",
+        nowrap=True,  # Simplify movement to detect jumps
+        random_teleport_period=period,
+    )
+    params = env.default_params
+    _, state = env.reset(key, params)
+
+    t_jumps = []
+
+    # Run for a bit more than a period
+    for _ in range(period + 2):
+        prev_pos = state.pos
+        # Note: Step calculates new time = old_time + 1. Teleport uses new time.
+        # If we are at time=9. Step -> time=10. 10 % 40 = 10 (quarter). Teleport should happen.
+
+        key, step_key = jax.random.split(key)
+        _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
+
+        # Check if we jumped
+        # Normal UP move: dist=1.
+        dist = jnp.sum(jnp.abs(state.pos - prev_pos))
+        if dist > 1:
+            t_jumps.append(state.time)
+
+    # Expected times: 10 (1/4) and 30 (3/4)
+    quarter = period // 4
+    three_quarter = 3 * period // 4
+
+    # We expect jumps exactly at these times
+    t_jumps_int = [int(t) for t in t_jumps]
+    assert quarter in t_jumps_int
+    assert three_quarter in t_jumps_int
+    assert len(t_jumps_int) == 2, f"Unexpected jumps: {t_jumps_int}"
+
+    # CASE 2: Disabled
+    env_disabled = ForagaxEnv(size=(20, 20), random_teleport_period=0, nowrap=True)
+    _, state = env_disabled.reset(key, params)
+    for _ in range(period):
+        prev_pos = state.pos
+        key, step_key = jax.random.split(key)
+        _, state, _, _, _ = env_disabled.step(step_key, state, Actions.UP, params)
+        dist = jnp.sum(jnp.abs(state.pos - prev_pos))
+        assert dist <= 1, "Teleported when disabled!"
+        assert env_disabled.random_teleport_period == 0
+
+
+def test_random_teleport_offsets():
+    """Test random teleport offsets and random shifts."""
+    key = jax.random.key(0)
+    period = 40
+    fixed_offset = 5
+    random_shift_max = 10
+
+    env = ForagaxEnv(
+        size=(20, 20),
+        objects=(),
+        nowrap=True,
+        random_teleport_period=period,
+        random_teleport_offset=fixed_offset,
+        random_shift_max_steps=random_shift_max,
+    )
+    params = env.default_params
+    _, state = env.reset(key, params)
+
+    # Get the realized random offset
+    realized_offset = int(state.offset)
+    assert 0 <= realized_offset <= random_shift_max
+
+    # Trigger condition:
+    # (time + fixed_offset + realized_offset) % period == period/4 or 3*period/4
+
+    quarter = period // 4
+    three_quarter = 3 * period // 4
+
+    t_jumps = []
+
+    for _ in range(period * 2):
+        prev_pos = state.pos
+        key, step_key = jax.random.split(key)
+        _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
+
+        dist = jnp.sum(jnp.abs(state.pos - prev_pos))
+        if dist > 1:
+            # Verify this time matches the condition
+            effective_time = state.time + fixed_offset + realized_offset
+            t_in_period = effective_time % period
+            assert (t_in_period == quarter) or (t_in_period == three_quarter)
+            t_jumps.append(state.time)
+
+    assert len(t_jumps) > 0, "No jumps detected with offset"
+
+
+def test_random_teleport_validity():
+    """Test that teleport lands on valid empty cells within biomes."""
+    key = jax.random.key(42)
+    period = 20
+
+    # Two biomes setup
+    biome1 = Biome(object_frequencies=(0.1,), start=(0, 0), stop=(10, 10))
+    biome2 = Biome(object_frequencies=(0.1,), start=(10, 10), stop=(20, 20))
+
+    env = ForagaxEnv(
+        size=(20, 20),
+        objects=(FLOWER,),  # Fill some spots
+        biomes=(biome1, biome2),
+        observation_type="object",
+        random_teleport_period=period,
+    )
+    params = env.default_params
+
+    # JIT the step for testing JIT compat as well
+    step_jit = jax.jit(env.step)
+
+    obs, state = env.reset(key, params)
+
+    teleport_positions = []
+
+    # Run long enough to generate many teleports
+    for _ in range(period * 5):
+        key, step_key = jax.random.split(key)
+        _, state, _, _, _ = step_jit(step_key, state, Actions.UP, params)
+
+        time_in_period = state.time % period
+        quarter = period // 4
+        three_quarter = 3 * period // 4
+
+        if (time_in_period == quarter) or (time_in_period == three_quarter):
+            # This WAS a teleport step
+            teleport_positions.append(state.pos)
+
+            # Check empty cell
+            agent_cell_id = state.object_state.object_id[state.pos[1], state.pos[0]]
+            assert agent_cell_id == 0, "Teleported to non-empty cell"
+
+    # Check biome bounds
+    for pos in teleport_positions:
+        x, y = int(pos[0]), int(pos[1])
+        in_b1 = (biome1.start[0] <= x < biome1.stop[0]) and (
+            biome1.start[1] <= y < biome1.stop[1]
+        )
+        in_b2 = (biome2.start[0] <= x < biome2.stop[0]) and (
+            biome2.start[1] <= y < biome2.stop[1]
+        )
+        assert in_b1 or in_b2, f"Position {pos} not in any biome"
+
+
+def test_deterministic_teleport():
+    """Test deterministic teleportation logic triggers at correct times and targets correct biomes."""
+    # Define environment parameters
+    period = 10
+    half_period = period // 2
+
+    # Create two disjoint biomes with NO objects
+    # Biome 1: 5x5 area at top-left (0,0) to (5,5)
+    # Biome 2: 5x5 area at bottom-right (5,5) to (10,10)
+    biomes = (
+        Biome(start=(0, 0), stop=(5, 5), object_frequencies=(0.0,)),
+        Biome(start=(5, 5), stop=(10, 10), object_frequencies=(0.0,)),
+    )
+
+    env = ForagaxEnv(
+        size=(10, 10),
+        biomes=biomes,
+        deterministic_teleport_period=period,
+        deterministic_spawn=True,
+    )
+
+    # Use JIT step to ensure compatibility
+    step_fn = jax.jit(env.step)
+    reset_fn = jax.jit(env.reset)
+
+    key = jax.random.key(0)
+    obs, state = reset_fn(key, env.default_params)
+
+    def check_in_biome(pos, biome_idx):
+        b = biomes[biome_idx]
+        x, y = pos[0], pos[1]
+        in_x = (x >= b.start[0]) & (x < b.stop[0])
+        in_y = (y >= b.start[1]) & (y < b.stop[1])
+        return in_x & in_y
+
+    # Reset puts agent at biome 1 immediately (time=0 teleport)
+    assert check_in_biome(state.pos, 0), (
+        f"Reset failed: Agent at {state.pos} not in Biome 1"
+    )
+
+    # Step 1 -> time=1. No teleport (1 % 10 != 0/5).
+    # Normal movement (Action 0 = DOWN).
+    key, step_key = jax.random.split(key)
+    obs, state, reward, done, info = step_fn(step_key, state, 0, env.default_params)
+    assert state.time == 1
+
+    # Should still be in biome 1 (or at least NOT in biome 2 for sure)
+    # Since we move down, strict biome check might fail if we were at bottom edge,
+    # but with 5x5 biome and random start, 1 step is unlikely to leave unless very unlucky.
+    # But crucially, it should NOT be in Biome 2.
+    assert check_in_biome(state.pos, 0), (
+        f"Step 1 failed: Agent at {state.pos} left Biome 1 unexpectedly"
+    )
+
+    # Continue stepping until time=5 (half period). Should teleport.
+    for _ in range(half_period - 1):
+        key, step_key = jax.random.split(key)
+        obs, state, reward, done, info = step_fn(step_key, state, 0, env.default_params)
+
+    # Check time is 5
+    assert state.time == 5
+
+    # Calculate expected biome index
+    # time=5. 5 % 10 = 5. half_period trigger.
+    # full_periods = 5 // 10 = 0
+    # past_half = 1
+    # teleport_index = 2*0 + 1 = 1
+    # biome_idx = 1 % 2 = 1 -> Biome 2
+    assert check_in_biome(state.pos, 1), (
+        f"Time 5 failed: Agent at {state.pos} not in Biome 2"
+    )
+
+    # Step until 10
+    for _ in range(period - half_period):
+        key, step_key = jax.random.split(key)
+        obs, state, reward, done, info = step_fn(step_key, state, 0, env.default_params)
+
+    # Check time is 10
+    assert state.time == 10
+
+    # Calculate expected biome index
+    # time=10. 10 % 10 = 0. initial trigger.
+    # full_periods = 10 // 10 = 1
+    # past_half = 0 (0 >= 5 False)
+    # teleport_index = 2*1 + 0 = 2
+    # biome_idx = 2 % 2 = 0 -> Biome 1
+    assert check_in_biome(state.pos, 0), (
+        f"Time 10 failed: Agent at {state.pos} not in Biome 1"
+    )
+
+    # One more half period -> time=15
+    for _ in range(half_period):
+        key, step_key = jax.random.split(key)
+        obs, state, reward, done, info = step_fn(step_key, state, 0, env.default_params)
+
+    assert state.time == 15
+    # time=15. 15 % 10 = 5.
+    # full_periods = 1
+    # past_half = 1
+    # teleport_index = 2*1 + 1 = 3
+    # biome_idx = 3 % 2 = 1 -> Biome 2
+    assert check_in_biome(state.pos, 1), (
+        f"Time 15 failed: Agent at {state.pos} not in Biome 2"
+    )
+
+
+def test_deterministic_teleport_initial_placement():
+    """Test that deterministic teleport places agent correctly on reset."""
+    period = 100
+
+    # Two biomes, no objects
+    biomes = (
+        Biome(start=(0, 0), stop=(5, 5), object_frequencies=(0.0,)),
+        Biome(start=(5, 5), stop=(10, 10), object_frequencies=(0.0,)),
+    )
+
+    env = ForagaxEnv(
+        size=(10, 10),
+        biomes=biomes,
+        deterministic_teleport_period=period,
+        deterministic_spawn=True,
+    )
+
+    reset_fn = jax.jit(env.reset)
+
+    key = jax.random.key(42)
+    obs, state = reset_fn(key, env.default_params)
+
+    # Helper to check biome bounds
+    def check_in_biome(pos, biome_idx):
+        b = biomes[biome_idx]
+        x, y = pos[0], pos[1]
+        in_x = (x >= b.start[0]) & (x < b.stop[0])
+        in_y = (y >= b.start[1]) & (y < b.stop[1])
+        return in_x & in_y
+
+    # Agent should start in Biome 1 immediately after reset
+    assert state.time == 0
+    assert check_in_biome(state.pos, 0), f"Reset position {state.pos} not in Biome 1"
+
+
+def test_deterministic_teleport_open_spot():
+    """Test that deterministic teleport lands on an open (empty) cell.
+
+    When the biome center is occupied by an object, the teleport should
+    find a random empty cell within the biome instead.
+    Uses sparse objects so there are empty cells available.
+    """
+    period = 10
+    half_period = period // 2
+
+    obj = DefaultForagaxObject(name="block", blocking=False)
+
+    # Use moderate object frequency so centers are occupied but empty cells exist
+    biomes = (
+        Biome(start=(0, 0), stop=(5, 5), object_frequencies=(0.5,)),
+        Biome(start=(5, 5), stop=(10, 10), object_frequencies=(0.5,)),
+    )
+
+    env = ForagaxEnv(
+        size=(10, 10),
+        objects=(obj,),
+        biomes=biomes,
+        deterministic_teleport_period=period,
+        deterministic_spawn=True,
+    )
+
+    step_fn = jax.jit(env.step)
+    reset_fn = jax.jit(env.reset)
+
+    key = jax.random.key(7)
+    obs, state = reset_fn(key, env.default_params)
+
+    # Check reset position first
+    x, y = int(state.pos[0]), int(state.pos[1])
+    obj_at_pos = state.object_state.object_id[y, x]
+    assert obj_at_pos == 0, (
+        f"Reset: Agent at ({x}, {y}) is on occupied cell {obj_at_pos}"
+    )
+
+    # Run for multiple teleport events and verify each teleport landing is on an empty cell
+    for step_idx in range(40):
+        key, step_key = jax.random.split(key)
+        obs, state, reward, done, info = step_fn(step_key, state, 0, env.default_params)
+
+        # Determine if this was a teleport step
+        effective_time = int(state.time) + int(state.offset)
+        time_in_period = effective_time % period
+        is_teleport = (time_in_period == 0) or (time_in_period == half_period)
+
+        if is_teleport:
+            x, y = int(state.pos[0]), int(state.pos[1])
+            obj_at_pos = state.object_state.object_id[y, x]
+            assert obj_at_pos == 0, (
+                f"Step {step_idx + 1} (teleport): Agent at ({x}, {y}) is on an "
+                f"occupied cell (object_id={obj_at_pos})"
+            )
+
+
+def test_deterministic_teleport_single_open_spot():
+    """Test that teleport picks the only available empty cell.
+
+    Create a scenario where we know the biome is full except for one spot,
+    and verify the agent lands on that spot.
+    """
+    period = 10
+
+    obj = DefaultForagaxObject(name="block", blocking=False)
+
+    # A single biome covering 3x3 at top-left. Center = (1, 1).
+    # object_frequencies=(1.0,) fills all 9 cells.
+    biomes = (Biome(start=(0, 0), stop=(3, 3), object_frequencies=(1.0,)),)
+
+    env = ForagaxEnv(
+        size=(10, 10),
+        objects=(obj,),
+        biomes=biomes,
+        deterministic_teleport_period=period,
+        deterministic_spawn=True,
+    )
+
+    step_fn = jax.jit(env.step)
+    reset_fn = jax.jit(env.reset)
+
+    key = jax.random.key(0)
+    obs, state = reset_fn(key, env.default_params)
+
+    # All 9 cells in the biome are occupied. Agent lands at fallback position (5,5).
+    # Manually clear one cell (1, 0).
+    new_object_id = state.object_state.object_id.at[0, 1].set(0)
+    state = state.replace(
+        object_state=state.object_state.replace(object_id=new_object_id)
+    )
+
+    # Step until next teleport event (time=5, half period)
+    # Reset was time=0. We need 5 steps.
+    for _ in range(5):
+        key, step_key = jax.random.split(key)
+        obs, state, reward, done, info = step_fn(step_key, state, 0, env.default_params)
+
+    assert state.time == 5
+
+    # Teleport should select Biome 0 (index 0).
+    # Only cell (1,0) is empty.
+    expected_pos = jnp.array([1, 0], dtype=jnp.int32)
+    chex.assert_trees_all_equal(state.pos, expected_pos)
+    # Confirm the cell is indeed empty
+    assert state.object_state.object_id[0, 1] == 0
+
+
+def test_deterministic_teleport_all_occupied_fallback():
+    """Test that teleport falls back to current position when all biome cells are occupied."""
+    period = 10
+
+    # Providing an object is safer for correctness, though tests seemed to rely on implicit behavior
+    wall = DefaultForagaxObject(name="wall", blocking=False)
+
+    # Single biome, 100% filled
+    biomes = (Biome(start=(0, 0), stop=(3, 3), object_frequencies=(1.0,)),)
+
+    env = ForagaxEnv(
+        size=(10, 10),
+        objects=(wall,),
+        biomes=biomes,
+        deterministic_teleport_period=period,
+        deterministic_spawn=True,
+    )
+
+    reset_fn = jax.jit(env.reset)
+
+    key = jax.random.key(0)
+    obs, state = reset_fn(key, env.default_params)
+
+    # Initial reset teleport (time=0) is triggered.
+    # Biome is full. Teleport fails and falls back to current position.
+    # Initial agent position before teleport is (5, 5).
+    # If teleport succeeded (found spot), it would be in (0,0)-(3,3).
+    # Fallback means it remains at (5, 5).
+    expected_pos = jnp.array([5, 5], dtype=jnp.int32)
+    chex.assert_trees_all_equal(state.pos, expected_pos)

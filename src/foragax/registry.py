@@ -34,7 +34,10 @@ from foragax.objects import (
     WALL,
     create_fourier_objects,
     create_sine_biome_objects,
+    create_square_wave_biome_objects,
     create_weather_objects,
+    create_weather_wave_objects,
+    create_shift_square_wave_biome_objects,
 )
 
 BIG_WIDTH = 15
@@ -930,6 +933,363 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
         "nowrap": False,
         "deterministic_spawn": True,
     },
+    "ForagaxSineTwoBiome-v2": {
+        "size": (15, 15),
+        "aperture_size": None,
+        "objects": None,
+        "biomes": (
+            # Biome 1 (left): Oyster +10, Death Cap -10 with sine
+            Biome(
+                start=(2, 0),
+                stop=(6, 15),
+                object_frequencies=(8 / 30, 8 / 30, 0.0, 0.0),
+            ),
+            # Biome 2 (right): Oyster -10, Death Cap +10 with inverted sine
+            Biome(
+                start=(9, 0),
+                stop=(13, 15),
+                object_frequencies=(0.0, 0.0, 8 / 30, 8 / 30),
+            ),
+        ),
+        "nowrap": False,
+        "deterministic_spawn": True,
+    },
+    "ForagaxSquareWaveTwoBiome-v1": {
+        "size": (15, 15),
+        "aperture_size": None,
+        "objects": None,
+        "biomes": (
+            # Biome 1 (left): Oyster +10, Death Cap -10 with square
+            Biome(
+                start=(2, 0),
+                stop=(6, 15),
+                object_frequencies=(8 / 30, 8 / 30, 0.0, 0.0),
+            ),
+            # Biome 2 (right): Oyster -10, Death Cap +10 with inverted square
+            Biome(
+                start=(9, 0),
+                stop=(13, 15),
+                object_frequencies=(0.0, 0.0, 8 / 30, 8 / 30),
+            ),
+        ),
+        "nowrap": False,
+        "deterministic_spawn": True,
+    },
+    "ForagaxSquareWaveTwoBiome-v2": {
+        "size": (15, 15),
+        "aperture_size": None,
+        "objects": None,
+        "biomes": (
+            # Biome 1 (left): Oyster +10, Death Cap -10 with square
+            Biome(
+                start=(2, 0),
+                stop=(6, 15),
+                object_frequencies=(8 / 30, 8 / 30, 0.0, 0.0, 2 / 60),
+            ),
+            # Biome 2 (right): Oyster -10, Death Cap +10 with inverted square
+            Biome(
+                start=(9, 0),
+                stop=(13, 15),
+                object_frequencies=(0.0, 0.0, 8 / 30, 8 / 30, 2 / 60),
+            ),
+        ),
+        "nowrap": False,
+        "deterministic_spawn": True,
+    },
+    "ForagaxSquareWaveTwoBiome-v3": {
+        "size": (40, 15),
+        "aperture_size": None,
+        "objects": None,
+        "biomes": (
+            # Biome 1 (left): Oyster +10, Death Cap -10 with square wave
+            Biome(
+                start=(8, 0),
+                stop=(12, 15),
+                object_frequencies=(16 / 60, 16 / 60, 0.0, 0.0, 2 / 60),
+            ),
+            # Biome 2 (right): Oyster -10, Death Cap +10 with inverted square wave
+            Biome(
+                start=(28, 0),
+                stop=(32, 15),
+                object_frequencies=(0.0, 0.0, 16 / 60, 16 / 60, 2 / 60),
+            ),
+        ),
+        "nowrap": False,
+        "deterministic_spawn": True,
+    },
+    "ForagaxSquareWaveTwoBiome-v4": {
+        "size": (40, 15),
+        "aperture_size": None,
+        "objects": None,
+        "biomes": (
+            # Biome 1 (left): Oyster +10, Death Cap -10 with square wave
+            Biome(
+                start=(8, 0),
+                stop=(12, 15),
+                object_frequencies=(16 / 60, 16 / 60, 0.0, 0.0, 2 / 60),
+            ),
+            # Biome 2 (right): Oyster -10, Death Cap +10 with inverted square wave
+            Biome(
+                start=(28, 0),
+                stop=(32, 15),
+                object_frequencies=(0.0, 0.0, 16 / 60, 16 / 60, 2 / 60),
+            ),
+        ),
+        "nowrap": False,
+        "deterministic_spawn": True,
+    },
+    "ForagaxSquareWaveTwoBiome-v5": {
+        "size": (20, 15),
+        "aperture_size": None,
+        "objects": None,
+        "biomes": (
+            # Void
+            Biome(
+                start=(0, 0),
+                stop=(20, 15),
+                object_frequencies=(0.0, 0.0, 0.0, 0.0, 4 / 60),
+            ),
+            # Biome 1 (left): Oyster +10, Death Cap -10 with square wave
+            Biome(
+                start=(3, 0),
+                stop=(7, 15),
+                object_frequencies=(16 / 60, 16 / 60, 0.0, 0.0, 4 / 60),
+            ),
+            # Biome 2 (right): Oyster -10, Death Cap +10 with inverted square wave
+            Biome(
+                start=(13, 0),
+                stop=(17, 15),
+                object_frequencies=(0.0, 0.0, 16 / 60, 16 / 60, 4 / 60),
+            ),
+        ),
+        "nowrap": False,
+        "deterministic_spawn": True,
+    },
+    "ForagaxSquareWaveTwoBiome-v6": {
+        "size": (24, 15),
+        "aperture_size": None,
+        "objects": None,
+        "biomes": (
+            # Void
+            Biome(
+                start=(0, 0),
+                stop=(24, 15),
+                object_frequencies=(0.0, 0.0, 0.0, 0.0, 4 / 60),
+            ),
+            # Biome 1 (left): Oyster +10, Death Cap -10 with square wave
+            Biome(
+                start=(4, 0),
+                stop=(8, 15),
+                object_frequencies=(16 / 60, 16 / 60, 0.0, 0.0, 4 / 60),
+            ),
+            # Biome 2 (right): Oyster -10, Death Cap +10 with inverted square wave
+            Biome(
+                start=(16, 0),
+                stop=(20, 15),
+                object_frequencies=(0.0, 0.0, 16 / 60, 16 / 60, 4 / 60),
+            ),
+        ),
+        "nowrap": False,
+        "deterministic_spawn": True,
+    },
+    "ForagaxSquareWaveTwoBiome-v7": {
+        "size": (24, 15),
+        "aperture_size": None,
+        "objects": None,
+        "biomes": (
+            # Biome 1 (left)
+            Biome(
+                start=(4, 0),
+                stop=(8, 15),
+                object_frequencies=(16 / 60, 16 / 60, 0.0, 0.0, 0.0),
+            ),
+            # Biome 2 (right)
+            Biome(
+                start=(16, 0),
+                stop=(20, 15),
+                object_frequencies=(0.0, 0.0, 16 / 60, 16 / 60, 0.0),
+            ),
+            # Walls in Biome 1
+            Biome(
+                start=(5, 5),
+                stop=(7, 10),
+                object_frequencies=(0.0, 0.0, 0.0, 0.0, 4 / 10),
+            ),
+            # Walls in Biome 2
+            Biome(
+                start=(17, 5),
+                stop=(19, 10),
+                object_frequencies=(0.0, 0.0, 0.0, 0.0, 4 / 10),
+            ),
+        ),
+        "nowrap": False,
+        "deterministic_spawn": True,
+    },
+    "ForagaxSquareWaveTwoBiome-v8": {
+        "size": (24, 15),
+        "aperture_size": None,
+        "objects": None,
+        "biomes": (
+            # Void
+            Biome(
+                start=(0, 0),
+                stop=(24, 15),
+                object_frequencies=(0.0, 0.0, 0.0, 0.0, 4 / 60),
+            ),
+            # Biome 1 (left): Oyster +10, Death Cap -10 with square wave
+            Biome(
+                start=(4, 0),
+                stop=(8, 15),
+                object_frequencies=(16 / 60, 16 / 60, 0.0, 0.0, 4 / 60),
+            ),
+            # Biome 2 (right): Oyster -10, Death Cap +10 with inverted square wave
+            Biome(
+                start=(16, 0),
+                stop=(20, 15),
+                object_frequencies=(0.0, 0.0, 16 / 60, 16 / 60, 4 / 60),
+            ),
+        ),
+        "nowrap": False,
+        "deterministic_spawn": True,
+    },
+    "ForagaxSquareWaveTwoBiome-v9": {
+        "size": (24, 15),
+        "aperture_size": None,
+        "objects": None,
+        "biomes": (
+            # Void
+            Biome(
+                start=(0, 0),
+                stop=(24, 15),
+                object_frequencies=(0.0, 0.0, 0.0, 0.0, 4 / 60),
+            ),
+            # Biome 1 (left): Oyster +10, Death Cap -10 with square wave
+            Biome(
+                start=(4, 0),
+                stop=(8, 15),
+                object_frequencies=(16 / 60, 16 / 60, 0.0, 0.0, 4 / 60),
+            ),
+            # Biome 2 (right): Oyster -10, Death Cap +10 with inverted square wave
+            Biome(
+                start=(16, 0),
+                stop=(20, 15),
+                object_frequencies=(0.0, 0.0, 16 / 60, 16 / 60, 4 / 60),
+            ),
+        ),
+        "nowrap": False,
+        "deterministic_spawn": True,
+    },
+    "ForagaxSquareWaveTwoBiome-v10": {
+        "size": (24, 15),
+        "aperture_size": None,
+        "objects": None,
+        "biomes": (
+            # Void
+            Biome(
+                start=(0, 0),
+                stop=(24, 15),
+                object_frequencies=(0.0, 0.0, 0.0, 0.0, 4 / 60),
+            ),
+            # Biome 1 (left): Oyster +10, Death Cap -10 with square wave
+            Biome(
+                start=(4, 0),
+                stop=(8, 15),
+                object_frequencies=(15 / 60, 15 / 60, 0.0, 0.0, 4 / 60),
+            ),
+            # Biome 2 (right): Oyster -10, Death Cap +10 with inverted square wave
+            Biome(
+                start=(16, 0),
+                stop=(20, 15),
+                object_frequencies=(0.0, 0.0, 15 / 60, 15 / 60, 4 / 60),
+            ),
+        ),
+        "nowrap": False,
+        "deterministic_spawn": True,
+    },
+    "ForagaxWeatherWaveTwoBiome-v1": {
+        "size": (15, 15),
+        "aperture_size": None,
+        "objects": None,
+        "biomes": (
+            # Biome 1 (left): Oyster +10, Death Cap -10 with weather
+            Biome(
+                start=(2, 0),
+                stop=(6, 15),
+                object_frequencies=(8 / 30, 8 / 30, 0.0, 0.0),
+            ),
+            # Biome 2 (right): Oyster -10, Death Cap +10 with inverted weather
+            Biome(
+                start=(9, 0),
+                stop=(13, 15),
+                object_frequencies=(0.0, 0.0, 8 / 30, 8 / 30),
+            ),
+        ),
+        "nowrap": False,
+        "deterministic_spawn": True,
+    },
+    "ForagaxWeatherWaveTwoBiome-v2": {
+        "size": (15, 15),
+        "aperture_size": None,
+        "objects": None,
+        "biomes": (
+            # Biome 1 (left): Oyster +10, Death Cap -10 with weather
+            Biome(
+                start=(2, 0),
+                stop=(6, 15),
+                object_frequencies=(8 / 30, 8 / 30, 0.0, 0.0),
+            ),
+            # Biome 2 (right): Oyster -10, Death Cap +10 with inverted weather
+            Biome(
+                start=(9, 0),
+                stop=(13, 15),
+                object_frequencies=(0.0, 0.0, 8 / 30, 8 / 30),
+            ),
+        ),
+        "nowrap": False,
+        "deterministic_spawn": True,
+    },
+    "ForagaxWeatherWaveTwoBiome-v3": {
+        "size": (15, 15),
+        "aperture_size": None,
+        "objects": None,
+        "biomes": (
+            # Biome 1 (left): Oyster +10, Death Cap -10 with weather
+            Biome(
+                start=(2, 0),
+                stop=(6, 15),
+                object_frequencies=(16 / 60, 16 / 60, 0.0, 0.0, 2 / 60),
+            ),
+            # Biome 2 (right): Oyster -10, Death Cap +10 with inverted weather
+            Biome(
+                start=(9, 0),
+                stop=(13, 15),
+                object_frequencies=(0.0, 0.0, 16 / 60, 16 / 60, 2 / 60),
+            ),
+        ),
+        "nowrap": False,
+        "deterministic_spawn": True,
+    },
+    "ForagaxWeatherWaveTwoBiome-v4": {
+        "size": (68, 15),
+        "aperture_size": None,
+        "objects": None,
+        "biomes": (
+            # Biome 1 (left): Oyster +10, Death Cap -10 with weather
+            Biome(
+                start=(15, 0),
+                stop=(19, 15),
+                object_frequencies=(16 / 60, 16 / 60, 0.0, 0.0, 2 / 60),
+            ),
+            # Biome 2 (right): Oyster -10, Death Cap +10 with inverted weather
+            Biome(
+                start=(49, 0),
+                stop=(53, 15),
+                object_frequencies=(0.0, 0.0, 16 / 60, 16 / 60, 2 / 60),
+            ),
+        ),
+        "nowrap": False,
+        "deterministic_spawn": True,
+    },
 }
 
 
@@ -940,6 +1300,7 @@ def make(
     file_index: int = 0,
     repeat: int = 500,
     reward_delay: int = 0,
+    random_shift_max_steps: int = 0,
     **kwargs: Any,
 ) -> ForagaxEnv:
     """Create a Foragax environment.
@@ -967,6 +1328,7 @@ def make(
         else:
             aperture_size = (aperture_size, aperture_size)
     config["aperture_size"] = aperture_size
+    config["random_shift_max_steps"] = random_shift_max_steps
 
     # Handle special size and biome configurations
     if env_id in (
@@ -1114,8 +1476,8 @@ def make(
     if env_id == "ForagaxSineTwoBiome-v1":
         biome1_oyster, biome1_deathcap, biome2_oyster, biome2_deathcap = (
             create_sine_biome_objects(
-                period=1000,
-                amplitude=20.0,
+                period=1000000,
+                amplitude=10.0,
                 base_oyster_reward=10.0,
                 base_deathcap_reward=-10.0,
                 regen_delay=(9, 11),
@@ -1129,6 +1491,215 @@ def make(
             biome1_deathcap,
             biome2_oyster,
             biome2_deathcap,
+        )
+
+    if env_id == "ForagaxSineTwoBiome-v2":
+        biome1_oyster, biome1_deathcap, biome2_oyster, biome2_deathcap = (
+            create_sine_biome_objects(
+                period=1000000,
+                amplitude=10.0,
+                base_oyster_reward=10.0,
+                base_deathcap_reward=-10.0,
+                regen_delay=(9, 11),
+                reward_delay=reward_delay,
+                expiry_time=500,
+                expiry_regen_delay=(9, 11),
+            )
+        )
+        config["objects"] = (
+            biome1_oyster,
+            biome1_deathcap,
+            biome2_oyster,
+            biome2_deathcap,
+        )
+
+    if env_id == "ForagaxSquareWaveTwoBiome-v1":
+        biome1_oyster, biome1_deathcap, biome2_oyster, biome2_deathcap = (
+            create_square_wave_biome_objects(
+                period=1000000,
+                amplitude=10.0,
+                base_oyster_reward=10.0,
+                base_deathcap_reward=-10.0,
+                regen_delay=(9, 11),
+                reward_delay=reward_delay,
+                expiry_time=500,
+                expiry_regen_delay=(9, 11),
+            )
+        )
+        config["objects"] = (
+            biome1_oyster,
+            biome1_deathcap,
+            biome2_oyster,
+            biome2_deathcap,
+        )
+
+    if (
+        env_id == "ForagaxSquareWaveTwoBiome-v2"
+        or env_id == "ForagaxSquareWaveTwoBiome-v3"
+    ):
+        biome1_oyster, biome1_chanterelle, biome2_oyster, biome2_chanterelle = (
+            create_shift_square_wave_biome_objects(
+                period=1000000,
+                regen_delay=(9, 11),
+                reward_delay=reward_delay,
+                expiry_time=500,
+                expiry_regen_delay=(9, 11),
+            )
+        )
+        config["objects"] = (
+            biome1_oyster,
+            biome1_chanterelle,
+            biome2_oyster,
+            biome2_chanterelle,
+            WALL,
+        )
+
+    if (
+        env_id == "ForagaxSquareWaveTwoBiome-v4"
+        or env_id == "ForagaxSquareWaveTwoBiome-v5"
+        or env_id == "ForagaxSquareWaveTwoBiome-v6"
+    ):
+        biome1_oyster, biome1_chanterelle, biome2_oyster, biome2_chanterelle = (
+            create_shift_square_wave_biome_objects(
+                period=1000000,
+                regen_delay=(9, 11),
+                reward_delay=reward_delay,
+                expiry_time=500,
+                expiry_regen_delay=(9, 11),
+            )
+        )
+        config["objects"] = (
+            biome1_oyster,
+            biome1_chanterelle,
+            biome2_oyster,
+            biome2_chanterelle,
+            WALL,
+        )
+        config["random_teleport_period"] = 1000000
+
+    if (
+        env_id == "ForagaxSquareWaveTwoBiome-v7"
+        or env_id == "ForagaxSquareWaveTwoBiome-v8"
+    ):
+        biome1_oyster, biome1_chanterelle, biome2_oyster, biome2_chanterelle = (
+            create_shift_square_wave_biome_objects(
+                period=1000000,
+                regen_delay=(9, 11),
+                reward_delay=reward_delay,
+                expiry_time=500,
+                expiry_regen_delay=(9, 11),
+            )
+        )
+        config["objects"] = (
+            biome1_oyster,
+            biome1_chanterelle,
+            biome2_oyster,
+            biome2_chanterelle,
+            WALL,
+        )
+        config["deterministic_teleport_period"] = 1000000
+
+    if env_id == "ForagaxSquareWaveTwoBiome-v9":
+        biome1_oyster, biome1_chanterelle, biome2_oyster, biome2_chanterelle = (
+            create_shift_square_wave_biome_objects(
+                period=1000000,
+                regen_delay=(9, 11),
+                reward_delay=reward_delay,
+                expiry_time=500,
+                expiry_regen_delay=(9, 11),
+            )
+        )
+        config["objects"] = (
+            biome1_oyster,
+            biome1_chanterelle,
+            biome2_oyster,
+            biome2_chanterelle,
+            WALL,
+        )
+    if env_id == "ForagaxSquareWaveTwoBiome-v10":
+        biome1_oyster, biome1_chanterelle, biome2_oyster, biome2_chanterelle = (
+            create_shift_square_wave_biome_objects(
+                period=1000000,
+                amplitude_big=9.0,
+                amplitude_small=3.0,
+                base_oyster_reward=-5.0,
+                base_chanterelle_reward=-5.0,
+                regen_delay=(9, 11),
+                reward_delay=reward_delay,
+                expiry_time=500,
+                expiry_regen_delay=(9, 11),
+            )
+        )
+        config["objects"] = (
+            biome1_oyster,
+            biome1_chanterelle,
+            biome2_oyster,
+            biome2_chanterelle,
+            WALL,
+        )
+
+    if env_id == "ForagaxWeatherWaveTwoBiome-v1":
+        biome1_oyster, biome1_deathcap, biome2_oyster, biome2_deathcap = (
+            create_weather_wave_objects(
+                repeat=1000,
+                multiplier=20.0,
+                base_oyster_reward=10.0,
+                base_deathcap_reward=-10.0,
+                regen_delay=(9, 11),
+                reward_delay=reward_delay,
+                expiry_time=500,
+                expiry_regen_delay=(9, 11),
+            )
+        )
+        config["objects"] = (
+            biome1_oyster,
+            biome1_deathcap,
+            biome2_oyster,
+            biome2_deathcap,
+        )
+
+    if env_id == "ForagaxWeatherWaveTwoBiome-v2":
+        biome1_oyster, biome1_deathcap, biome2_oyster, biome2_deathcap = (
+            create_weather_wave_objects(
+                repeat=2000,
+                multiplier=20.0,
+                base_oyster_reward=10.0,
+                base_deathcap_reward=-10.0,
+                regen_delay=(9, 11),
+                reward_delay=reward_delay,
+                expiry_time=500,
+                expiry_regen_delay=(9, 11),
+            )
+        )
+        config["objects"] = (
+            biome1_oyster,
+            biome1_deathcap,
+            biome2_oyster,
+            biome2_deathcap,
+        )
+
+    if (
+        env_id == "ForagaxWeatherWaveTwoBiome-v3"
+        or env_id == "ForagaxWeatherWaveTwoBiome-v4"
+    ):
+        biome1_oyster, biome1_deathcap, biome2_oyster, biome2_deathcap = (
+            create_weather_wave_objects(
+                repeat=2000,
+                multiplier=20.0,
+                base_oyster_reward=10.0,
+                base_deathcap_reward=-10.0,
+                regen_delay=(9, 11),
+                reward_delay=reward_delay,
+                expiry_time=500,
+                expiry_regen_delay=(9, 11),
+            )
+        )
+        config["objects"] = (
+            biome1_oyster,
+            biome1_deathcap,
+            biome2_oyster,
+            biome2_deathcap,
+            WALL,
         )
 
     # Backward compatibility: map "world" to "object" with full world
