@@ -552,7 +552,7 @@ class ForagaxEnv(environment.Environment):
             reward = jax.lax.switch(
                 obj_id.astype(jnp.int32),
                 self.reward_fns,
-                state.time,
+                state.time + state.offset,
                 fixed_key,
                 params.astype(jnp.float32),
             )
@@ -583,7 +583,7 @@ class ForagaxEnv(environment.Environment):
             reward = jax.lax.switch(
                 obj_id.astype(jnp.int32),
                 self.reward_fns,
-                state.time,
+                state.time + state.offset,
                 fixed_key,
                 params.astype(jnp.float32),
             )
