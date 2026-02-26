@@ -1,3 +1,17 @@
+## 0.52.0 (2026-02-26)
+
+### Feat
+
+- add WeatherWave and SquareWave
+
+### Fix
+
+- fix mean reward calculation
+- fix test
+- apply suggestion from @Copilot
+- square and weather objects are now dynamic
+- apply suggestion from @Copilot
+
 ## 0.51.0 (2026-02-23)
 
 ### Feat
