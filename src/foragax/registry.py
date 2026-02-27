@@ -1206,6 +1206,33 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
         "nowrap": False,
         "deterministic_spawn": True,
     },
+    "ForagaxSquareWaveTwoBiome-v11": {
+        "size": (24, 15),
+        "aperture_size": None,
+        "objects": None,
+        "biomes": (
+            # Void
+            Biome(
+                start=(0, 0),
+                stop=(24, 15),
+                object_frequencies=(0.0, 0.0, 0.0, 0.0, 4 / 60),
+            ),
+            # Biome 1 (left): Oyster +10, Death Cap -10 with square wave
+            Biome(
+                start=(4, 0),
+                stop=(8, 15),
+                object_frequencies=(15 / 60, 15 / 60, 0.0, 0.0, 4 / 60),
+            ),
+            # Biome 2 (right): Oyster -10, Death Cap +10 with inverted square wave
+            Biome(
+                start=(16, 0),
+                stop=(20, 15),
+                object_frequencies=(0.0, 0.0, 15 / 60, 15 / 60, 4 / 60),
+            ),
+        ),
+        "nowrap": False,
+        "deterministic_spawn": True,
+    },
     "ForagaxWeatherWaveTwoBiome-v1": {
         "size": (15, 15),
         "aperture_size": None,
@@ -1620,6 +1647,27 @@ def make(
         biome1_oyster, biome1_chanterelle, biome2_oyster, biome2_chanterelle = (
             create_shift_square_wave_biome_objects(
                 period=1000000,
+                amplitude_big=9.0,
+                amplitude_small=3.0,
+                base_oyster_reward=-5.0,
+                base_chanterelle_reward=-5.0,
+                regen_delay=(9, 11),
+                reward_delay=reward_delay,
+                expiry_time=500,
+                expiry_regen_delay=(9, 11),
+            )
+        )
+        config["objects"] = (
+            biome1_oyster,
+            biome1_chanterelle,
+            biome2_oyster,
+            biome2_chanterelle,
+            WALL,
+        )
+    if env_id == "ForagaxSquareWaveTwoBiome-v11":
+        biome1_oyster, biome1_chanterelle, biome2_oyster, biome2_chanterelle = (
+            create_shift_square_wave_biome_objects(
+                period=500000,
                 amplitude_big=9.0,
                 amplitude_small=3.0,
                 base_oyster_reward=-5.0,
