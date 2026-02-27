@@ -1,3 +1,9 @@
+## 0.53.0 (2026-02-27)
+
+### Feat
+
+- add ForagaxSquareWaveTwoBiome-v11
+
 ## 0.52.0 (2026-02-26)
 
 ### Feat
