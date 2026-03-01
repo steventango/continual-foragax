@@ -1,6 +1,6 @@
 [project]
 name = "continual-foragax"
-version = "0.53.0"
+version = "0.54.0"
 description = "A continual reinforcement learning benchmark"
 readme = "README.md"
 authors = [
@@ -34,7 +34,7 @@ build-backend = "setuptools.build_meta"
 [tool]
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "0.53.0"
+version = "0.54.0"
 tag_format = "$version"
 version_files = ["pyproject.toml"]
 
