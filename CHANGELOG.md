@@ -1,3 +1,9 @@
+## 0.54.1 (2026-03-01)
+
+### Fix
+
+- kwargs can overwite config
+
 ## 0.54.0 (2026-03-01)
 
 ### Feat
