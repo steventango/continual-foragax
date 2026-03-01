@@ -33,11 +33,11 @@ from foragax.objects import (
     MEDIUM_MOREL,
     WALL,
     create_fourier_objects,
+    create_shift_square_wave_biome_objects,
     create_sine_biome_objects,
     create_square_wave_biome_objects,
     create_weather_objects,
     create_weather_wave_objects,
-    create_shift_square_wave_biome_objects,
 )
 
 BIG_WIDTH = 15
@@ -1898,4 +1898,4 @@ def make(
     config["name"] = env_id
     config["observation_type"] = observation_type
 
-    return ForagaxEnv(**config, **kwargs)
+    return ForagaxEnv(**{**config, **kwargs})
