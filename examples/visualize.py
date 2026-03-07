@@ -15,14 +15,15 @@ def main():
     for seed in range(1):
         key = jax.random.key(seed)
         aperture_sizes = [9]
-        render_modes = ["world_reward"]
+        render_modes = ["world"]
         video_folder = "videos"
         if not os.path.exists(video_folder):
             os.makedirs(video_folder)
 
         for aperture_size in aperture_sizes:
             env = make(
-                "ForagaxBig-v1",
+                # "ForagaxBig-v5",
+                "ForagaxSquareWaveTwoBiome-v11",
                 aperture_size=aperture_size,
                 observation_type="color",
             )
@@ -34,9 +35,18 @@ def main():
             for frame in tqdm(range(1_000_000), desc=f"Aperture {aperture_size}"):
                 if frame % video_every < video_length:
                     for render_mode in render_modes:
-                        frames[render_mode].append(
-                            env.render(env_state, env_params, render_mode=render_mode)
+                        frame = env.render(
+                            env_state, env_params, render_mode=render_mode
                         )
+                        frames[render_mode].append(frame)
+                        # save frame to disk
+                        from PIL import Image
+                        import numpy as np
+
+                        img = Image.fromarray(np.array(frame))
+                        img.save(f"frame_{render_mode}.png")
+                        exit(-1)
+
                 if len(frames[render_mode]) >= video_length:
                     for render_mode in render_modes:
                         save_video(

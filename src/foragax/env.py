@@ -2147,7 +2147,7 @@ class ForagaxEnv(environment.Environment):
                 img = jnp.where(agent_mask_x3[..., None], self.agent_color_jax, img)
 
                 # Final scale by 3 to get 9x
-                img = jnp.repeat(jnp.repeat(img, 3, axis=0), 3, axis=1)
+                img = jnp.repeat(jnp.repeat(img, 8, axis=0), 8, axis=1)
             else:
                 # Standard rendering without reward visualization
                 aperture_mask = jnp.zeros((self.size[1], self.size[0]), dtype=bool)
@@ -2162,7 +2162,7 @@ class ForagaxEnv(environment.Environment):
                 # Set agent
                 img = img.at[state.pos[1], state.pos[0]].set(self.agent_color_jax)
                 # Scale by 9
-                img = jnp.repeat(jnp.repeat(img, 9, axis=0), 9, axis=1)
+                img = jnp.repeat(jnp.repeat(img, 24, axis=0), 24, axis=1)
 
             if is_true_mode:
                 # Apply true object borders
@@ -2175,7 +2175,7 @@ class ForagaxEnv(environment.Environment):
 
             # Add grid lines
             img = apply_grid_lines(
-                img, (self.size[1], self.size[0]), self.grid_color_jax, 9
+                img, (self.size[1], self.size[0]), self.grid_color_jax, 24
             )
 
         elif is_aperture_mode:
@@ -2254,7 +2254,7 @@ class ForagaxEnv(environment.Environment):
                 # Scale by 3 to final size
                 img = jax.image.resize(
                     img,
-                    (self.aperture_size[0] * 3, self.aperture_size[1] * 3, 3),
+                    (self.aperture_size[0] * 24, self.aperture_size[1] * 24, 3),
                     jax.image.ResizeMethod.NEAREST,
                 )
             else:
@@ -2269,7 +2269,7 @@ class ForagaxEnv(environment.Environment):
                 img = img.astype(jnp.uint8)
                 img = jax.image.resize(
                     img,
-                    (self.aperture_size[0] * 9, self.aperture_size[1] * 9, 3),
+                    (self.aperture_size[0] * 24, self.aperture_size[1] * 24, 3),
                     jax.image.ResizeMethod.NEAREST,
                 )
 
@@ -2280,15 +2280,15 @@ class ForagaxEnv(environment.Environment):
                 )
 
             # Add grid lines
-            img = apply_grid_lines(img, self.aperture_size, self.grid_color_jax, 9)
+            img = apply_grid_lines(img, self.aperture_size, self.grid_color_jax, 24)
 
         else:
             raise ValueError(f"Unknown render_mode: {render_mode}")
 
-        if self.return_hint:
-            obs = self.get_obs(state, params)
-            if isinstance(obs, dict) and "hint" in obs:
-                hint = obs["hint"]
-                img = apply_hint_bottom_bar(img, hint, bar_height=9, separator_height=9)
+        # if self.return_hint:
+        #     obs = self.get_obs(state, params)
+        #     if isinstance(obs, dict) and "hint" in obs:
+        #         hint = obs["hint"]
+        #         img = apply_hint_bottom_bar(img, hint, bar_height=9, separator_height=9)
 
         return img
