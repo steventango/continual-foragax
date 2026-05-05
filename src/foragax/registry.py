@@ -70,11 +70,7 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
             Biome(
                 start=(
                     BIG_OFFSET + BIG_WIDTH // 2 - BIG_WALL_WIDTH,
-                    BIG_OFFSET
-                    + BIG_WIDTH
-                    + BIG_GAP
-                    + BIG_WIDTH // 2
-                    - BIG_WALL_WIDTH,
+                    BIG_OFFSET + BIG_WIDTH + BIG_GAP + BIG_WIDTH // 2 - BIG_WALL_WIDTH,
                 ),
                 stop=(
                     BIG_OFFSET + BIG_WIDTH // 2 + 1 + BIG_WALL_WIDTH,
@@ -89,11 +85,7 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
             ),
             Biome(
                 start=(
-                    BIG_OFFSET
-                    + BIG_WIDTH
-                    + BIG_GAP
-                    + BIG_WIDTH // 2
-                    - BIG_WALL_WIDTH,
+                    BIG_OFFSET + BIG_WIDTH + BIG_GAP + BIG_WIDTH // 2 - BIG_WALL_WIDTH,
                     BIG_OFFSET + BIG_WIDTH // 2 - BIG_WALL_WIDTH,
                 ),
                 stop=(
@@ -109,16 +101,8 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
             ),
             Biome(
                 start=(
-                    BIG_OFFSET
-                    + BIG_WIDTH
-                    + BIG_GAP
-                    + BIG_WIDTH // 2
-                    - BIG_WALL_WIDTH,
-                    BIG_OFFSET
-                    + BIG_WIDTH
-                    + BIG_GAP
-                    + BIG_WIDTH // 2
-                    - BIG_WALL_WIDTH,
+                    BIG_OFFSET + BIG_WIDTH + BIG_GAP + BIG_WIDTH // 2 - BIG_WALL_WIDTH,
+                    BIG_OFFSET + BIG_WIDTH + BIG_GAP + BIG_WIDTH // 2 - BIG_WALL_WIDTH,
                 ),
                 stop=(
                     BIG_OFFSET
