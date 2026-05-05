@@ -1,3 +1,9 @@
+## 0.54.2 (2026-05-05)
+
+### Fix
+
+- update observation.py example for ForagaxSquareWaveTwoBiome-v11
+
 ## 0.54.1 (2026-03-01)
 
 ### Fix
