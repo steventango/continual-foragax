@@ -6,7 +6,6 @@ from foragax.registry import make
 def test_no_negative_regret():
     """Verify that biome_regret is never negative, even if all regions have negative means."""
     print("Running negative regret safety test...")
-    # Use a small environment
     env = make("ForagaxBig-v5")
     params = env.default_params
     key = jax.random.key(0)
