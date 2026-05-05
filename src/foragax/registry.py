@@ -1,7 +1,7 @@
 """Factory functions for creating Foragax environment variants."""
 
 import warnings
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, Union
 
 from foragax.env import (
     Biome,
@@ -168,7 +168,7 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
 def make(
     env_id: str,
     observation_type: str = "color",
-    aperture_size: Optional[Tuple[int, int]] = (5, 5),
+    aperture_size: Optional[Union[Tuple[int, int], int]] = (5, 5),
     reward_delay: int = 0,
     random_shift_max_steps: int = 0,
     **kwargs: Any,
