@@ -8,111 +8,80 @@ from foragax.env import (
     ForagaxEnv,
 )
 from foragax.objects import (
-    BROWN_MOREL,
-    BROWN_MOREL_2,
-    BROWN_MOREL_UNIFORM,
-    BROWN_MOREL_UNIFORM_RANDOM,
-    BROWN_MOREL_UNIFORM_RANDOM_EXPIRY,
-    BROWN_OYSTER,
-    BROWN_OYSTER_UNIFORM,
-    BROWN_OYSTER_UNIFORM_RANDOM,
-    BROWN_OYSTER_UNIFORM_RANDOM_EXPIRY,
-    GREEN_DEATHCAP,
-    GREEN_DEATHCAP_2,
-    GREEN_DEATHCAP_3,
-    GREEN_DEATHCAP_UNIFORM,
-    GREEN_DEATHCAP_UNIFORM_RANDOM,
-    GREEN_DEATHCAP_UNIFORM_RANDOM_EXPIRY,
-    GREEN_FAKE,
-    GREEN_FAKE_2,
-    GREEN_FAKE_UNIFORM,
-    GREEN_FAKE_UNIFORM_RANDOM,
-    GREEN_FAKE_UNIFORM_RANDOM_EXPIRY,
-    LARGE_MOREL,
-    LARGE_OYSTER,
-    MEDIUM_MOREL,
     WALL,
     create_fourier_objects,
     create_shift_square_wave_biome_objects,
-    create_sine_biome_objects,
-    create_square_wave_biome_objects,
-    create_weather_objects,
-    create_weather_wave_objects,
 )
 
-BIG_WIDTH = 15
-BIG_GAP = 9
-BIG_GAP_V3 = 5
-BIG_WIDTH_V2 = 9
-BIG_OFFSET = BIG_WIDTH // 2 + 1
-BIG_OFFSET_V2 = BIG_GAP // 2 + 1
-BIG_OFFSET_V3 = BIG_GAP_V3 // 2 + 1
+BIG_WIDTH = 9
+BIG_GAP = 5
+BIG_OFFSET = BIG_GAP // 2 + 1
 BIG_WALL_WIDTH = 1
 
 ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
     "ForagaxBig-v5": {
-        "size": (2 * (BIG_WIDTH_V2 + BIG_GAP_V3), 2 * (BIG_WIDTH_V2 + BIG_GAP_V3)),
+        "size": (2 * (BIG_WIDTH + BIG_GAP), 2 * (BIG_WIDTH + BIG_GAP)),
         "aperture_size": None,
         "objects": None,
         "biomes": (
             Biome(
-                start=(BIG_OFFSET_V3, BIG_OFFSET_V3),
-                stop=(BIG_OFFSET_V3 + BIG_WIDTH_V2, BIG_OFFSET_V3 + BIG_WIDTH_V2),
+                start=(BIG_OFFSET, BIG_OFFSET),
+                stop=(BIG_OFFSET + BIG_WIDTH, BIG_OFFSET + BIG_WIDTH),
                 object_frequencies=(0.2, 0.0),
             ),
             Biome(
-                start=(BIG_OFFSET_V3 + BIG_WIDTH_V2 + BIG_GAP_V3, BIG_OFFSET_V3),
+                start=(BIG_OFFSET + BIG_WIDTH + BIG_GAP, BIG_OFFSET),
                 stop=(
-                    BIG_OFFSET_V3 + 2 * BIG_WIDTH_V2 + BIG_GAP_V3,
-                    BIG_OFFSET_V3 + BIG_WIDTH_V2,
+                    BIG_OFFSET + 2 * BIG_WIDTH + BIG_GAP,
+                    BIG_OFFSET + BIG_WIDTH,
                 ),
                 object_frequencies=(0.2, 0.0),
             ),
             Biome(
-                start=(BIG_OFFSET_V3, BIG_OFFSET_V3 + BIG_WIDTH_V2 + BIG_GAP_V3),
+                start=(BIG_OFFSET, BIG_OFFSET + BIG_WIDTH + BIG_GAP),
                 stop=(
-                    BIG_OFFSET_V3 + BIG_WIDTH_V2,
-                    BIG_OFFSET_V3 + 2 * BIG_WIDTH_V2 + BIG_GAP_V3,
-                ),
-                object_frequencies=(0.2, 0.0),
-            ),
-            Biome(
-                start=(
-                    BIG_OFFSET_V3 + BIG_WIDTH_V2 + BIG_GAP_V3,
-                    BIG_OFFSET_V3 + BIG_WIDTH_V2 + BIG_GAP_V3,
-                ),
-                stop=(
-                    BIG_OFFSET_V3 + 2 * BIG_WIDTH_V2 + BIG_GAP_V3,
-                    BIG_OFFSET_V3 + 2 * BIG_WIDTH_V2 + BIG_GAP_V3,
+                    BIG_OFFSET + BIG_WIDTH,
+                    BIG_OFFSET + 2 * BIG_WIDTH + BIG_GAP,
                 ),
                 object_frequencies=(0.2, 0.0),
             ),
             Biome(
                 start=(
-                    BIG_OFFSET_V3 + BIG_WIDTH_V2 // 2 - BIG_WALL_WIDTH,
-                    BIG_OFFSET_V3 + BIG_WIDTH_V2 // 2 - BIG_WALL_WIDTH,
+                    BIG_OFFSET + BIG_WIDTH + BIG_GAP,
+                    BIG_OFFSET + BIG_WIDTH + BIG_GAP,
                 ),
                 stop=(
-                    BIG_OFFSET_V3 + BIG_WIDTH_V2 // 2 + 1 + BIG_WALL_WIDTH,
-                    BIG_OFFSET_V3 + BIG_WIDTH_V2 // 2 + 1 + BIG_WALL_WIDTH,
+                    BIG_OFFSET + 2 * BIG_WIDTH + BIG_GAP,
+                    BIG_OFFSET + 2 * BIG_WIDTH + BIG_GAP,
+                ),
+                object_frequencies=(0.2, 0.0),
+            ),
+            Biome(
+                start=(
+                    BIG_OFFSET + BIG_WIDTH // 2 - BIG_WALL_WIDTH,
+                    BIG_OFFSET + BIG_WIDTH // 2 - BIG_WALL_WIDTH,
+                ),
+                stop=(
+                    BIG_OFFSET + BIG_WIDTH // 2 + 1 + BIG_WALL_WIDTH,
+                    BIG_OFFSET + BIG_WIDTH // 2 + 1 + BIG_WALL_WIDTH,
                 ),
                 object_frequencies=(0.0, 0.6),
             ),
             Biome(
                 start=(
-                    BIG_OFFSET_V3 + BIG_WIDTH_V2 // 2 - BIG_WALL_WIDTH,
-                    BIG_OFFSET_V3
-                    + BIG_WIDTH_V2
-                    + BIG_GAP_V3
-                    + BIG_WIDTH_V2 // 2
+                    BIG_OFFSET + BIG_WIDTH // 2 - BIG_WALL_WIDTH,
+                    BIG_OFFSET
+                    + BIG_WIDTH
+                    + BIG_GAP
+                    + BIG_WIDTH // 2
                     - BIG_WALL_WIDTH,
                 ),
                 stop=(
-                    BIG_OFFSET_V3 + BIG_WIDTH_V2 // 2 + 1 + BIG_WALL_WIDTH,
-                    BIG_OFFSET_V3
-                    + BIG_WIDTH_V2
-                    + BIG_GAP_V3
-                    + BIG_WIDTH_V2 // 2
+                    BIG_OFFSET + BIG_WIDTH // 2 + 1 + BIG_WALL_WIDTH,
+                    BIG_OFFSET
+                    + BIG_WIDTH
+                    + BIG_GAP
+                    + BIG_WIDTH // 2
                     + 1
                     + BIG_WALL_WIDTH,
                 ),
@@ -120,48 +89,48 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
             ),
             Biome(
                 start=(
-                    BIG_OFFSET_V3
-                    + BIG_WIDTH_V2
-                    + BIG_GAP_V3
-                    + BIG_WIDTH_V2 // 2
+                    BIG_OFFSET
+                    + BIG_WIDTH
+                    + BIG_GAP
+                    + BIG_WIDTH // 2
                     - BIG_WALL_WIDTH,
-                    BIG_OFFSET_V3 + BIG_WIDTH_V2 // 2 - BIG_WALL_WIDTH,
+                    BIG_OFFSET + BIG_WIDTH // 2 - BIG_WALL_WIDTH,
                 ),
                 stop=(
-                    BIG_OFFSET_V3
-                    + BIG_WIDTH_V2
-                    + BIG_GAP_V3
-                    + BIG_WIDTH_V2 // 2
+                    BIG_OFFSET
+                    + BIG_WIDTH
+                    + BIG_GAP
+                    + BIG_WIDTH // 2
                     + 1
                     + BIG_WALL_WIDTH,
-                    BIG_OFFSET_V3 + BIG_WIDTH_V2 // 2 + 1 + BIG_WALL_WIDTH,
+                    BIG_OFFSET + BIG_WIDTH // 2 + 1 + BIG_WALL_WIDTH,
                 ),
                 object_frequencies=(0.0, 0.6),
             ),
             Biome(
                 start=(
-                    BIG_OFFSET_V3
-                    + BIG_WIDTH_V2
-                    + BIG_GAP_V3
-                    + BIG_WIDTH_V2 // 2
+                    BIG_OFFSET
+                    + BIG_WIDTH
+                    + BIG_GAP
+                    + BIG_WIDTH // 2
                     - BIG_WALL_WIDTH,
-                    BIG_OFFSET_V3
-                    + BIG_WIDTH_V2
-                    + BIG_GAP_V3
-                    + BIG_WIDTH_V2 // 2
+                    BIG_OFFSET
+                    + BIG_WIDTH
+                    + BIG_GAP
+                    + BIG_WIDTH // 2
                     - BIG_WALL_WIDTH,
                 ),
                 stop=(
-                    BIG_OFFSET_V3
-                    + BIG_WIDTH_V2
-                    + BIG_GAP_V3
-                    + BIG_WIDTH_V2 // 2
+                    BIG_OFFSET
+                    + BIG_WIDTH
+                    + BIG_GAP
+                    + BIG_WIDTH // 2
                     + 1
                     + BIG_WALL_WIDTH,
-                    BIG_OFFSET_V3
-                    + BIG_WIDTH_V2
-                    + BIG_GAP_V3
-                    + BIG_WIDTH_V2 // 2
+                    BIG_OFFSET
+                    + BIG_WIDTH
+                    + BIG_GAP
+                    + BIG_WIDTH // 2
                     + 1
                     + BIG_WALL_WIDTH,
                 ),
@@ -169,7 +138,7 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
             ),
             Biome(
                 start=(0, 0),
-                stop=(2 * (BIG_WIDTH_V2 + BIG_GAP_V3), 2 * (BIG_WIDTH_V2 + BIG_GAP_V3)),
+                stop=(2 * (BIG_WIDTH + BIG_GAP), 2 * (BIG_WIDTH + BIG_GAP)),
                 object_frequencies=(0.0, 0.1),
             ),
         ),
@@ -216,8 +185,6 @@ def make(
     env_id: str,
     observation_type: str = "color",
     aperture_size: Optional[Tuple[int, int]] = (5, 5),
-    file_index: int = 0,
-    repeat: int = 500,
     reward_delay: int = 0,
     random_shift_max_steps: int = 0,
     **kwargs: Any,
@@ -229,9 +196,7 @@ def make(
         observation_type: The type of observation to use. One of "object", "rgb", or "color".
         aperture_size: The size of the agent's observation aperture. If -1, full world observation.
             If None, the default for the environment is used.
-        file_index: File index for weather objects.
-        repeat: How many steps each temperature value repeats for (weather environments).
-        reward_delay: Number of steps required to digest food items (weather environments).
+        reward_delay: Number of steps required to digest food items.
         **kwargs: Additional keyword arguments to pass to the ForagaxEnv constructor.
 
     Returns:

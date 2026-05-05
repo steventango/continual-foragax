@@ -24,7 +24,6 @@ from foragax.objects import (
     NormalRegenForagaxObject,
     SineObject,
     WeatherObject,
-    create_weather_wave_objects,
     create_fourier_objects,
 )
 
