@@ -214,7 +214,7 @@ def make(
     config["aperture_size"] = aperture_size
     config["random_shift_max_steps"] = random_shift_max_steps
 
-    if env_id.startswith("ForagaxBig"):
+    if env_id == "ForagaxBig-v5":
         config["objects"] = (
             create_fourier_objects(
                 num_fourier_terms=10,
