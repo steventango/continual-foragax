@@ -281,8 +281,31 @@ def test_benchmark_small_env_world(benchmark):
     benchmark(benchmark_fn)
 
 
-def test_benchmark_diwali_v5(benchmark):
-    env = registry.make("ForagaxDiwali-v5")
+def _benchmark_registry_reset(benchmark, env_id):
+    env = registry.make(env_id)
+    params = env.default_params
+
+    @jax.jit
+    def _build(key):
+        _, state = env.reset(key, params)
+        return state
+
+    def benchmark_fn():
+        _build(jax.random.key(1)).pos.block_until_ready()
+
+    benchmark(benchmark_fn)
+
+
+def test_benchmark_reset_big_v5(benchmark):
+    _benchmark_registry_reset(benchmark, "ForagaxBig-v5")
+
+
+def test_benchmark_reset_square_wave_two_biome_v11(benchmark):
+    _benchmark_registry_reset(benchmark, "ForagaxSquareWaveTwoBiome-v11")
+
+
+def _benchmark_registry_step(benchmark, env_id):
+    env = registry.make(env_id)
     params = env.default_params
     key = jax.random.key(0)
     key, reset_key = jax.random.split(key)
@@ -309,36 +332,16 @@ def test_benchmark_diwali_v5(benchmark):
     benchmark(benchmark_fn)
 
 
-def test_benchmark_sine_two_biome_v1(benchmark):
-    env = registry.make("ForagaxSineTwoBiome-v1")
-    params = env.default_params
-    key = jax.random.key(0)
-    key, reset_key = jax.random.split(key)
-    _, state = env.reset(reset_key, params)
-
-    @jax.jit
-    def _run(state, key):
-        def f(carry, _):
-            state, key = carry
-            key, step_key = jax.random.split(key, 2)
-            _, new_state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
-            return (new_state, key), None
-
-        (final_state, _), _ = jax.lax.scan(f, (state, key), None, length=10)
-        return final_state
-
-    key, run_key = jax.random.split(key)
-    _run(state, run_key).pos.block_until_ready()
-
-    def benchmark_fn():
-        key, run_key = jax.random.split(jax.random.key(1))
-        _run(state, run_key).pos.block_until_ready()
-
-    benchmark(benchmark_fn)
+def test_benchmark_step_big_v5(benchmark):
+    _benchmark_registry_step(benchmark, "ForagaxBig-v5")
 
 
-def test_benchmark_render(benchmark):
-    env = registry.make("ForagaxDiwali-v5")
+def test_benchmark_step_square_wave_two_biome_v11(benchmark):
+    _benchmark_registry_step(benchmark, "ForagaxSquareWaveTwoBiome-v11")
+
+
+def _benchmark_registry_render(benchmark, env_id):
+    env = registry.make(env_id)
     params = env.default_params
     key = jax.random.key(0)
     key, reset_key = jax.random.split(key)
@@ -351,3 +354,11 @@ def test_benchmark_render(benchmark):
         env.render(state, params, render_mode="world_reward").block_until_ready()
 
     benchmark(benchmark_fn)
+
+
+def test_benchmark_render_big_v5(benchmark):
+    _benchmark_registry_render(benchmark, "ForagaxBig-v5")
+
+
+def test_benchmark_render_square_wave_two_biome_v11(benchmark):
+    _benchmark_registry_render(benchmark, "ForagaxSquareWaveTwoBiome-v11")

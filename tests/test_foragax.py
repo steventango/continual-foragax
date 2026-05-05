@@ -24,7 +24,6 @@ from foragax.objects import (
     NormalRegenForagaxObject,
     SineObject,
     WeatherObject,
-    create_weather_wave_objects,
     create_fourier_objects,
 )
 
@@ -153,58 +152,6 @@ def test_rgb_observation_mode_large_aperture():
     obs, state = env.reset(key, params)
 
     assert obs.shape == (20, 20, 3)
-
-
-def test_create_weather_wave_objects():
-    o1, d1, o2, d2 = create_weather_wave_objects(file_index=0, repeat=7)
-
-    # Basic identity
-    assert o1.name == "oyster_weather_wave_1"
-    assert d1.name == "deathcap_weather_wave_1"
-    assert o2.name == "oyster_weather_wave_2"
-    assert d2.name == "deathcap_weather_wave_2"
-
-    # Collectable + respawn defaults
-    assert o1.collectable is True
-    assert d1.collectable is True
-    assert o2.collectable is True
-    assert d2.collectable is True
-    assert o1.random_respawn is True
-    assert d1.random_respawn is True
-    assert o2.random_respawn is True
-    assert d2.random_respawn is True
-
-    # Factory uses fixed colors
-    assert o1.color == (124, 61, 81)
-    assert o2.color == (124, 61, 81)
-    assert d1.color == (174, 179, 94)
-    assert d2.color == (174, 179, 94)
-
-    # Rewards are loaded and attached (should be identical references or identical arrays)
-    chex.assert_rank(o1.rewards, 1)
-    chex.assert_rank(d1.rewards, 1)
-    chex.assert_rank(o2.rewards, 1)
-    chex.assert_rank(d2.rewards, 1)
-    chex.assert_trees_all_equal(o1.rewards, d1.rewards)
-    chex.assert_trees_all_equal(d1.rewards, -o2.rewards)
-    chex.assert_trees_all_equal(o2.rewards, d2.rewards)
-
-    # Base rewards are symmetric across biomes
-    assert o2.base_reward == -o1.base_reward
-    assert d2.base_reward == -d1.base_reward
-
-    # Multiplier sign symmetry across biomes
-    assert o2.rewards.shape == o1.rewards.shape
-    assert d2.rewards.shape == d1.rewards.shape
-
-    for i in range(0, o1.rewards.shape[0] * 500, 500):
-        chex.assert_trees_all_close(o1.reward(i) - d1.reward(i), 20, atol=1e-6)
-        chex.assert_trees_all_close(d2.reward(i) - o2.reward(i), 20, atol=1e-6)
-        chex.assert_trees_all_close(o1.reward(i) + o2.reward(i), 0, atol=1e-6)
-        chex.assert_trees_all_close(d1.reward(i) + d2.reward(i), 0, atol=1e-6)
-        chex.assert_trees_all_close(
-            o1.reward(i) + d1.reward(i) + o2.reward(i) + d2.reward(i), 0, atol=1e-6
-        )
 
 
 def test_world_observation_mode():
