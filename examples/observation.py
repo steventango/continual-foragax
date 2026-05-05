@@ -34,7 +34,7 @@ def main():
 
         for aperture_size in aperture_sizes:
             env = make(
-                "ForagaxTwoBiome-v10",
+                "ForagaxSquareWaveTwoBiome-v11",
                 aperture_size=aperture_size,
                 observation_type="world",
             )

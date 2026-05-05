@@ -6,7 +6,7 @@ from foragax.env import Actions
 
 def test_benchmark_diwali_v5_vmap(benchmark):
     num_envs = 128
-    env = registry.make("ForagaxDiwali-v5")
+    env = registry.make("ForagaxBig-v5")
     params = env.default_params
     key = jax.random.key(0)
     key, reset_key = jax.random.split(key)
@@ -39,7 +39,7 @@ def test_benchmark_diwali_v5_vmap(benchmark):
 
 def test_benchmark_sine_two_biome_v1_vmap(benchmark):
     num_envs = 128
-    env = registry.make("ForagaxSineTwoBiome-v1")
+    env = registry.make("ForagaxSquareWaveTwoBiome-v11")
     params = env.default_params
     key = jax.random.key(0)
     key, reset_key = jax.random.split(key)
