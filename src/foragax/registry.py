@@ -8,6 +8,9 @@ from foragax.env import (
     ForagaxEnv,
 )
 from foragax.objects import (
+    LARGE_MOREL,
+    LARGE_DEATHCAP,
+    LARGE_OYSTER,
     WALL,
     create_fourier_objects,
     create_shift_square_wave_biome_objects,
@@ -19,6 +22,21 @@ BIG_OFFSET = BIG_GAP // 2 + 1
 BIG_WALL_WIDTH = 1
 
 ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
+    "ForagaxTwoBiomeLarge-v1": {
+        "size": (15, 15), 
+        "aperture_size": None, 
+        "objects": (LARGE_DEATHCAP, LARGE_MOREL, LARGE_OYSTER), 
+        "biomes": ( 
+            # Morel biome
+            Biome(start=(3, 0), stop=(5, 15), object_frequencies=(0.0, 0.5, 0.0)),
+            # Oyster biome
+            Biome(
+                start=(10, 0), stop=(12, 15), object_frequencies=(0.25, 0.0, 0.5)
+            ),
+        ),
+        "nowrap": False,
+    },
+
     "ForagaxBig-v5": {
         "size": (2 * (BIG_WIDTH + BIG_GAP), 2 * (BIG_WIDTH + BIG_GAP)),
         "aperture_size": None,

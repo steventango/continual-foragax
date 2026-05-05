@@ -8,10 +8,12 @@ from tqdm import tqdm
 from foragax.registry import make
 
 
+    
 def main():
     """Generate a visualization of a Foragax environment under random behavior."""
-    video_length = 1000
-    video_every = 100_000
+    video_length = 500
+    video_every = 1000
+    env_title = "ForagaxTwoBiomeLarge-v1"
     for seed in range(1):
         key = jax.random.key(seed)
         aperture_sizes = [9]
@@ -22,7 +24,7 @@ def main():
 
         for aperture_size in aperture_sizes:
             env = make(
-                "ForagaxBig-v5",
+                env_title,
                 aperture_size=aperture_size,
                 observation_type="color",
             )
@@ -31,7 +33,7 @@ def main():
             frames = defaultdict(list)
             key, key_reset = jax.random.split(key)
             _, env_state = env.reset_env(key_reset, env_params)
-            for frame in tqdm(range(1_000_000), desc=f"Aperture {aperture_size}"):
+            for frame in tqdm(range(2000), desc=f"Aperture {aperture_size}"):
                 if frame % video_every < video_length:
                     for render_mode in render_modes:
                         frames[render_mode].append(
@@ -42,7 +44,7 @@ def main():
                         save_video(
                             frames[render_mode],
                             video_folder,
-                            name_prefix=f"foragax_{seed}_{render_mode}_aperture-{aperture_size}_{frame - video_length + 1}_{frame}",
+                            name_prefix=f"foragax_{env_title}_{seed}_{render_mode}_aperture-{aperture_size}_{frame - video_length + 1}_{frame}",
                             fps=8,
                         )
                         frames[render_mode] = []
