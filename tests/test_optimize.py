@@ -4,7 +4,7 @@ from foragax import registry
 from foragax.env import Actions
 
 
-def test_benchmark_diwali_v5_vmap(benchmark):
+def test_benchmark_big_v5_vmap(benchmark):
     num_envs = 128
     env = registry.make("ForagaxBig-v5")
     params = env.default_params
@@ -37,7 +37,7 @@ def test_benchmark_diwali_v5_vmap(benchmark):
     benchmark(benchmark_fn)
 
 
-def test_benchmark_sine_two_biome_v1_vmap(benchmark):
+def test_benchmark_square_wave_two_biome_v11_vmap(benchmark):
     num_envs = 128
     env = registry.make("ForagaxSquareWaveTwoBiome-v11")
     params = env.default_params
