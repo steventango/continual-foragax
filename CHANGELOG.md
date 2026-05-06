@@ -1,3 +1,9 @@
+## 0.55.0 (2026-05-06)
+
+### Feat
+
+- add ForagaxTwoBiomeLarge-v1 env with LARGE_OYSTER and LARGE_DEATHCAP objects
+
 ## 0.54.2 (2026-05-05)
 
 ### Fix
