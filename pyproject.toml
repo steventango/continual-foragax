@@ -18,6 +18,7 @@ find-links = ["https://storage.googleapis.com/jax-releases/jax_releases.html"]
 
 [dependency-groups]
 dev = [
+    "moviepy>=1.0.3",
     "pre-commit",
     "pytest",
     "pytest-benchmark",

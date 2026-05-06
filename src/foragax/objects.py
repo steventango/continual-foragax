@@ -429,19 +429,19 @@ THORNS = DefaultForagaxObject(
     collectable=True,
     color=(255, 0, 0),
 )
-
-MOREL = DefaultForagaxObject(
-    name="morel",
-    reward=10.0,
-    collectable=True,
-    regen_delay=(100, 100),
-    color=(63, 30, 25),
-)
 OYSTER = DefaultForagaxObject(
     name="oyster",
     reward=1.0,
     collectable=True,
     regen_delay=(10, 10),
+    color=(124, 61, 81),
+)
+LARGE_OYSTER = NormalRegenForagaxObject(
+    name="large_oyster",
+    reward=1.0,
+    collectable=True,
+    mean_regen_delay=10,
+    std_regen_delay=1,
     color=(124, 61, 81),
 )
 LARGE_MOREL = NormalRegenForagaxObject(
@@ -459,6 +459,21 @@ MEDIUM_MOREL = NormalRegenForagaxObject(
     mean_regen_delay=100,
     std_regen_delay=10,
     color=(63, 30, 25),
+)
+MOREL = DefaultForagaxObject(
+    name="morel",
+    reward=10.0,
+    collectable=True,
+    regen_delay=(100, 100),
+    color=(63, 30, 25),
+)
+LARGE_DEATHCAP = NormalRegenForagaxObject(
+    name="large_deathcap",
+    reward=-1.0,
+    collectable=True,
+    mean_regen_delay=10,
+    std_regen_delay=1,
+    color=(193, 178, 30),
 )
 DEATHCAP = DefaultForagaxObject(
     name="deathcap",
