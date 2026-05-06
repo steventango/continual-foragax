@@ -268,13 +268,13 @@ source = { editable = "." }
 dependencies = [
     { name = "gymnax", version = "0.0.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "gymnax", version = "0.0.9", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
-    { name = "moviepy", version = "1.0.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
-    { name = "moviepy", version = "2.2.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
     { name = "six", marker = "python_full_version < '3.10'" },
 ]
 
 [package.dev-dependencies]
 dev = [
+    { name = "moviepy", version = "1.0.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
+    { name = "moviepy", version = "2.2.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
     { name = "pre-commit", version = "2.3.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "pre-commit", version = "3.3.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "pytest" },
@@ -286,12 +286,12 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "gymnax" },
-    { name = "moviepy", specifier = ">=1.0.3" },
     { name = "six", marker = "python_full_version < '3.10'" },
 ]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "moviepy", specifier = ">=1.0.3" },
     { name = "pre-commit" },
     { name = "pytest" },
     { name = "pytest-benchmark" },

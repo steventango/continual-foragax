@@ -8,7 +8,6 @@ from tqdm import tqdm
 from foragax.registry import make
 
 
-    
 def main():
     """Generate a visualization of a Foragax environment under random behavior."""
     video_length = 500
