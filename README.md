@@ -10,7 +10,7 @@ Key ideas:
 
 - Functional, JAX-friendly API (explicit PRNG keys, immutable env state objects).
 - Multiple observation modalities: object, RGB, and color, as well as aperture-based or
-	full-world observations.
+  full-world observations.
 - Customizable biomes.
 - Customizable object placement, respawning, and rewards.
 - Visualization via RGB rendering.
@@ -63,23 +63,23 @@ short videos under `videos/` using Gymnasium helpers.
 Use `foragax.registry.make` to construct environments by id. The registered ids are:
 
 - `ForagaxBig-v5` — large multi-biome layout with Fourier-modulated rewards (used by
-	`examples/visualize.py`).
+  `examples/visualize.py`).
 - `ForagaxSquareWaveTwoBiome-v11` — two-biome layout with square-wave reward shifts (used
-	by `examples/observation.py`).
+  by `examples/observation.py`).
 - `ForagaxTwoBiomeLarge-v1` — 15×15 two-biome layout with a Morel biome and an Oyster
-	biome (containing Deathcaps), built from `LARGE_MOREL`, `LARGE_OYSTER`, and
-	`LARGE_DEATHCAP` in `foragax.objects`.
+  biome (containing Deathcaps), built from `LARGE_MOREL`, `LARGE_OYSTER`, and
+  `LARGE_DEATHCAP` in `foragax.objects`.
 
 The `make` factory accepts the following kwargs:
 
 - `observation_type`: one of `"object"`, `"rgb"`, or `"color"` (default `"color"`).
 - `aperture_size`: `int`, `(int, int)`, or `-1` for full-world observation. Defaults to
-	`(5, 5)`; pass `None` to use the environment's own default.
+  `(5, 5)`; pass `None` to use the environment's own default.
 - `reward_delay`: steps required to digest food items (default `0`).
 - `random_shift_max_steps`: random initial offset on the underlying time signal
-	(default `0`).
+  (default `0`).
 - Additional `**kwargs` are forwarded to the `ForagaxEnv` constructor and override config
-	defaults.
+  defaults.
 
 ## Custom objects and extensions
 
@@ -89,7 +89,7 @@ this module:
 
 - `create_fourier_objects` — Fourier-modulated reward objects (used by `ForagaxBig-v5`).
 - `create_shift_square_wave_biome_objects` — square-wave biome objects (used by
-	`ForagaxSquareWaveTwoBiome-v11`).
+  `ForagaxSquareWaveTwoBiome-v11`).
 
 Weather-driven environments are also supported even though no weather preset is currently
 registered: compose `WeatherObject` or `WeatherWaveObject` from `foragax.objects` with
@@ -102,19 +102,26 @@ new entry in `foragax.registry.ENV_CONFIGS` or construct `ForagaxEnv` directly.
 ## Design notes
 
 - JAX-first: RNG keys and immutable env state are passed explicitly so environments can be
-	stepped inside JIT/pmapped loops if desired.
+  stepped inside JIT/pmapped loops if desired.
 - Small, composable environment variants are provided through the registry (easy to add more).
 
 ## Examples
 
 - `examples/observation.py` — runs a random policy in `ForagaxSquareWaveTwoBiome-v11` and
-	saves a video of the color observations to `plots/`.
+  saves a video of the color observations to `videos/`.
 - `examples/visualize.py` — runs a random policy in `ForagaxBig-v5` and saves periodic
-	`world_reward` render videos to `videos/`.
+  `world_reward` render videos to `videos/`.
 
 ## Development
 
-Run `uv run pytest` from the repo root. The project uses `uv` for package management; `ruff` for formatting and linting.
+Sync dev dependencies and run the test suite:
+
+```bash
+uv sync --dev
+uv run pytest tests
+```
+
+The project uses `uv` for package management and `ruff` for formatting and linting.
 
 ## Citation
 
