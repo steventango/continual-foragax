@@ -1,20 +1,19 @@
 # foragax
 
 Foragax is a lightweight, JAX-first grid-world environment suite for continual / procedural
-experiments. It provides a small collection of environment variants (weather, multi-biome,
-etc.), a registry factory for easy construction, and simple example scripts for plotting and
-visualization.
+experiments. It provides a small collection of environment variants, a registry factory for
+easy construction, and example scripts for visualization.
 
-This version is a [Gymnax](https://github.com/RobertTLange/gymnax) environment implemented in JAX. The original implementation of Forager is implemented in Numba is available at [andnp/forager](https://github.com/andnp/forager). In addition to the original features, this implementation includes: biomes, visualization, and a weather environment.
+This version is a [Gymnax](https://github.com/RobertTLange/gymnax) environment implemented in JAX. The original implementation of Forager (in Numba) is available at [andnp/forager](https://github.com/andnp/forager). In addition to the original features, this implementation includes biomes and visualization.
 
 Key ideas:
 
 - Functional, JAX-friendly API (explicit PRNG keys, immutable env state objects).
-- Multiple observation modalities: Object and RGB, as well as aperture based or
+- Multiple observation modalities: object, RGB, and color, as well as aperture-based or
 	full-world observations.
-- Customizable biomes
+- Customizable biomes.
 - Customizable object placement, respawning, and rewards.
-- Visualization via RGB rendering and plotting.
+- Visualization via RGB rendering.
 
 ## Quickstart
 
@@ -24,12 +23,12 @@ We recommend installing with pip from https://pypi.org/project/continual-foragax
 pip install continual-foragax
 ```
 
-We support Python 3.8 through Python 3.13.
+Requires Python 3.8 or newer.
 
 The codebase expects JAX and other numeric dependencies. If you don't have JAX installed, see
 the JAX install instructions for your platform; the project `uv.lock` pins compatible versions.
 
-## Minimal example (from examples)
+## Minimal example
 
 Use the registry factory to create an environment and run it with JAX-style RNG keys and an
 explicit environment state.
@@ -38,55 +37,64 @@ explicit environment state.
 from foragax.registry import make
 import jax
 
-# create env (observation_type is one of: 'object', 'rgb', 'world')
 env = make(
-		"ForagaxWeather-v1",
-		aperture_size=5,
-		observation_type="object",
+    "ForagaxSquareWaveTwoBiome-v11",
+    aperture_size=9,
+    observation_type="color",
 )
 
-# environment parameters and RNG
 env_params = env.default_params
 key = jax.random.key(0)
 key, key_reset = jax.random.split(key)
+obs, env_state = env.reset(key_reset, env_params)
 
-# reset returns (obs, env_state)
-_, env_state = env.reset(key_reset, env_params)
-
-# sampling an action and stepping (functional-style)
 key, key_act, key_step = jax.random.split(key, 3)
 action = env.action_space(env_params).sample(key_act)
-_, next_env_state, reward, done, info = env.step(key_step, env_state, action, env_params)
+obs, env_state, reward, done, info = env.step(key_step, env_state, action, env_params)
 
-# rendering supports multiple modes: 'world' and 'aperture'
-frame = env.render(env_state, env_params, render_mode="aperture")
+frame = env.render(env_state, env_params, render_mode="world")
 ```
 
-See `examples/plot.py` and `examples/visualize.py` for runnable scripts that produce a sample
-plot and saved videos using Gym/Gymnasium helpers.
+See `examples/observation.py` and `examples/visualize.py` for runnable scripts that save
+short videos under `videos/` using Gymnasium helpers.
 
 ## Registry and included environments
 
-Use `foragax.registry.make` to construct environments by id. Example environment ids include:
+Use `foragax.registry.make` to construct environments by id. The registered ids are:
 
-- `ForagaxTwoBiomeSmall-v1` / `-v2` — hand-crafted small multi-biome layouts
-- `ForagaxWeather-v1` — small weather-driven two-biome environment used by examples
+- `ForagaxBig-v5` — large multi-biome layout with Fourier-modulated rewards (used by
+	`examples/visualize.py`).
+- `ForagaxSquareWaveTwoBiome-v11` — two-biome layout with square-wave reward shifts (used
+	by `examples/observation.py`).
 
-The `make` factory accepts the following notable kwargs:
+The `make` factory accepts the following kwargs:
 
-- `observation_type`: one of `"object"`, `"rgb"`, or `"world"`.
-- `aperture_size`: integer or tuple controlling the agent's local observation aperture.
-- `file_index`: used to pick weather locations.
+- `observation_type`: one of `"object"`, `"rgb"`, or `"color"` (default `"color"`).
+- `aperture_size`: `int`, `(int, int)`, or `-1` for full-world observation. Defaults to
+	`(5, 5)`; pass `None` to use the environment's own default.
+- `reward_delay`: steps required to digest food items (default `0`).
+- `random_shift_max_steps`: random initial offset on the underlying time signal
+	(default `0`).
+- Additional `**kwargs` are forwarded to the `ForagaxEnv` constructor and override config
+	defaults.
 
 ## Custom objects and extensions
 
-The codebase includes an object system for placing items into biomes and controlling
-behaviour (rewards, respawn / regen behavior, blocking/collectable flags). See
-`foragax.objects` for the canonical object definitions and helpers like
-`create_weather_objects` used by the registry.
+Object classes in `foragax.objects` define rewards, respawn / regen behavior, and
+blocking/collectable flags. The registry presets above are built using two helpers from
+this module:
 
-If you want to add new object classes, follow the examples in `foragax.objects` and add the
-class into registry configs or construct environments programmatically.
+- `create_fourier_objects` — Fourier-modulated reward objects (used by `ForagaxBig-v5`).
+- `create_shift_square_wave_biome_objects` — square-wave biome objects (used by
+	`ForagaxSquareWaveTwoBiome-v11`).
+
+Weather-driven environments are also supported even though no weather preset is currently
+registered: compose `WeatherObject` or `WeatherWaveObject` from `foragax.objects` with
+`foragax.weather.get_temperature` (which reads ECA&D temperature data shipped under
+`foragax/data/`) to build one programmatically.
+
+To add new object classes, follow the patterns in `foragax.objects` and either register a
+new entry in `foragax.registry.ENV_CONFIGS` or construct `ForagaxEnv` directly.
 
 ## Design notes
 
@@ -96,14 +104,14 @@ class into registry configs or construct environments programmatically.
 
 ## Examples
 
-- `examples/plot.py` — runs a short random policy in `ForagaxWeather-v1` and produces a
-	temperature vs reward plot (saves to `plots/sample_plot.png`).
-- `examples/visualize.py` — runs environments at multiple aperture sizes and saves short
-	videos under `videos/` using `save_video`.
+- `examples/observation.py` — runs a random policy in `ForagaxSquareWaveTwoBiome-v11` and
+	saves a video of the color observations to `plots/`.
+- `examples/visualize.py` — runs a random policy in `ForagaxBig-v5` and saves periodic
+	`world_reward` render videos to `videos/`.
 
 ## Development
 
-Run unit tests via pytest.
+Run `uv run pytest` from the repo root. The project uses `uv` for package management; `ruff` for formatting and linting.
 
 ## Citation
 
