@@ -14,3 +14,9 @@ def test_make_square_wave_two_biome_v11():
     assert env.name == "ForagaxSquareWaveTwoBiome-v11"
     assert env.size == (24, 15)
     assert env.deterministic_spawn
+
+
+def test_make_two_biome_large_v1():
+    env = make("ForagaxTwoBiomeLarge-v1")
+    assert env.name == "ForagaxTwoBiomeLarge-v1"
+    assert env.size == (15, 15)
