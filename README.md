@@ -105,6 +105,22 @@ class into registry configs or construct environments programmatically.
 
 Run unit tests via pytest.
 
+## Citation
+
+If you use Foragax in your research, please cite:
+
+```bibtex
+@misc{tang2026forager,
+    title={Forager: a lightweight testbed for continual learning with partial observability in RL},
+    author={Steven Tang and Xinze Xiong and Anna Hakhverdyan and Andrew Patterson and Jacob Adkins and Jiamin He and Esraa Elelimy and Parham Mohammad Panahi and Martha White and Adam White},
+    year={2026},
+    eprint={2605.01131},
+    archivePrefix={arXiv},
+    primaryClass={cs.LG},
+    url={https://arxiv.org/abs/2605.01131},
+}
+```
+
 ## Acknowledgments
 
 We acknowledge the data providers in the ECA&D project. Klein Tank, A.M.G. and
