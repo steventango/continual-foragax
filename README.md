@@ -66,6 +66,9 @@ Use `foragax.registry.make` to construct environments by id. The registered ids 
 	`examples/visualize.py`).
 - `ForagaxSquareWaveTwoBiome-v11` — two-biome layout with square-wave reward shifts (used
 	by `examples/observation.py`).
+- `ForagaxTwoBiomeLarge-v1` — 15×15 two-biome layout with a Morel biome and an Oyster
+	biome (containing Deathcaps), built from `LARGE_MOREL`, `LARGE_OYSTER`, and
+	`LARGE_DEATHCAP` in `foragax.objects`.
 
 The `make` factory accepts the following kwargs:
 
