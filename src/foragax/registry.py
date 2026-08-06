@@ -186,7 +186,7 @@ def make(
     aperture_size: Optional[Union[Tuple[int, int], int]] = (5, 5),
     reward_delay: int = 0,
     random_shift_max_steps: int = 0,
-    period: int | None = None, 
+    period: Optional[int] = None,
     **kwargs: Any,
 ) -> ForagaxEnv:
     """Create a Foragax environment.
@@ -197,7 +197,7 @@ def make(
         aperture_size: The size of the agent's observation aperture. If -1, full world observation.
             If None, the default for the environment is used.
         reward_delay: Number of steps required to digest food items.
-        period: The periodic cycle when the task switches in 'ForagaxSquareWaveTwoBiome-v11'. 
+        period: The periodic cycle when the task switches in 'ForagaxSquareWaveTwoBiome-v11'.
         **kwargs: Additional keyword arguments to pass to the ForagaxEnv constructor.
     Returns:
         A Foragax environment instance.
