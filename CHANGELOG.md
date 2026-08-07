@@ -1,3 +1,9 @@
+## 0.56.0 (2026-08-07)
+
+### Feat
+
+- added 'period' argument for ForagaxSquareWaveBiome-v11 to control task-switch periodicity
+
 ## 0.55.0 (2026-05-06)
 
 ### Feat
