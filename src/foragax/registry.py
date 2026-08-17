@@ -179,6 +179,11 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
     },
 }
 
+ENV_ALIASES: Dict[str, str] = {
+    "ForagaxNeverEndingRelearning-v1": "ForagaxSquareWaveTwoBiome-v11",
+    "ForagaxUnendingTasks-v1": "ForagaxBig-v5",
+}
+
 
 def make(
     env_id: str,
@@ -202,10 +207,11 @@ def make(
     Returns:
         A Foragax environment instance.
     """
-    if env_id not in ENV_CONFIGS:
+    resolved_env_id = ENV_ALIASES.get(env_id, env_id)
+    if resolved_env_id not in ENV_CONFIGS:
         raise ValueError(f"Unknown env_id: {env_id}")
 
-    config = ENV_CONFIGS[env_id].copy()
+    config = ENV_CONFIGS[resolved_env_id].copy()
     if isinstance(aperture_size, int):
         if aperture_size == -1:
             aperture_size = -1  # keep as -1
@@ -214,7 +220,7 @@ def make(
     config["aperture_size"] = aperture_size
     config["random_shift_max_steps"] = random_shift_max_steps
 
-    if env_id == "ForagaxBig-v5":
+    if resolved_env_id == "ForagaxBig-v5":
         config["objects"] = (
             create_fourier_objects(
                 num_fourier_terms=10,
@@ -225,7 +231,7 @@ def make(
             WALL,
         )
 
-    if env_id == "ForagaxSquareWaveTwoBiome-v11":
+    if resolved_env_id == "ForagaxSquareWaveTwoBiome-v11":
         biome1_oyster, biome1_chanterelle, biome2_oyster, biome2_chanterelle = (
             create_shift_square_wave_biome_objects(
                 period=500000 if period is None else period,
