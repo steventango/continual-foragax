@@ -1,3 +1,9 @@
+## 0.57.0 (2026-08-18)
+
+### Feat
+
+- add registry aliases for NeverEndingRelearning and UnendingTasks
+
 ## 0.56.0 (2026-08-07)
 
 ### Feat
