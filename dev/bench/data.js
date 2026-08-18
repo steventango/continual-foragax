@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786075809404,
+  "lastUpdate": 1787023411881,
   "repoUrl": "https://github.com/steventango/continual-foragax",
   "entries": {
     "Python Benchmark with pytest-benchmark": [
@@ -2516,6 +2516,142 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.009672709120896556",
             "extra": "mean: 5.889803349199974 sec\nrounds: 5"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "18170455+steventango@users.noreply.github.com",
+            "name": "Steven Tang",
+            "username": "steventango"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a91abb3559d2e0daa1f0ea79969474a85150901e",
+          "message": "Merge pull request #101 from steventango/add-registry-aliases\n\nfeat: add registry aliases for NeverEndingRelearning and UnendingTasks",
+          "timestamp": "2026-08-17T21:13:38-06:00",
+          "tree_id": "71a046cc4add6a2d9215f4cf3c82384a6671e1a4",
+          "url": "https://github.com/steventango/continual-foragax/commit/a91abb3559d2e0daa1f0ea79969474a85150901e"
+        },
+        "date": 1787023410897,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_vision",
+            "value": 4910.241635102036,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0021310141768903857",
+            "extra": "mean: 203.6559652892153 usec\nrounds: 1815"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_reset",
+            "value": 89.64434127535763,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0021416422783659484",
+            "extra": "mean: 11.155193800000518 msec\nrounds: 5"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_tiny_env",
+            "value": 1982.532170291,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00006807188789195438",
+            "extra": "mean: 504.4054341136961 usec\nrounds: 1495"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_small_env",
+            "value": 73.36291240766249,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0008519274713085464",
+            "extra": "mean: 13.630865612902706 msec\nrounds: 62"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_big_env",
+            "value": 0.46802890900072414,
+            "unit": "iter/sec",
+            "range": "stddev: 0.014114672432645107",
+            "extra": "mean: 2.136620154799995 sec\nrounds: 5"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_vmap_env",
+            "value": 0.7543114612410632,
+            "unit": "iter/sec",
+            "range": "stddev: 0.009264948329678953",
+            "extra": "mean: 1.3257123235999984 sec\nrounds: 5"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_small_env_color",
+            "value": 74.22665505823105,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0010909734484796606",
+            "extra": "mean: 13.47224927777625 msec\nrounds: 54"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_small_env_world",
+            "value": 73.49692381615071,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000725436493501021",
+            "extra": "mean: 13.606011627118646 msec\nrounds: 59"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_reset_big_v5",
+            "value": 528.6932394942355,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00008236999750710447",
+            "extra": "mean: 1.8914559999984704 msec\nrounds: 5"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_reset_square_wave_two_biome_v11",
+            "value": 2318.9115585525783,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00006388054106584232",
+            "extra": "mean: 431.236800002921 usec\nrounds: 5"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_step_big_v5",
+            "value": 739.7555030518294,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00006816663823550722",
+            "extra": "mean: 1.3517979871383765 msec\nrounds: 622"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_step_square_wave_two_biome_v11",
+            "value": 957.7588368068269,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00011062775057287452",
+            "extra": "mean: 1.0441041748400937 msec\nrounds: 938"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_render_big_v5",
+            "value": 1802.6729522491466,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00005770227422358453",
+            "extra": "mean: 554.7317935581864 usec\nrounds: 1366"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_render_square_wave_two_biome_v11",
+            "value": 2413.6567361963166,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000025571011644867595",
+            "extra": "mean: 414.30912068130317 usec\nrounds: 1997"
+          },
+          {
+            "name": "tests/test_optimize.py::test_benchmark_big_v5_vmap",
+            "value": 0.019562166295349664,
+            "unit": "iter/sec",
+            "range": "stddev: 0.1937275085435306",
+            "extra": "mean: 51.11908287160001 sec\nrounds: 5"
+          },
+          {
+            "name": "tests/test_optimize.py::test_benchmark_square_wave_two_biome_v11_vmap",
+            "value": 0.1777072521479056,
+            "unit": "iter/sec",
+            "range": "stddev: 0.008901094392016765",
+            "extra": "mean: 5.62723236060001 sec\nrounds: 5"
           }
         ]
       }
