@@ -1776,10 +1776,8 @@ class ForagaxEnv(environment.Environment):
         return 4
 
     def action_space(self, params: EnvParams) -> spaces.Discrete:
-        action_space = spaces.Discrete(self.num_actions)
-        # NOTE: workaround for https://github.com/RobertTLange/gymnax/issues/58
-        action_space.dtype = int
-        return action_space
+        """Action space of the environment."""
+        return spaces.Discrete(self.num_actions)
 
     def state_space(self, params: EnvParams) -> spaces.Dict:
         """State space of the environment."""
