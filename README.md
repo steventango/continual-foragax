@@ -58,6 +58,32 @@ frame = env.render(env_state, env_params, render_mode="world")
 See `examples/observation.py` and `examples/visualize.py` for runnable scripts that save
 short videos under `videos/` using Gymnasium helpers.
 
+## Gymnasium example
+
+Foragax environments follow the Gymnax API, but can be used with the Gymnasium
+interface with `GymnaxToGymWrapper`. The wrappers step the environment eagerly
+from Python, so they give up the throughput advantages of JAX. Prefer the Gymnax
+API for performance, and use the wrappers for compatibility with existing
+Gymnasium-based code.
+
+```python
+from gymnax.wrappers.gym import GymnaxToGymWrapper
+from foragax.registry import make
+
+env = GymnaxToGymWrapper(
+    make("ForagaxNeverEndingRelearning-v1", aperture_size=9, observation_type="color"),
+    seed=0,
+)
+
+obs, info = env.reset(seed=0)
+for _ in range(100):
+    action = env.action_space.sample()
+    obs, reward, terminated, truncated, info = env.step(action)
+    if terminated or truncated:
+        obs, info = env.reset()
+```
+
+
 ## Registry and included environments
 
 Use `foragax.registry.make` to construct environments by id. The registered ids are:
