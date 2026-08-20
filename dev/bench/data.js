@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1787023411881,
+  "lastUpdate": 1787251569282,
   "repoUrl": "https://github.com/steventango/continual-foragax",
   "entries": {
     "Python Benchmark with pytest-benchmark": [
@@ -2652,6 +2652,142 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.008901094392016765",
             "extra": "mean: 5.62723236060001 sec\nrounds: 5"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "18170455+steventango@users.noreply.github.com",
+            "name": "Steven Tang",
+            "username": "steventango"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "07d71b47252d80eb91fdacdf48b50f947200df88",
+          "message": "Merge pull request #102 from steventango/fix/wall-reward-color-render\n\nfix: exclude walls from reward-to-color render overlay",
+          "timestamp": "2026-08-20T12:36:17-06:00",
+          "tree_id": "6ac401dc868e3d6fe897eb81ad4bfa576073576a",
+          "url": "https://github.com/steventango/continual-foragax/commit/07d71b47252d80eb91fdacdf48b50f947200df88"
+        },
+        "date": 1787251568141,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_vision",
+            "value": 4896.186701234119,
+            "unit": "iter/sec",
+            "range": "stddev: 0.002278688718642588",
+            "extra": "mean: 204.24057762093565 usec\nrounds: 1984"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_reset",
+            "value": 94.33553417507098,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0005409195819985204",
+            "extra": "mean: 10.600459399998385 msec\nrounds: 5"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_tiny_env",
+            "value": 2025.2727144593334,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000027450927037381603",
+            "extra": "mean: 493.76066386543897 usec\nrounds: 1428"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_small_env",
+            "value": 72.44244401980336,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0008242404587383715",
+            "extra": "mean: 13.80406215624963 msec\nrounds: 64"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_big_env",
+            "value": 0.4433816531436338,
+            "unit": "iter/sec",
+            "range": "stddev: 0.03636662605390287",
+            "extra": "mean: 2.2553932777999934 sec\nrounds: 5"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_vmap_env",
+            "value": 0.7480250271837869,
+            "unit": "iter/sec",
+            "range": "stddev: 0.011468311591689232",
+            "extra": "mean: 1.3368536661999997 sec\nrounds: 5"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_small_env_color",
+            "value": 71.12859158657818,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0009455160861758843",
+            "extra": "mean: 14.05904401724015 msec\nrounds: 58"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_small_env_world",
+            "value": 69.17274029494978,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0006894129246036736",
+            "extra": "mean: 14.456561873015879 msec\nrounds: 63"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_reset_big_v5",
+            "value": 516.8448523755261,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00010070593125367214",
+            "extra": "mean: 1.9348165999986122 msec\nrounds: 5"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_reset_square_wave_two_biome_v11",
+            "value": 2325.4818863632836,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00004928257416988537",
+            "extra": "mean: 430.0183999987439 usec\nrounds: 5"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_step_big_v5",
+            "value": 755.3904578715604,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000550469041766373",
+            "extra": "mean: 1.3238186815566457 msec\nrounds: 694"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_step_square_wave_two_biome_v11",
+            "value": 894.6370946232529,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00010832034287875678",
+            "extra": "mean: 1.117771670781343 msec\nrounds: 729"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_render_big_v5",
+            "value": 1817.9925072229876,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00008098654702723221",
+            "extra": "mean: 550.0572725283207 usec\nrounds: 1376"
+          },
+          {
+            "name": "tests/test_benchmark.py::test_benchmark_render_square_wave_two_biome_v11",
+            "value": 2395.6669131935278,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001900971423497982",
+            "extra": "mean: 417.42029932990835 usec\nrounds: 1941"
+          },
+          {
+            "name": "tests/test_optimize.py::test_benchmark_big_v5_vmap",
+            "value": 0.01961713101410039,
+            "unit": "iter/sec",
+            "range": "stddev: 0.07262730364491639",
+            "extra": "mean: 50.97585366999999 sec\nrounds: 5"
+          },
+          {
+            "name": "tests/test_optimize.py::test_benchmark_square_wave_two_biome_v11_vmap",
+            "value": 0.1774762491326989,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0045353315791935005",
+            "extra": "mean: 5.6345567640000125 sec\nrounds: 5"
           }
         ]
       }
