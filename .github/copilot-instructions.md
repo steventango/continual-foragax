@@ -46,7 +46,7 @@ obs, next_state, reward, done, info = env.step(key_step, env_state, action, env.
 
 ### Build & Development
 - **Dependencies**: Managed with `uv` - use `uv pip install -e .[dev]` for development setup
-- **Testing**: `uv run --frozen pytest tests` (CI runs across Python 3.8-3.13)
+- **Testing**: `uv run --frozen pytest tests` (CI runs across Python 3.10-3.13)
 - **Linting**: `ruff check --fix` and `ruff format` (via pre-commit hooks)
 - **Publishing**: Uses commitizen for version bumping and releases
 
