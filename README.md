@@ -38,7 +38,7 @@ from foragax.registry import make
 import jax
 
 env = make(
-    "ForagaxSquareWaveTwoBiome-v11",
+    "ForagaxNeverEndingRelearning-v1",
     aperture_size=9,
     observation_type="color",
 )
@@ -62,9 +62,8 @@ short videos under `videos/` using Gymnasium helpers.
 
 Use `foragax.registry.make` to construct environments by id. The registered ids are:
 
-- `ForagaxBig-v5` — large multi-biome layout with Fourier-modulated rewards (used by
-  `examples/visualize.py`).
-- `ForagaxSquareWaveTwoBiome-v11` — two-biome layout with square-wave reward shifts (used
+- `ForagaxUnendingTasks-v1` — large multi-biome layout with Fourier-modulated rewards.
+- `ForagaxNeverEndingRelearning-v1` — two-biome layout with square-wave reward shifts (used
   by `examples/observation.py`).
 - `ForagaxTwoBiomeLarge-v1` — 15×15 two-biome layout with a Morel biome and an Oyster
   biome (containing Deathcaps), built from `LARGE_MOREL`, `LARGE_OYSTER`, and
@@ -87,9 +86,10 @@ Object classes in `foragax.objects` define rewards, respawn / regen behavior, an
 blocking/collectable flags. The registry presets above are built using two helpers from
 this module:
 
-- `create_fourier_objects` — Fourier-modulated reward objects (used by `ForagaxBig-v5`).
+- `create_fourier_objects` — Fourier-modulated reward objects (used by
+  `ForagaxUnendingTasks-v1`).
 - `create_shift_square_wave_biome_objects` — square-wave biome objects (used by
-  `ForagaxSquareWaveTwoBiome-v11`).
+  `ForagaxNeverEndingRelearning-v1`).
 
 Weather-driven environments are also supported even though no weather preset is currently
 registered: compose `WeatherObject` or `WeatherWaveObject` from `foragax.objects` with
@@ -107,10 +107,10 @@ new entry in `foragax.registry.ENV_CONFIGS` or construct `ForagaxEnv` directly.
 
 ## Examples
 
-- `examples/observation.py` — runs a random policy in `ForagaxSquareWaveTwoBiome-v11` and
+- `examples/observation.py` — runs a random policy in `ForagaxNeverEndingRelearning-v1` and
   saves a video of the color observations to `videos/`.
-- `examples/visualize.py` — runs a random policy in `ForagaxBig-v5` and saves periodic
-  `world_reward` render videos to `videos/`.
+- `examples/visualize.py` — runs a random policy in `ForagaxUnendingTasks-v1` and saves
+  periodic `world_reward` render videos to `videos/`.
 
 ## Development
 
