@@ -15,7 +15,7 @@ def test_no_negative_regret():
 
     # Manually check that regret >= 0 for many random positions
     def check_non_negative(k, s):
-        _, _, _, _, info = env.step(k, s, 0, params)
+        _, _, _, _, _, info = env.step(k, s, 0, params)
         return info["biome_regret"]
 
     keys = jax.random.split(key, 100)

@@ -23,7 +23,7 @@ We recommend installing with pip from https://pypi.org/project/continual-foragax
 pip install continual-foragax
 ```
 
-Requires Python 3.8 or newer.
+Requires Python 3.10 or newer.
 
 The codebase expects JAX and other numeric dependencies. If you don't have JAX installed, see
 the JAX install instructions for your platform; the project `uv.lock` pins compatible versions.
@@ -50,10 +50,16 @@ obs, env_state = env.reset(key_reset, env_params)
 
 key, key_act, key_step = jax.random.split(key, 3)
 action = env.action_space(env_params).sample(key_act)
-obs, env_state, reward, done, info = env.step(key_step, env_state, action, env_params)
+obs, env_state, reward, terminated, truncated, info = env.step(
+    key_step, env_state, action, env_params
+)
 
 frame = env.render(env_state, env_params, render_mode="world")
 ```
+
+`step` follows the Gymnax 1.0 six-value API. Foragax is a continuing benchmark, so
+`terminated` is always `False`, and `truncated` is `False` unless you set a finite
+`max_steps_in_episode` in `EnvParams`.
 
 See `examples/observation.py` and `examples/visualize.py` for runnable scripts that save
 short videos under `videos/` using Gymnasium helpers.

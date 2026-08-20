@@ -961,20 +961,22 @@ class ForagaxEnv(environment.Environment):
         state: EnvState,
         action: Union[int, float, jax.Array],
         params: Optional[EnvParams] = None,
-    ) -> Tuple[jax.Array, EnvState, jax.Array, jax.Array, Dict[Any, Any]]:
+    ) -> Tuple[jax.Array, EnvState, jax.Array, jax.Array, jax.Array, Dict[Any, Any]]:
         """Performs step transitions in the environment."""
         if params is None:
             params = self.default_params
 
         # Step
         key_step, key_reset = jax.random.split(key)
-        obs_st, state_st, reward, done, info = self.step_env(
+        obs_st, state_st, reward, terminated, info = self.step_env(
             key_step, state, action, params
         )
 
+        truncated = self.is_truncated(state_st, params)
+
         # No auto-reset (Foragax is a continuing environment).
 
-        return obs_st, state_st, reward, done, info
+        return obs_st, state_st, reward, terminated, truncated, info
 
     def step_env(
         self,
@@ -1133,12 +1135,12 @@ class ForagaxEnv(environment.Environment):
                 jnp.float16
             )
 
-        done = self.is_terminal(state, params)
+        terminated = self.is_terminated(state, params)
         return (
             jax.lax.stop_gradient(self.get_obs(state, params)),
             jax.lax.stop_gradient(state),
             reward,
-            done,
+            terminated,
             info,
         )
 
@@ -1754,9 +1756,15 @@ class ForagaxEnv(environment.Environment):
 
         return object_grid, color_grid, params_grid
 
-    def is_terminal(self, state: EnvState, params: EnvParams) -> jax.Array:
-        """Foragax is a continuing environment."""
-        return False
+    def is_terminated(self, state: EnvState, params: EnvParams) -> jax.Array:
+        """Foragax is a continuing environment, so it never terminates."""
+        return jnp.array(False)
+
+    def is_truncated(self, state: EnvState, params: EnvParams) -> jax.Array:
+        """Truncate only when a finite step limit is configured."""
+        if params.max_steps_in_episode is None:
+            return jnp.array(False)
+        return state.time >= params.max_steps_in_episode
 
     @property
     def name(self) -> str:

@@ -22,7 +22,7 @@ def test_benchmark_vision(benchmark):
     @jax.jit
     def _run(state, key):
         key, step_key = jax.random.split(key)
-        obs, new_state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+        obs, new_state, _, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
         return obs, new_state
 
     # warm-up
@@ -82,7 +82,7 @@ def test_benchmark_tiny_env(benchmark):
         def f(carry, _):
             state, key = carry
             key, step_key = jax.random.split(key, 2)
-            _, new_state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+            _, new_state, _, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
             return (new_state, key), None
 
         (final_state, _), _ = jax.lax.scan(f, (state, key), None, length=10)
@@ -116,7 +116,7 @@ def test_benchmark_small_env(benchmark):
         def f(carry, _):
             state, key = carry
             key, step_key = jax.random.split(key, 2)
-            _, new_state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+            _, new_state, _, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
             return (new_state, key), None
 
         (final_state, _), _ = jax.lax.scan(f, (state, key), None, length=10)
@@ -152,7 +152,7 @@ def test_benchmark_big_env(benchmark):
         def f(carry, _):
             state, key = carry
             key, step_key = jax.random.split(key, 2)
-            _, new_state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+            _, new_state, _, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
             return (new_state, key), None
 
         (final_state, _), _ = jax.lax.scan(f, (state, key), None, length=10)
@@ -193,7 +193,7 @@ def test_benchmark_vmap_env(benchmark):
             states, key = carry
             key, step_key = jax.random.split(key, 2)
             step_keys = jax.random.split(step_key, num_envs)
-            _, new_states, _, _, _ = jax.vmap(env.step, in_axes=(0, 0, None, None))(
+            _, new_states, _, _, _, _ = jax.vmap(env.step, in_axes=(0, 0, None, None))(
                 step_keys, states, Actions.DOWN, params
             )
             return (new_states, key), None
@@ -231,7 +231,7 @@ def test_benchmark_small_env_color(benchmark):
         def f(carry, _):
             state, key = carry
             key, step_key = jax.random.split(key, 2)
-            _, new_state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+            _, new_state, _, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
             return (new_state, key), None
 
         (final_state, _), _ = jax.lax.scan(f, (state, key), None, length=10)
@@ -265,7 +265,7 @@ def test_benchmark_small_env_world(benchmark):
         def f(carry, _):
             state, key = carry
             key, step_key = jax.random.split(key, 2)
-            _, new_state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+            _, new_state, _, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
             return (new_state, key), None
 
         (final_state, _), _ = jax.lax.scan(f, (state, key), None, length=10)
@@ -316,7 +316,7 @@ def _benchmark_registry_step(benchmark, env_id):
         def f(carry, _):
             state, key = carry
             key, step_key = jax.random.split(key, 2)
-            _, new_state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+            _, new_state, _, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
             return (new_state, key), None
 
         (final_state, _), _ = jax.lax.scan(f, (state, key), None, length=10)

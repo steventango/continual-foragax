@@ -52,7 +52,46 @@ def test_gymnax_api():
     action = env.action_space(env_params).sample(key_act)
 
     # Perform the step transition.
-    n_obs, n_state, reward, done, _ = env.step(key_step, state, action, env_params)
+    n_obs, n_state, reward, terminated, truncated, _ = env.step(
+        key_step, state, action, env_params
+    )
+
+
+def test_continuing_env_never_terminates():
+    # Foragax is continuing: no natural termination, and no truncation unless a
+    # finite step limit is configured.
+    env = ForagaxEnv(size=(5, 5), observation_type="color")
+    params = env.default_params
+    assert params.max_steps_in_episode is None
+
+    key = jax.random.key(0)
+    obs, state = env.reset(key, params)
+    for _ in range(3):
+        key, step_key = jax.random.split(key)
+        _, state, _, terminated, truncated, _ = env.step(
+            step_key, state, Actions.DOWN, params
+        )
+        assert not terminated
+        assert not truncated
+
+
+def test_truncates_at_max_steps_in_episode():
+    env = ForagaxEnv(size=(5, 5), observation_type="color")
+    params = env.default_params.replace(max_steps_in_episode=3)
+
+    key = jax.random.key(0)
+    obs, state = env.reset(key, params)
+    truncations = []
+    for _ in range(4):
+        key, step_key = jax.random.split(key)
+        _, state, _, terminated, truncated, _ = env.step(
+            step_key, state, Actions.DOWN, params
+        )
+        assert not terminated  # never terminates, only truncates
+        truncations.append(bool(truncated))
+
+    # Truncates once state.time reaches the limit, and stays truncated after.
+    assert truncations == [False, False, True, True]
 
 
 def test_sizes():
@@ -200,19 +239,19 @@ def test_basic_movement():
 
     # stays still when bumping into a wall
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+    _, state, _, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
     assert jnp.array_equal(state.pos, jnp.array([3, 3]))
 
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
+    _, state, _, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
     assert jnp.array_equal(state.pos, jnp.array([4, 3]))
 
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
+    _, state, _, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
     assert jnp.array_equal(state.pos, jnp.array([3, 3]))
 
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
+    _, state, _, _, _, _ = env.step(step_key, state, Actions.UP, params)
     assert jnp.array_equal(state.pos, jnp.array([3, 2]))
 
 
@@ -242,7 +281,7 @@ def test_vision():
 
     # No movement
     key, step_key = jax.random.split(key)
-    obs, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+    obs, state, _, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
 
     expected = jnp.zeros((3, 3, 1), dtype=int)
     expected = expected.at[2, 1, 0].set(1)
@@ -252,9 +291,9 @@ def test_vision():
 
     # Move right
     key, step_key = jax.random.split(key)
-    obs, state, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
+    obs, state, _, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
     key, step_key = jax.random.split(key)
-    obs, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+    obs, state, _, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
     expected = jnp.zeros((3, 3, 1), dtype=int)
     expected = expected.at[1, 0, 0].set(1)
     expected = expected.at[2, 0, 0].set(1)
@@ -287,7 +326,7 @@ def test_respawn():
 
     # Collect the flower
     key, step_key = jax.random.split(key)
-    _, state, reward, _, _ = env.step(step_key, state, Actions.DOWN, params)
+    _, state, reward, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
     assert reward == FLOWER.reward_val
     assert state.object_state.object_id[4, 3] == 0  # Object removed
     assert state.object_state.respawn_timer[4, 3] > 0  # Timer set
@@ -297,7 +336,7 @@ def test_respawn():
     # Step until it respawns
     for i in range(steps_until_respawn):
         key, step_key = jax.random.split(key)
-        _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+        _, state, _, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
         if i < steps_until_respawn - 1:
             assert state.object_state.object_id[4, 3] == 0  # Still empty
             assert state.object_state.respawn_timer[4, 3] > 0  # Timer still counting
@@ -351,7 +390,7 @@ def test_random_respawn():
 
         # Collect the flower
         key, step_key = jax.random.split(key)
-        _, new_state, reward, _, _ = env.step(step_key, state, Actions.RIGHT, params)
+        _, new_state, reward, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
 
         assert reward == flower_random.reward_val
         # Original position should be empty
@@ -422,7 +461,7 @@ def test_random_respawn_no_empty_space():
 
     # Collect the flower
     key, step_key = jax.random.split(key)
-    _, new_state, reward, _, _ = env.step(step_key, state, Actions.RIGHT, params)
+    _, new_state, reward, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
 
     assert reward == flower_random.reward_val
     # The timer should be placed back at the original position
@@ -444,76 +483,76 @@ def test_wrapping_dynamics():
     # Go up
     assert jnp.array_equal(state.pos, jnp.array([2, 2]))
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+    _, state, _, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 3]))
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+    _, state, _, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 4]))
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+    _, state, _, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 0]))
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+    _, state, _, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 1]))
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+    _, state, _, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 2]))
 
     # Go down
     _, state = env.reset(key, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 2]))
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
+    _, state, _, _, _, _ = env.step(step_key, state, Actions.UP, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 1]))
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
+    _, state, _, _, _, _ = env.step(step_key, state, Actions.UP, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 0]))
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
+    _, state, _, _, _, _ = env.step(step_key, state, Actions.UP, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 4]))
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
+    _, state, _, _, _, _ = env.step(step_key, state, Actions.UP, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 3]))
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
+    _, state, _, _, _, _ = env.step(step_key, state, Actions.UP, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 2]))
 
     # Go right
     _, state = env.reset(key, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 2]))
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
+    _, state, _, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
     assert jnp.array_equal(state.pos, jnp.array([3, 2]))
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
+    _, state, _, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
     assert jnp.array_equal(state.pos, jnp.array([4, 2]))
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
+    _, state, _, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
     assert jnp.array_equal(state.pos, jnp.array([0, 2]))
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
+    _, state, _, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
     assert jnp.array_equal(state.pos, jnp.array([1, 2]))
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
+    _, state, _, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 2]))
 
     # Go left
     _, state = env.reset(key, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 2]))
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
+    _, state, _, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
     assert jnp.array_equal(state.pos, jnp.array([1, 2]))
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
+    _, state, _, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
     assert jnp.array_equal(state.pos, jnp.array([0, 2]))
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
+    _, state, _, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
     assert jnp.array_equal(state.pos, jnp.array([4, 2]))
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
+    _, state, _, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
     assert jnp.array_equal(state.pos, jnp.array([3, 2]))
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
+    _, state, _, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 2]))
 
 
@@ -529,48 +568,48 @@ def test_no_wrapping_dynamics():
     # Move to top edge
     for _ in range(2):
         key, step_key = jax.random.split(key)
-        _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
+        _, state, _, _, _, _ = env.step(step_key, state, Actions.UP, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 0]))  # at top
 
     # Try to move up again, should stay put
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
+    _, state, _, _, _, _ = env.step(step_key, state, Actions.UP, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 0]))  # still at top
 
     # Move to bottom edge
     _, state = env.reset(key, params)
     for _ in range(2):
         key, step_key = jax.random.split(key)
-        _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+        _, state, _, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 4]))  # at bottom
 
     # Try to move down again, should stay put
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
+    _, state, _, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
     assert jnp.array_equal(state.pos, jnp.array([2, 4]))  # still at bottom
 
     # Move to left edge
     _, state = env.reset(key, params)
     for _ in range(2):
         key, step_key = jax.random.split(key)
-        _, state, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
+        _, state, _, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
     assert jnp.array_equal(state.pos, jnp.array([0, 2]))  # at left
 
     # Try to move left again, should stay put
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
+    _, state, _, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
     assert jnp.array_equal(state.pos, jnp.array([0, 2]))  # still at left
 
     # Move to right edge
     _, state = env.reset(key, params)
     for _ in range(2):
         key, step_key = jax.random.split(key)
-        _, state, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
+        _, state, _, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
     assert jnp.array_equal(state.pos, jnp.array([4, 2]))  # at right
 
     # Try to move right again, should stay put
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
+    _, state, _, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
     assert jnp.array_equal(state.pos, jnp.array([4, 2]))  # still at right
 
 
@@ -595,11 +634,11 @@ def test_wrapping_vision():
 
     # go left
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
+    _, state, _, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
 
     # go down
     key, step_key = jax.random.split(key)
-    obs, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
+    obs, state, _, _, _, _ = env.step(step_key, state, Actions.UP, params)
 
     expected = jnp.zeros((3, 3, 1), dtype=int)
     expected = expected.at[0, 0, 0].set(1)
@@ -609,9 +648,9 @@ def test_wrapping_vision():
 
     # go left , go left
     key, step_key = jax.random.split(key)
-    _, state, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
+    _, state, _, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
     key, step_key = jax.random.split(key)
-    obs, state, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
+    obs, state, _, _, _, _ = env.step(step_key, state, Actions.LEFT, params)
 
     expected = jnp.zeros((3, 3, 1), dtype=int)
     expected = expected.at[0, 2, 0].set(1)
@@ -985,7 +1024,7 @@ def test_info_discount():
     obs, state = env.reset(key, params)
 
     key, step_key = jax.random.split(key)
-    _, _, _, _, info = env.step(step_key, state, Actions.UP, params)
+    _, _, _, _, _, info = env.step(step_key, state, Actions.UP, params)
 
     assert "discount" in info
     assert info["discount"] == 1.0
@@ -1012,7 +1051,7 @@ def test_info_temperature():
     obs, state = env.reset(key, params)
 
     key, step_key = jax.random.split(key)
-    _, state, _, _, info = env.step(step_key, state, Actions.UP, params)
+    _, state, _, _, _, info = env.step(step_key, state, Actions.UP, params)
 
     assert "temperatures" in info
     # Temperatures should be an array with temperature at index 1 (object ID 1 for the weather object)
@@ -1021,7 +1060,7 @@ def test_info_temperature():
     assert info["temperatures"][1] == 10.0  # weather object at index 1
 
     key, step_key = jax.random.split(key)
-    _, state, _, _, info = env.step(step_key, state, Actions.UP, params)
+    _, state, _, _, _, info = env.step(step_key, state, Actions.UP, params)
     assert info["temperatures"][1] == 20.0  # Next temperature value
 
 
@@ -1052,7 +1091,7 @@ def test_info_multiple_weather_objects():
     obs, state = env.reset(key, params)
 
     key, step_key = jax.random.split(key)
-    _, state, _, _, info = env.step(step_key, state, Actions.UP, params)
+    _, state, _, _, _, info = env.step(step_key, state, Actions.UP, params)
 
     # Should have temperatures array
     assert "temperatures" in info
@@ -1062,7 +1101,7 @@ def test_info_multiple_weather_objects():
     assert info["temperatures"][2] == -5.0  # cold object at index 2 (raw temperature)
 
     key, step_key = jax.random.split(key)
-    _, state, _, _, info = env.step(step_key, state, Actions.UP, params)
+    _, state, _, _, _, info = env.step(step_key, state, Actions.UP, params)
     assert info["temperatures"][1] == 20.0  # hot next
     assert info["temperatures"][2] == -15.0  # cold next
 
@@ -1086,7 +1125,7 @@ def test_info_biome_id():
 
     # Move right to biome 0: from (2,2) to (3,2)
     key, step_key = jax.random.split(key)
-    _, state, _, _, info = env.step(step_key, state, Actions.RIGHT, params)
+    _, state, _, _, _, info = env.step(step_key, state, Actions.RIGHT, params)
 
     assert "biome_id" in info
     assert state.object_state.biome_id[2, 3] == 0  # Position (3,2) is in biome 0
@@ -1094,7 +1133,7 @@ def test_info_biome_id():
 
     # Move right again to biome 1: from (3,2) to (4,2)
     key, step_key = jax.random.split(key)
-    _, state, _, _, info = env.step(step_key, state, Actions.RIGHT, params)
+    _, state, _, _, _, info = env.step(step_key, state, Actions.RIGHT, params)
 
     assert state.object_state.biome_id[2, 4] == 1  # Position (4,2) is in biome 1
     assert info["biome_id"] == 1
@@ -1122,7 +1161,7 @@ def test_info_object_collected_id():
 
     # Collect the flower by moving down
     key, step_key = jax.random.split(key)
-    _, _, reward, _, info = env.step(step_key, state, Actions.DOWN, params)
+    _, _, reward, _, _, info = env.step(step_key, state, Actions.DOWN, params)
 
     assert "object_collected_id" in info
     assert info["object_collected_id"] == 1  # FLOWER id
@@ -1130,7 +1169,7 @@ def test_info_object_collected_id():
 
     # Next step should not collect anything
     key, step_key = jax.random.split(key)
-    _, _, reward, _, info = env.step(step_key, state, Actions.UP, params)
+    _, _, reward, _, _, info = env.step(step_key, state, Actions.UP, params)
 
     assert info["object_collected_id"] == -1  # No object collected
     assert reward == 0.0
@@ -1168,24 +1207,24 @@ def test_reward_delay():
 
     # Collect the flower by moving down - should get no immediate reward
     key, step_key = jax.random.split(key)
-    _, state, reward, _, info = env.step(step_key, state, Actions.DOWN, params)
+    _, state, reward, _, _, info = env.step(step_key, state, Actions.DOWN, params)
 
     assert info["object_collected_id"] == delayed_flower_id
     assert reward == 0.0  # No immediate reward due to digestion delay
 
     # Step 1: Still no reward (time=1, reward should arrive at time=2)
     key, step_key = jax.random.split(key)
-    _, state, reward, _, _ = env.step(step_key, state, Actions.UP, params)
+    _, state, reward, _, _, _ = env.step(step_key, state, Actions.UP, params)
     assert reward == 0.0
 
     # Step 2: Reward should arrive now (time=2)
     key, step_key = jax.random.split(key)
-    _, state, reward, _, _ = env.step(step_key, state, Actions.UP, params)
+    _, state, reward, _, _, _ = env.step(step_key, state, Actions.UP, params)
     assert reward == 5.0
 
     # Step 3: No more rewards
     key, step_key = jax.random.split(key)
-    _, state, reward, _, _ = env.step(step_key, state, Actions.UP, params)
+    _, state, reward, _, _, _ = env.step(step_key, state, Actions.UP, params)
     assert reward == 0.0
 
 
@@ -1222,7 +1261,7 @@ def test_basic_object_expiry():
     # Step through 5 times - objects should still be present
     for _ in range(5):
         key, key_step = jax.random.split(key)
-        obs, state, _, _, _ = env.step(
+        obs, state, _, _, _, _ = env.step(
             key_step, state, Actions.DOWN, env.default_params
         )
 
@@ -1231,7 +1270,7 @@ def test_basic_object_expiry():
 
     # Step once more - objects should expire and become timers
     key, key_step = jax.random.split(key)
-    obs, state, _, _, _ = env.step(key_step, state, Actions.DOWN, env.default_params)
+    obs, state, _, _, _, _ = env.step(key_step, state, Actions.DOWN, env.default_params)
 
     assert jnp.all(state.object_state.object_id == 0)  # All objects removed
     assert jnp.all(state.object_state.respawn_timer > 0)  # All have timers
@@ -1245,7 +1284,7 @@ def test_basic_object_expiry():
     # Step through regen delay (3 more steps due to +1 in encoding)
     for _ in range(3):
         key, key_step = jax.random.split(key)
-        obs, state, _, _, _ = env.step(
+        obs, state, _, _, _, _ = env.step(
             key_step, state, Actions.DOWN, env.default_params
         )
 
@@ -1289,7 +1328,7 @@ def test_basic_object_expiry_one():
     # Step through 10 times - objects should still be present
     for _ in range(10):
         key, key_step = jax.random.split(key)
-        obs, state, _, _, _ = env.step(
+        obs, state, _, _, _, _ = env.step(
             key_step, state, Actions.DOWN, env.default_params
         )
 
@@ -1298,7 +1337,7 @@ def test_basic_object_expiry_one():
 
     # Step once more - objects should expire and become timers
     key, key_step = jax.random.split(key)
-    obs, state, _, _, _ = env.step(key_step, state, Actions.DOWN, env.default_params)
+    obs, state, _, _, _, _ = env.step(key_step, state, Actions.DOWN, env.default_params)
 
     assert (
         jnp.count_nonzero(state.object_state.object_id == 0) == 1
@@ -1316,7 +1355,7 @@ def test_basic_object_expiry_one():
     # Step through all removals and they all become timers (8 more steps)
     for _ in range(8):
         key, key_step = jax.random.split(key)
-        obs, state, _, _, _ = env.step(
+        obs, state, _, _, _, _ = env.step(
             key_step, state, Actions.DOWN, env.default_params
         )
 
@@ -1331,7 +1370,7 @@ def test_basic_object_expiry_one():
 
     # Step once more - one object should respawn
     key, key_step = jax.random.split(key)
-    obs, state, _, _, _ = env.step(key_step, state, Actions.DOWN, env.default_params)
+    obs, state, _, _, _, _ = env.step(key_step, state, Actions.DOWN, env.default_params)
 
     assert (
         jnp.count_nonzero(state.object_state.object_id == 0) == 8
@@ -1349,7 +1388,7 @@ def test_basic_object_expiry_one():
     # Step through regen delay for remaining (8 more objects)
     for _ in range(8):
         key, key_step = jax.random.split(key)
-        obs, state, _, _, _ = env.step(
+        obs, state, _, _, _, _ = env.step(
             key_step, state, Actions.DOWN, env.default_params
         )
 
@@ -1389,7 +1428,7 @@ def test_no_expiry_backwards_compatibility():
     # Step through many timesteps - grid should remain unchanged
     for _ in range(20):
         key, key_step = jax.random.split(key)
-        obs, state, _, _, _ = env.step(
+        obs, state, _, _, _, _ = env.step(
             key_step, state, Actions.DOWN, env.default_params
         )
 
@@ -1429,7 +1468,7 @@ def test_expiry_with_collection():
     collected_count = 0
     for _ in range(20):
         key, key_step = jax.random.split(key)
-        obs, state, reward, _, _ = env.step(
+        obs, state, reward, _, _, _ = env.step(
             key_step, state, Actions.UP, env.default_params
         )
         if reward > 0:
@@ -1472,13 +1511,13 @@ def test_expiry_with_normal_regen():
     # Step until expiry
     for _ in range(8):
         key, key_step = jax.random.split(key)
-        obs, state, _, _, _ = env.step(
+        obs, state, _, _, _, _ = env.step(
             key_step, state, Actions.LEFT, env.default_params
         )
 
     # Objects should expire
     key, key_step = jax.random.split(key)
-    obs, state, _, _, _ = env.step(key_step, state, Actions.LEFT, env.default_params)
+    obs, state, _, _, _, _ = env.step(key_step, state, Actions.LEFT, env.default_params)
 
     assert jnp.all(state.object_state.object_id == 0)  # All objects removed
     assert jnp.all(state.object_state.respawn_timer > 0)  # All have timers
@@ -1523,7 +1562,7 @@ def test_mixed_expiry_times():
     # Step 4 times - fast should expire, slow should not
     for _ in range(4):
         key, key_step = jax.random.split(key)
-        obs, state, _, _, _ = env.step(
+        obs, state, _, _, _, _ = env.step(
             key_step, state, Actions.RIGHT, env.default_params
         )
 
@@ -1567,7 +1606,7 @@ def test_expiry_spawn_time_tracking():
     # Step until expiry
     for step in range(6):
         key, key_step = jax.random.split(key)
-        obs, state, _, _, _ = env.step(
+        obs, state, _, _, _, _ = env.step(
             key_step, state, Actions.DOWN, env.default_params
         )
 
@@ -1579,7 +1618,7 @@ def test_expiry_spawn_time_tracking():
     # Step through regen delay (3 steps)
     for step in range(3):
         key, key_step = jax.random.split(key)
-        obs, state, _, _, _ = env.step(
+        obs, state, _, _, _, _ = env.step(
             key_step, state, Actions.DOWN, env.default_params
         )
 
@@ -1629,7 +1668,9 @@ def test_expiry_with_collectable_spawn_time_update():
     for step in range(10):
         key, key_step = jax.random.split(key)
         action = step % 4
-        obs, state, reward, _, _ = env.step(key_step, state, action, env.default_params)
+        obs, state, reward, _, _, _ = env.step(
+            key_step, state, action, env.default_params
+        )
         total_reward += reward
 
         if reward > 0 and collected_time is None:
@@ -1645,7 +1686,7 @@ def test_expiry_with_collectable_spawn_time_update():
     # Step through regen delay (6 more steps due to +1 in encoding)
     for step in range(6):
         key, key_step = jax.random.split(key)
-        obs, state, _, _, _ = env.step(
+        obs, state, _, _, _, _ = env.step(
             key_step, state, Actions.DOWN, env.default_params
         )
 
@@ -1691,7 +1732,7 @@ def test_expiry_with_random_respawn():
     # Step until expiry (4 steps - expiry happens when age >= expiry_time)
     for _ in range(4):
         key, key_step = jax.random.split(key)
-        obs, state, _, _, _ = env.step(
+        obs, state, _, _, _, _ = env.step(
             key_step, state, Actions.DOWN, env.default_params
         )
 
@@ -1708,7 +1749,7 @@ def test_expiry_with_random_respawn():
     # Step through regen delay (2 steps due to +1 encoding)
     for _ in range(2):
         key, key_step = jax.random.split(key)
-        obs, state, _, _, _ = env.step(
+        obs, state, _, _, _, _ = env.step(
             key_step, state, Actions.DOWN, env.default_params
         )
 
@@ -1772,7 +1813,7 @@ def test_dynamic_biome_respawn_threshold():
         key, key_step = jax.random.split(key)
         # Take a random action
         action = jax.random.randint(key_step, (), 0, 4)
-        obs, current_state, reward, done, info = env.step(
+        obs, current_state, reward, terminated, truncated, info = env.step(
             key_step, current_state, action, env.default_params
         )
         steps_taken += 1
@@ -1822,7 +1863,7 @@ def test_object_no_individual_respawn():
     # Position agent above the object so moving down collects it
     state = state.replace(pos=jnp.array([x, y - 1]))
     key, key_step = jax.random.split(key)
-    obs, state, reward, done, info = env.step(
+    obs, state, reward, terminated, truncated, info = env.step(
         key_step, state, Actions.DOWN, env.default_params
     )
 
@@ -1863,7 +1904,7 @@ def test_object_color_grid_cleared_on_collection():
     # Position agent above the flower so moving down collects it
     state = state.replace(pos=jnp.array([x, y - 1]))
     key, step_key = jax.random.split(key)
-    _, state, reward, _, _ = env.step(step_key, state, Actions.DOWN, params)
+    _, state, reward, _, _, _ = env.step(step_key, state, Actions.DOWN, params)
 
     assert reward == FLOWER.reward_val
 
@@ -1945,7 +1986,7 @@ def test_object_color_grid_cleared_on_expiry():
     # Step until expiry (4 steps: expiry happens when age >= expiry_time)
     for _ in range(4):
         key, key_step = jax.random.split(key)
-        obs, state, _, _, _ = env.step(
+        obs, state, _, _, _, _ = env.step(
             key_step, state, Actions.DOWN, env.default_params
         )
 
@@ -2040,7 +2081,7 @@ def test_biome_regeneration_preserves_old_objects():
                     start_y = (y - 1) % size[1]
                     current_state = current_state.replace(pos=jnp.array([x, start_y]))
                     key_step, step_key = jax.random.split(key_step)
-                    obs, current_state, reward, done, info = env.step(
+                    obs, current_state, reward, terminated, truncated, info = env.step(
                         step_key, current_state, 0, env.default_params
                     )
 
@@ -2154,7 +2195,7 @@ def test_biome_regeneration_updates_only_new_objects():
                 start_y = (y - 1) % size[1]
                 current_state = current_state.replace(pos=jnp.array([x, start_y]))
                 key_step, step_key = jax.random.split(key_step)
-                obs, current_state, reward, done, info = env.step(
+                obs, current_state, reward, terminated, truncated, info = env.step(
                     step_key, current_state, 0, env.default_params
                 )
                 if info["object_collected_id"] >= 0:
@@ -2290,7 +2331,7 @@ def test_consumption_threshold_per_generation():
                         action = 3  # LEFT
 
                     key_step, step_key = jax.random.split(key_step)
-                    obs, current_state, reward, done, info = env.step(
+                    obs, current_state, reward, terminated, truncated, info = env.step(
                         step_key, current_state, action, env.default_params
                     )
 
@@ -2380,7 +2421,7 @@ def test_consumption_threshold_per_generation():
         action = 3  # LEFT
 
     key_step, step_key = jax.random.split(key_step)
-    obs, current_state, reward, done, info = env.step(
+    obs, current_state, reward, terminated, truncated, info = env.step(
         step_key, current_state, action, env.default_params
     )
 
@@ -2456,7 +2497,7 @@ def test_biome_respawn_maintains_total_object_count_nondeterministic():
                 current_state = current_state.replace(pos=jnp.array([x, start_y]))
                 # Step to collect
                 key_step, step_key = jax.random.split(key_step)
-                obs, current_state, reward, done, info = env.step(
+                obs, current_state, reward, terminated, truncated, info = env.step(
                     step_key, current_state, 0, env.default_params
                 )
                 if info["object_collected_id"] >= 0:
@@ -2556,7 +2597,7 @@ def test_biome_respawn_maintains_total_object_count_deterministic():
                 current_state = current_state.replace(pos=jnp.array([x, start_y]))
                 # Take NOOP action to collect
                 key_step, step_key = jax.random.split(key_step)
-                obs, current_state, reward, done, info = env.step(
+                obs, current_state, reward, terminated, truncated, info = env.step(
                     step_key, current_state, 0, env.default_params
                 )
                 if info["object_collected_id"] >= 0:
@@ -2870,7 +2911,7 @@ def test_info_rewards():
     obs, state = env.reset(key, params)
 
     key, step_key = jax.random.split(key)
-    _, state, _, _, info = env.step(step_key, state, Actions.UP, params)
+    _, state, _, _, _, info = env.step(step_key, state, Actions.UP, params)
 
     # Check that rewards is in info
     assert "rewards" in info
@@ -2935,7 +2976,7 @@ def test_random_respawn_preserves_state():
     # Use a key that we know moves it to a different location if possible,
     # but any random move is fine as long as we check the new location.
     # We'll try a few keys if needed, but let's just use key 0.
-    _, news, reward, _, _ = env.step(step_key, state, Actions.RIGHT, params)
+    _, news, reward, _, _, _ = env.step(step_key, state, Actions.RIGHT, params)
 
     # Should get the reward based on params
     assert reward == 42.0
@@ -2986,7 +3027,7 @@ def test_wall_properties_and_preservation():
     state = state.replace(pos=dynamic_pos.astype(jnp.int32))
 
     key, subkey = jax.random.split(key)
-    _, news, _, _, _ = env.step(subkey, state, Actions.DOWN, params)
+    _, news, _, _, _, _ = env.step(subkey, state, Actions.DOWN, params)
 
     # Verify walls are still in the same place
     new_wall_mask = news.object_state.object_id == 2
@@ -3008,7 +3049,7 @@ def test_info_rewards_aperture():
     params = env.default_params
     _, state = env.reset(key, params)
 
-    _, _, _, _, info = env.step(key, state, Actions.DOWN, params)
+    _, _, _, _, _, info = env.step(key, state, Actions.DOWN, params)
     assert info["rewards"].shape == aperture_size
 
 
@@ -3021,7 +3062,7 @@ def test_info_rewards_world():
     )
     params = env_world.default_params
     _, state_w = env_world.reset(key, params)
-    _, _, _, _, info_w = env_world.step(key, state_w, Actions.DOWN, params)
+    _, _, _, _, _, info_w = env_world.step(key, state_w, Actions.DOWN, params)
     assert info_w["rewards"].shape == (20, 20)
 
 
@@ -3063,7 +3104,9 @@ def test_reward_centering():
 
     # Move right to (2, 2) and collect obj1
     key, step_key = jax.random.split(key)
-    obs, state, reward, done, info = env.step(step_key, state, Actions.RIGHT, params)
+    obs, state, reward, terminated, truncated, info = env.step(
+        step_key, state, Actions.RIGHT, params
+    )
 
     # Expected reward for obj1: 10.0 - 6.0 = 4.0
     assert jnp.isclose(reward, 4.0), f"Expected reward 4.0, got {reward}"
@@ -3074,7 +3117,9 @@ def test_reward_centering():
     # Global mean = reward(obj2) = 2.0
     # Expected centered reward = 2.0 - 2.0 = 0.0
     key, step_key = jax.random.split(key)
-    obs, state, reward, done, info = env.step(step_key, state, Actions.RIGHT, params)
+    obs, state, reward, terminated, truncated, info = env.step(
+        step_key, state, Actions.RIGHT, params
+    )
 
     assert jnp.isclose(reward, 0.0), f"Expected reward 0.0, got {reward}"
 
@@ -3127,7 +3172,9 @@ def test_reward_centering_with_empty():
     )
 
     key, step_key = jax.random.split(key)
-    obs, state, reward, done, info = env.step(step_key, state, Actions.RIGHT, params)
+    obs, state, reward, terminated, truncated, info = env.step(
+        step_key, state, Actions.RIGHT, params
+    )
 
     assert jnp.isclose(reward, 0.0), f"Expected reward 0.0, got {reward}"
 
@@ -3162,7 +3209,9 @@ def test_reward_centering_with_walls():
     # Therefore, the centered reward for collecting obj1 is 10.0 - 10.0 = 0.0
 
     key, step_key = jax.random.split(key)
-    obs, state, reward, done, info = env.step(step_key, state, Actions.RIGHT, params)
+    obs, state, reward, terminated, truncated, info = env.step(
+        step_key, state, Actions.RIGHT, params
+    )
 
     assert jnp.isclose(reward, 0.0), f"Expected reward 0.0, got {reward}"
 
@@ -3198,7 +3247,7 @@ def test_random_teleport_mechanics_and_timing():
         # If we are at time=9. Step -> time=10. 10 % 40 = 10 (quarter). Teleport should happen.
 
         key, step_key = jax.random.split(key)
-        _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
+        _, state, _, _, _, _ = env.step(step_key, state, Actions.UP, params)
 
         # Check if we jumped
         # Normal UP move: dist=1.
@@ -3222,7 +3271,7 @@ def test_random_teleport_mechanics_and_timing():
     for _ in range(period):
         prev_pos = state.pos
         key, step_key = jax.random.split(key)
-        _, state, _, _, _ = env_disabled.step(step_key, state, Actions.UP, params)
+        _, state, _, _, _, _ = env_disabled.step(step_key, state, Actions.UP, params)
         dist = jnp.sum(jnp.abs(state.pos - prev_pos))
         assert dist <= 1, "Teleported when disabled!"
         assert env_disabled.random_teleport_period == 0
@@ -3261,7 +3310,7 @@ def test_random_teleport_offsets():
     for _ in range(period * 2):
         prev_pos = state.pos
         key, step_key = jax.random.split(key)
-        _, state, _, _, _ = env.step(step_key, state, Actions.UP, params)
+        _, state, _, _, _, _ = env.step(step_key, state, Actions.UP, params)
 
         dist = jnp.sum(jnp.abs(state.pos - prev_pos))
         if dist > 1:
@@ -3302,7 +3351,7 @@ def test_random_teleport_validity():
     # Run long enough to generate many teleports
     for _ in range(period * 5):
         key, step_key = jax.random.split(key)
-        _, state, _, _, _ = step_jit(step_key, state, Actions.UP, params)
+        _, state, _, _, _, _ = step_jit(step_key, state, Actions.UP, params)
 
         time_in_period = state.time % period
         quarter = period // 4
@@ -3371,7 +3420,9 @@ def test_deterministic_teleport():
     # Step 1 -> time=1. No teleport (1 % 10 != 0/5).
     # Normal movement (Action 0 = DOWN).
     key, step_key = jax.random.split(key)
-    obs, state, reward, done, info = step_fn(step_key, state, 0, env.default_params)
+    obs, state, reward, terminated, truncated, info = step_fn(
+        step_key, state, 0, env.default_params
+    )
     assert state.time == 1
 
     # Should still be in biome 1 (or at least NOT in biome 2 for sure)
@@ -3385,7 +3436,9 @@ def test_deterministic_teleport():
     # Continue stepping until time=5 (half period). Should teleport.
     for _ in range(half_period - 1):
         key, step_key = jax.random.split(key)
-        obs, state, reward, done, info = step_fn(step_key, state, 0, env.default_params)
+        obs, state, reward, terminated, truncated, info = step_fn(
+            step_key, state, 0, env.default_params
+        )
 
     # Check time is 5
     assert state.time == 5
@@ -3403,7 +3456,9 @@ def test_deterministic_teleport():
     # Step until 10
     for _ in range(period - half_period):
         key, step_key = jax.random.split(key)
-        obs, state, reward, done, info = step_fn(step_key, state, 0, env.default_params)
+        obs, state, reward, terminated, truncated, info = step_fn(
+            step_key, state, 0, env.default_params
+        )
 
     # Check time is 10
     assert state.time == 10
@@ -3421,7 +3476,9 @@ def test_deterministic_teleport():
     # One more half period -> time=15
     for _ in range(half_period):
         key, step_key = jax.random.split(key)
-        obs, state, reward, done, info = step_fn(step_key, state, 0, env.default_params)
+        obs, state, reward, terminated, truncated, info = step_fn(
+            step_key, state, 0, env.default_params
+        )
 
     assert state.time == 15
     # time=15. 15 % 10 = 5.
@@ -3511,7 +3568,9 @@ def test_deterministic_teleport_open_spot():
     # Run for multiple teleport events and verify each teleport landing is on an empty cell
     for step_idx in range(40):
         key, step_key = jax.random.split(key)
-        obs, state, reward, done, info = step_fn(step_key, state, 0, env.default_params)
+        obs, state, reward, terminated, truncated, info = step_fn(
+            step_key, state, 0, env.default_params
+        )
 
         # Determine if this was a teleport step
         effective_time = int(state.time) + int(state.offset)
@@ -3566,7 +3625,9 @@ def test_deterministic_teleport_single_open_spot():
     # Reset was time=0. We need 5 steps.
     for _ in range(5):
         key, step_key = jax.random.split(key)
-        obs, state, reward, done, info = step_fn(step_key, state, 0, env.default_params)
+        obs, state, reward, terminated, truncated, info = step_fn(
+            step_key, state, 0, env.default_params
+        )
 
     assert state.time == 5
 
