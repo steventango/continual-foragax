@@ -1,3 +1,9 @@
+## 0.57.1 (2026-08-20)
+
+### Fix
+
+- exclude walls from reward-to-color render overlay
+
 ## 0.57.0 (2026-08-18)
 
 ### Feat
