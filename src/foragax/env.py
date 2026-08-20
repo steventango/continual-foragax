@@ -1761,10 +1761,8 @@ class ForagaxEnv(environment.Environment):
         return jnp.array(False)
 
     def is_truncated(self, state: EnvState, params: EnvParams) -> jax.Array:
-        """Truncate only when a finite step limit is configured."""
-        if params.max_steps_in_episode is None:
-            return jnp.array(False)
-        return state.time >= params.max_steps_in_episode
+        """Foragax is a continuing environment, so it never truncates."""
+        return jnp.array(False)
 
     @property
     def name(self) -> str:

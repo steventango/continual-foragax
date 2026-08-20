@@ -57,41 +57,25 @@ def test_gymnax_api():
     )
 
 
-def test_continuing_env_never_terminates():
-    # Foragax is continuing: no natural termination, and no truncation unless a
-    # finite step limit is configured.
+def test_continuing_env_never_ends():
+    # Foragax is strictly continuing: neither flag is ever set, and a step limit
+    # in EnvParams does not change that. Run length belongs to the experiment.
     env = ForagaxEnv(size=(5, 5), observation_type="color")
-    params = env.default_params
-    assert params.max_steps_in_episode is None
+    assert env.default_params.max_steps_in_episode is None
 
-    key = jax.random.key(0)
-    obs, state = env.reset(key, params)
-    for _ in range(3):
-        key, step_key = jax.random.split(key)
-        _, state, _, terminated, truncated, _ = env.step(
-            step_key, state, Actions.DOWN, params
-        )
-        assert not terminated
-        assert not truncated
-
-
-def test_truncates_at_max_steps_in_episode():
-    env = ForagaxEnv(size=(5, 5), observation_type="color")
-    params = env.default_params.replace(max_steps_in_episode=3)
-
-    key = jax.random.key(0)
-    obs, state = env.reset(key, params)
-    truncations = []
-    for _ in range(4):
-        key, step_key = jax.random.split(key)
-        _, state, _, terminated, truncated, _ = env.step(
-            step_key, state, Actions.DOWN, params
-        )
-        assert not terminated  # never terminates, only truncates
-        truncations.append(bool(truncated))
-
-    # Truncates once state.time reaches the limit, and stays truncated after.
-    assert truncations == [False, False, True, True]
+    for params in (
+        env.default_params,
+        env.default_params.replace(max_steps_in_episode=3),
+    ):
+        key = jax.random.key(0)
+        _, state = env.reset(key, params)
+        for _ in range(5):
+            key, step_key = jax.random.split(key)
+            _, state, _, terminated, truncated, _ = env.step(
+                step_key, state, Actions.DOWN, params
+            )
+            assert not terminated
+            assert not truncated
 
 
 def test_sizes():

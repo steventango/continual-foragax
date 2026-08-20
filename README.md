@@ -58,8 +58,8 @@ frame = env.render(env_state, env_params, render_mode="world")
 ```
 
 `step` follows the Gymnax 1.0 six-value API. Foragax is a continuing benchmark, so
-`terminated` is always `False`, and `truncated` is `False` unless you set a finite
-`max_steps_in_episode` in `EnvParams`.
+`terminated` and `truncated` are always `False` and the environment never resets
+itself. Decide how long to run in your experiment loop.
 
 See `examples/observation.py` and `examples/visualize.py` for runnable scripts that save
 short videos under `videos/` using Gymnasium helpers.
