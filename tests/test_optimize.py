@@ -19,7 +19,7 @@ def test_benchmark_big_v5_vmap(benchmark):
             states, key = carry
             key, step_key = jax.random.split(key, 2)
             step_keys = jax.random.split(step_key, num_envs)
-            _, new_states, _, _, _ = jax.vmap(env.step, in_axes=(0, 0, None, None))(
+            _, new_states, _, _, _, _ = jax.vmap(env.step, in_axes=(0, 0, None, None))(
                 step_keys, states, Actions.DOWN, params
             )
             return (new_states, key), None
@@ -52,7 +52,7 @@ def test_benchmark_square_wave_two_biome_v11_vmap(benchmark):
             states, key = carry
             key, step_key = jax.random.split(key, 2)
             step_keys = jax.random.split(step_key, num_envs)
-            _, new_states, _, _, _ = jax.vmap(env.step, in_axes=(0, 0, None, None))(
+            _, new_states, _, _, _, _ = jax.vmap(env.step, in_axes=(0, 0, None, None))(
                 step_keys, states, Actions.DOWN, params
             )
             return (new_states, key), None

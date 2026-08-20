@@ -23,7 +23,7 @@ We recommend installing with pip from https://pypi.org/project/continual-foragax
 pip install continual-foragax
 ```
 
-Requires Python 3.8 or newer.
+Requires Python 3.10 or newer.
 
 The codebase expects JAX and other numeric dependencies. If you don't have JAX installed, see
 the JAX install instructions for your platform; the project `uv.lock` pins compatible versions.
@@ -50,13 +50,45 @@ obs, env_state = env.reset(key_reset, env_params)
 
 key, key_act, key_step = jax.random.split(key, 3)
 action = env.action_space(env_params).sample(key_act)
-obs, env_state, reward, done, info = env.step(key_step, env_state, action, env_params)
+obs, env_state, reward, terminated, truncated, info = env.step(
+    key_step, env_state, action, env_params
+)
 
 frame = env.render(env_state, env_params, render_mode="world")
 ```
 
+`step` follows the Gymnax 1.0 six-value API. Foragax is a continuing benchmark, so
+`terminated` and `truncated` are always `False` and the environment never resets
+itself. Decide how long to run in your experiment loop.
+
 See `examples/observation.py` and `examples/visualize.py` for runnable scripts that save
 short videos under `videos/` using Gymnasium helpers.
+
+## Gymnasium example
+
+Foragax environments follow the Gymnax API, but can be used with the Gymnasium
+interface with `GymnaxToGymWrapper`. The wrappers step the environment eagerly
+from Python, so they give up the throughput advantages of JAX. Prefer the Gymnax
+API for performance, and use the wrappers for compatibility with existing
+Gymnasium-based code.
+
+```python
+from gymnax.wrappers.gym import GymnaxToGymWrapper
+from foragax.registry import make
+
+env = GymnaxToGymWrapper(
+    make("ForagaxNeverEndingRelearning-v1", aperture_size=9, observation_type="color"),
+    seed=0,
+)
+
+obs, info = env.reset(seed=0)
+for _ in range(100):
+    action = env.action_space.sample()
+    obs, reward, terminated, truncated, info = env.step(action)
+    if terminated or truncated:
+        obs, info = env.reset()
+```
+
 
 ## Registry and included environments
 

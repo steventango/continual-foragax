@@ -49,7 +49,7 @@ def main():
                 frames[render_mode].append(frame)
             key, key_act, key_step = jax.random.split(key, 3)
             action = env.action_space(env_params).sample(key_act)
-            obs, next_env_state, reward, done, info = env.step(
+            obs, next_env_state, reward, terminated, truncated, info = env.step(
                 key_step, env_state, action, env_params
             )
             env_state = next_env_state

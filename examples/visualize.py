@@ -49,7 +49,7 @@ def main():
                         frames[render_mode] = []
                 key, key_act, key_step = jax.random.split(key, 3)
                 action = env.action_space(env_params).sample(key_act)
-                _, env_state, reward, done, info = env.step(
+                _, env_state, reward, terminated, truncated, info = env.step(
                     key_step, env_state, action, env_params
                 )
 
