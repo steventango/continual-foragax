@@ -2071,8 +2071,11 @@ class ForagaxEnv(environment.Environment):
 
             reward = self._apply_centering(reward, obj_id, global_mean)
 
-            # Only show reward for objects that are fully present (no timer)
-            mask = (obj_id > 0) & (timer == 0)
+            # Only show reward for objects that are fully present (no timer).
+            # Ignore walls (blocking objects): they carry reward = -inf as an
+            # internal sentinel, not a real reward to render/display.
+            is_not_wall = ~self.object_blocking[obj_id.astype(jnp.int32)]
+            mask = (obj_id > 0) & (timer == 0) & is_not_wall
             return jnp.where(mask, reward, 0.0)
 
         reward_grid = jax.vmap(jax.vmap(compute_reward))(
