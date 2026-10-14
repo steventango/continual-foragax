@@ -1,3 +1,13 @@
+## 0.58.0 (2026-10-14)
+
+### Feat
+
+- add ForagaxSquareWaveAsymmetricTwoBiome-v1
+
+### Fix
+
+- fix species replacement behaviour
+
 ## 0.57.1 (2026-08-20)
 
 ### Fix
