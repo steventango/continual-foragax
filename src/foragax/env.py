@@ -1443,7 +1443,9 @@ class ForagaxEnv(environment.Environment):
                 object_id=new_obj_id,
                 respawn_timer=new_respawn_timer,
                 respawn_object_id=new_respawn_object_id,
+                spawn_time=new_spawn,
                 color=new_color,
+                generation=new_gen,
                 state_params=new_params,
             )
             return new_object_state, new_biome_state, key

@@ -493,6 +493,16 @@ BROWN_MOREL_UNIFORM = DefaultForagaxObject(
     color=(63, 30, 25),
     regen_delay=(90, 110),
 )
+BROWN_MOREL_SPARSE_UNIFORM = DefaultForagaxObject(
+    name="brown_morel_sparse",
+    reward=10.0,
+    collectable=True,
+    color=(63, 30, 25),
+    random_respawn=True,
+    regen_delay=(540, 660),
+    expiry_time=1200,
+    expiry_regen_delay=(540, 660),
+)
 BROWN_OYSTER_UNIFORM = DefaultForagaxObject(
     name="brown_oyster",
     reward=1.0,

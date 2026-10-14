@@ -9,6 +9,7 @@ from foragax.env import (
 )
 from foragax.objects import (
     LARGE_MOREL,
+    BROWN_MOREL_SPARSE_UNIFORM,
     LARGE_DEATHCAP,
     LARGE_OYSTER,
     WALL,
@@ -177,6 +178,33 @@ ENV_CONFIGS: Dict[str, Dict[str, Any]] = {
         "nowrap": False,
         "deterministic_spawn": True,
     },
+    "ForagaxSquareWaveAsymmetricTwoBiome-v1": {
+        "size": (24, 15),
+        "aperture_size": None,
+        "objects": None,
+        "biomes": (
+            # Void
+            Biome(
+                start=(0, 0),
+                stop=(24, 15),
+                object_frequencies=(0.0, 0.0, 0.0, 4 / 60),
+            ),
+            # Biome 1 (left): Oyster +10, Death Cap -10 with square wave
+            Biome(
+                start=(4, 0),
+                stop=(8, 15),
+                object_frequencies=(15 / 60, 15 / 60, 0.0, 4 / 60),
+            ),
+            # Biome 2 (right): LARGE_MOREL
+            Biome(
+                start=(16, 0),
+                stop=(20, 15),
+                object_frequencies=(0.0, 0.0, 15 / 60, 4 / 60),
+            ),
+        ),
+        "nowrap": False,
+        "deterministic_spawn": True,
+    },
 }
 
 ENV_ALIASES: Dict[str, str] = {
@@ -250,6 +278,27 @@ def make(
             biome1_chanterelle,
             biome2_oyster,
             biome2_chanterelle,
+            WALL,
+        )
+
+    if env_id == "ForagaxSquareWaveAsymmetricTwoBiome-v1":
+        biome1_oyster, biome1_chanterelle, _, _ = (
+            create_shift_square_wave_biome_objects(
+                period=200000,
+                amplitude_big=3.0,
+                amplitude_small=-3.0,
+                base_oyster_reward=1.0,
+                base_chanterelle_reward=1.0,
+                regen_delay=(9, 11),
+                reward_delay=reward_delay,
+                expiry_time=500,
+                expiry_regen_delay=(9, 11),
+            )
+        )
+        config["objects"] = (
+            biome1_oyster,
+            biome1_chanterelle,
+            BROWN_MOREL_SPARSE_UNIFORM,
             WALL,
         )
 
